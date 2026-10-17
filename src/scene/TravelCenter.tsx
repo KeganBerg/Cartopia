@@ -12,6 +12,7 @@ import { useGasPrice } from './useGasPrice'
 import { gasLabel } from '../game/gasPrice'
 import { asphaltTex, brickTex, concreteTex, pumpTex } from './textures'
 import { decal } from './layers'
+import { doorTag } from './doors'
 
 // Big Bison: the gas station's travel stop, for a merged block at level 7-10
 // (see src/game/travelCenter.ts for the layout and why). Built in true units
@@ -122,14 +123,12 @@ function Store({ m, win, bulb, level, t }: { m: Mat; win: ReactNode; bulb: React
         <Box m={m} at={[0, (s.h + 0.6) / 2, 0.12]} s={[ent, s.h + 0.6, 0.24]} c={RED} />
         <Box m={m} at={[0, s.h + 0.62, 0.12]} s={[ent + 0.08, 0.06, 0.3]} c="#fafafa" />
         <Box m={m} at={[0, 0.5, 0.245]} s={[ent * 0.66, 0.92, 0.01]} c="#37474f" shadow={false} />
-        {/* Glass doors with the lit shop behind them: people walk in here. */}
-        {[-1, 1].map((sd) => (
-          <mesh key={sd} position={[(sd * ent * 0.3) / 2 + sd * 0.01, 0.43, 0.252]}>
-            <planeGeometry args={[ent * 0.3, 0.76]} />
-            {bulb}
-          </mesh>
-        ))}
-        <Box m={m} at={[0, 0.43, 0.256]} s={[0.025, 0.76, 0.01]} c="#cfd8dc" shadow={false} />
+        {/* Automatic glass doors with the lit shop behind them: people walk in
+            here, and the pair slides apart for them (doors.ts). */}
+        <mesh position={[0, 0.43, 0.252]} userData={doorTag('slide')}>
+          <planeGeometry args={[ent * 0.62, 0.76]} />
+          {bulb}
+        </mesh>
         <Box m={m} at={[0, 0.84, 0.256]} s={[ent * 0.62, 0.025, 0.01]} c="#cfd8dc" shadow={false} />
         <LitSign text={NAME} w={signW} at={[0, s.h - 0.1, 0.25]} bg={RED} fg="#fffde7" m={m} />
         <Logo m={m} at={[0, s.h + 0.12 + ent * 0.32, 0.26]} r={ent * 0.32} />

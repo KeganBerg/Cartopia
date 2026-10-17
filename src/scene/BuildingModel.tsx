@@ -44,6 +44,7 @@ import { brickTex, sidingTex, shingleTex, gravelTex, awningTex, windowTex, paver
 import { PEOPLE_SIZED } from './keepShape'
 import { waterKinds } from './liveWater'
 import { DuckFamily, type DuckKind } from './Ducks'
+import { doorTag } from './doors'
 
 // The duck pond's family: a drake, a hen and her two ducklings.
 const POND_DUCKS: DuckKind[] = ['drake', 'hen', 'chick', 'chick']
@@ -511,6 +512,19 @@ function CrewHouse({ m, ghost, sign, bulb, win }: { m: ReturnType<typeof useMat>
         <planeGeometry args={[0.95, 0.09]} />
         <meshStandardMaterial color={ghost ? '#66bb6a' : clan} />
       </mesh>
+      {/* A wicket door let into the roll-up, for walking in and out. */}
+      <mesh position={[hx + 0.2, 0.37, len / 2 - 0.075]}>
+        <boxGeometry args={[0.38, 0.64, 0.004]} />
+        {m('#455a64')}
+      </mesh>
+      <mesh position={[hx + 0.2, 0.37, len / 2 - 0.071]} userData={doorTag()}>
+        <planeGeometry args={[0.32, 0.6]} />
+        {m('#b0bec5')}
+      </mesh>
+      <mesh position={[hx + 0.31, 0.38, len / 2 - 0.067]}>
+        <boxGeometry args={[0.03, 0.06, 0.006]} />
+        {m('#37474f')}
+      </mesh>
       {/* Porthole windows either side of the door. */}
       {[-0.68, 0.68].map((dx) => (
         <mesh key={dx} position={[hx + dx, 0.5, len / 2 - 0.085]}>
@@ -920,9 +934,10 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {/* The grandstand: barrier wall, rows of seats and (level 7 up) the upper deck. */}
           {!ghost && <SpeedwayStands deck={deckAt(lvl)} colors={['#b0bec5', '#c5ced3', '#b0bec5', '#eceff1'].map((c) => <meshStandardMaterial key={c} color={c} side={2} />)} />}
           {/* Floodlight towers that light the track at night, on every corner
-              but the one facing the camera so none stands in front of the sign.
+              but the one facing the camera so none stands in front of the sign
+              (the front one stands beside the gate, clear of the way in).
               They rise over the roof once it closes into a ring. */}
-          {!ghost && [[-1.6, 1.6], [1.6, -1.6], [-1.6, -1.6]].map(([x, z]) => (
+          {!ghost && [[-1.32, 1.72], [1.6, -1.6], [-1.6, -1.6]].map(([x, z]) => (
             <group key={`${x}${z}`} position={[x, 0, z]}>
               <Floodlight m={m} h={growthStage(lvl) === 3 ? sh + 2.05 : 2.2 + lift} face={Math.atan2(-x, -z)} bulb={bulb} />
               <LightPool r={1.3} x={-x * 0.5} z={-z * 0.5} y={0.1} />
@@ -946,6 +961,24 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
           {!ghost && <SpeedwayLife lvl={lvl} />}
           {lvl >= 4 && <SpeedwayGrown m={m} sh={sh} roof={def.roof} lvl={lvl} ghost={ghost} />}
           {sign && <SpeedwayGantry m={m} y={1.25 + lift * 0.5} roof={def.roof} ghost={ghost} />}
+          {/* The fans' gate in the front corner, past the open end of the
+              stands: an arch on two posts over an entry mat. */}
+          <group position={[-1.7, 0, 1.85]}>
+            {[-0.22, 0.22].map((x) => (
+              <mesh key={x} position={[x, 0.48, 0]} castShadow>
+                <boxGeometry args={[0.06, 0.96, 0.06]} />
+                {m('#b0bec5')}
+              </mesh>
+            ))}
+            <mesh position={[0, 0.92, 0]} castShadow>
+              <boxGeometry args={[0.56, 0.1, 0.08]} />
+              {m(def.roof)}
+            </mesh>
+            <mesh position={[0, 0.02, 0]} receiveShadow userData={doorTag('gate')}>
+              <boxGeometry args={[0.38, 0.04, 0.2]} />
+              {m('#5f646b')}
+            </mesh>
+          </group>
         </group>
       )
     }
@@ -961,7 +994,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <coneGeometry args={[1.15, 0.7, 4]} />
             {m(SEASON === 'winter' ? '#f4f8fb' : def.roof, shingleTex(3, 1.5))}
           </mesh>
-          <mesh position={[0, 0.3, 0.61]}>
+          <mesh position={[0, 0.3, 0.61]} userData={doorTag()}>
             <planeGeometry args={[0.3, 0.6]} />
             {m('#795548')}
           </mesh>
@@ -1038,6 +1071,30 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <cylinderGeometry args={[1.73, 1.73, 0.12, 32]} />
             {m('#e53935')}
           </mesh>
+          {/* Entrance porch out front: a brick vestibule through the plinth
+              down to the plaza, with automatic glass doors in a chrome frame. */}
+          <group position={[0, 0, 1.58]}>
+            <mesh position={[0, 0.53, 0]} castShadow receiveShadow>
+              <boxGeometry args={[0.72, 0.86, 0.3]} />
+              {m('#b0796b', brickTex(0.7, 0.9))}
+            </mesh>
+            <mesh position={[0, 0.99, 0.01]} castShadow>
+              <boxGeometry args={[0.8, 0.08, 0.36]} />
+              {m('#e53935')}
+            </mesh>
+            <mesh position={[0, 0.43, 0.156]}>
+              <boxGeometry args={[0.54, 0.66, 0.008]} />
+              {m('#eceff1')}
+            </mesh>
+            <mesh position={[0, 0.415, 0.162]} userData={doorTag('slide')}>
+              <planeGeometry args={[0.46, 0.63]} />
+              {m('#9be7f5')}
+            </mesh>
+            <mesh position={[0, 0.83, 0.18]}>
+              <boxGeometry args={[0.12, 0.06, 0.06]} />
+              {bulb}
+            </mesh>
+          </group>
           {/* Ceiling light and a glow on the plaza after dark. */}
           <mesh position={[0, 1.88, 0]} rotation-x={Math.PI / 2}>
             <circleGeometry args={[1.45, 32]} />
@@ -1104,6 +1161,19 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               </mesh>
             </group>
           ))}
+          {/* A wicket door let into the middle roll-up, for walking in and out. */}
+          <mesh position={[0, 0.36, D * 0.3 - 0.287]}>
+            <boxGeometry args={[0.42, 0.68, 0.004]} />
+            {m('#455a64')}
+          </mesh>
+          <mesh position={[0, 0.37, D * 0.3 - 0.283]} userData={doorTag()}>
+            <planeGeometry args={[0.34, 0.62]} />
+            {m('#607d8b')}
+          </mesh>
+          <mesh position={[0.12, 0.38, D * 0.3 - 0.279]}>
+            <boxGeometry args={[0.03, 0.06, 0.006]} />
+            {m('#cfd8dc')}
+          </mesh>
           {/* Concrete apron with oil stains and a tyre stack. */}
           <mesh position={[0, 0.03, 1.1]} receiveShadow>
             <boxGeometry args={[W * 0.9 - 0.01, 0.05, 1.2]} />
@@ -1194,8 +1264,17 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
               <boxGeometry args={[0.82, 0.1, 0.68]} />
               {m(def.roof)}
             </mesh>
-            <mesh position={[1.53, 0.45, -0.34]}>
-              <planeGeometry args={[0.6, 0.5]} />
+            {/* Shop window, and glass doors that slide open beside it. */}
+            <mesh position={[1.31, 0.45, -0.34]}>
+              <planeGeometry args={[0.26, 0.5]} />
+              {win}
+            </mesh>
+            <mesh position={[1.64, 0.36, -0.347]}>
+              <boxGeometry args={[0.36, 0.66, 0.006]} />
+              {m('#eceff1')}
+            </mesh>
+            <mesh position={[1.64, 0.36, -0.342]} userData={doorTag('slide')}>
+              <planeGeometry args={[0.3, 0.6]} />
               {win}
             </mesh>
             <mesh position={[1.53, 0.84, -0.27]} rotation-x={-0.5}>
@@ -1323,6 +1402,30 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             </group>
           )}
           {lvl >= 4 && <DriveInGrown m={m} lvl={lvl} sl={sl} ghost={ghost} roof={def.roof} />}
+          {/* The walk-in gate at the front left: two posts with lamps and a
+              bar across, over an entry mat (people stroll in to watch). */}
+          <group position={[-1.62, 0, 1.78]}>
+            {[-0.18, 0.18].map((x) => (
+              <group key={x}>
+                <mesh position={[x, 0.45, 0]} castShadow>
+                  <boxGeometry args={[0.06, 0.9, 0.06]} />
+                  {m('#5d4037')}
+                </mesh>
+                <mesh position={[x, 0.93, 0]}>
+                  <sphereGeometry args={[0.04, 8, 6]} />
+                  {bulb}
+                </mesh>
+              </group>
+            ))}
+            <mesh position={[0, 0.84, 0]} castShadow>
+              <boxGeometry args={[0.48, 0.08, 0.05]} />
+              {m(def.roof)}
+            </mesh>
+            <mesh position={[0, 0.06, 0]} receiveShadow userData={doorTag('gate')}>
+              <boxGeometry args={[0.3, 0.02, 0.24]} />
+              {m('#8d6e63')}
+            </mesh>
+          </group>
         </group>
       )
     }
@@ -1366,7 +1469,7 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <boxGeometry args={[W * 0.76, 0.03, 0.44]} />
             {m('#ffffff', awningTex(def.roof === '#f5f5f5' || def.roof === '#fff8e1' ? def.color : def.roof))}
           </mesh>
-          <mesh position={[0, 0.32, F + 0.036]}>
+          <mesh position={[0, 0.32, F + 0.036]} userData={doorTag()}>
             <planeGeometry args={[0.4, 0.6]} />
             {m('#4e342e')}
           </mesh>

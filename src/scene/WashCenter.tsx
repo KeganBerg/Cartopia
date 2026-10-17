@@ -8,6 +8,7 @@ import { glowMats } from './dayNight'
 import { signTexture } from './signTexture'
 import { asphaltTex, concreteTex } from './textures'
 import { decal } from './layers'
+import { doorTag } from './doors'
 
 // The Bubble Car Spa: a merged car wash at level 7-10, built for the whole
 // block (layout in src/game/washCenter.ts). Express tunnels with foam and
@@ -31,6 +32,18 @@ export function WashCenter(props: Props) {
   )
 }
 
+// Where the front tunnel's glass doors go: past the brushes, and in line with
+// a column of vacuum bays without cars, so the walk out to the street is clear.
+function doorAt(t: WashLayout) {
+  const u = t.tunnels[t.tunnels.length - 1]
+  const lo = u.x0 + 1.95
+  const hi = u.x1 - 0.35
+  const cols = [...new Set(t.vacs.map((v) => v.x))].filter((x) => x >= lo && x <= hi)
+  const empty = cols.filter((x) => t.vacs.every((v, i) => v.x !== x || i % 2 === 1))
+  const pick = (xs: number[]) => xs.reduce((a, b) => (Math.abs(b - (lo + hi) / 2) < Math.abs(a - (lo + hi) / 2) ? b : a))
+  return empty.length ? pick(empty) : cols.length ? pick(cols) : (lo + hi) / 2
+}
+
 function Spa({ m, bulb, level, ghost, t }: Props & { t: WashLayout }) {
   if (ghost) {
     return (
@@ -39,11 +52,12 @@ function Spa({ m, bulb, level, ghost, t }: Props & { t: WashLayout }) {
       </group>
     )
   }
+  const dx = doorAt(t)
   return (
     <group>
       <Box m={m} at={[0, 0.03, 0]} s={[t.L - 0.12, 0.04, t.D - 0.12]} c="#ffffff" t={asphaltTex()} shadow={false} />
-      {t.tunnels.map((u, i) => <Tunnel key={u.z} m={m} bulb={bulb} x0={u.x0} x1={u.x1} z={u.z} n={i} level={level} room={t.L / 2 - u.x1} />)}
-      {t.vacs.map((v, i) => <VacBay key={`${v.x},${v.z}`} m={m} bulb={bulb} at={[v.x, 0, v.z]} along={t.along} n={i} />)}
+      {t.tunnels.map((u, i) => <Tunnel key={u.z} m={m} bulb={bulb} x0={u.x0} x1={u.x1} z={u.z} n={i} level={level} room={t.L / 2 - u.x1} door={i === t.tunnels.length - 1 ? dx : undefined} />)}
+      {t.vacs.map((v, i) => <VacBay key={`${v.x},${v.z}`} m={m} bulb={bulb} at={[v.x, 0, v.z]} along={t.along} n={i} car={i % 2 === 0 && v.x !== dx} />)}
       <Pylon m={m} at={[t.pylon[0], 0, t.pylon[1]]} level={level} />
     </group>
   )
@@ -51,7 +65,8 @@ function Spa({ m, bulb, level, ghost, t }: Props & { t: WashLayout }) {
 
 // One express tunnel: a long glass-sided hall under an arched blue roof, the
 // pay kiosk and a queue at the way in, blowers and a dripping car at the way out.
-function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNode; x0: number; x1: number; z: number; n: number; level: number; room: number }) {
+// `door`: x of the glass doors in its front wall, where customers walk in to watch.
+function Tunnel({ m, bulb, x0, x1, z, n, level, room, door }: { m: Mat; bulb: ReactNode; x0: number; x1: number; z: number; n: number; level: number; room: number; door?: number }) {
   const len = x1 - x0
   const cx = (x0 + x1) / 2
   const h = 0.95
@@ -59,7 +74,9 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
   const zf = d / 2
   // Glass panes along the front wall, true size, framed in white.
   const panes: number[] = []
-  for (let x = x0 + 0.45; x <= x1 - 0.4; x += 0.42) panes.push(x)
+  for (let x = x0 + 0.45; x <= x1 - 0.4; x += 0.42) if (door === undefined || Math.abs(x - door) > 0.42) panes.push(x)
+  // The sill and the pink neon break for the doors.
+  const runs: [number, number][] = door === undefined ? [[x0, x1]] : [[x0, door - 0.3], [door + 0.3, x1]]
   const ribs = Math.max(2, Math.floor(len / 0.9))
   const brushes = [x0 + 0.7, x0 + 1.2, x0 + 1.7].filter((x) => x < x1 - 1)
   return (
@@ -74,7 +91,19 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
         </group>
       ))}
       {/* The glass front wall: low sill, tall panes, see the wash going on inside. */}
-      <Box m={m} at={[cx, 0.12, zf - 0.04]} s={[len, 0.2, 0.06]} c={BLUE} />
+      {runs.map(([a, b]) => <Box key={a} m={m} at={[(a + b) / 2, 0.12, zf - 0.04]} s={[b - a, 0.2, 0.06]} c={BLUE} />)}
+      {door !== undefined && (
+        <group position={[door, 0, zf]}>
+          {/* Glass doors lit from inside, in a white frame, with a mat out front. */}
+          <Box m={m} at={[0, 0.41, -0.03]} s={[0.6, 0.74, 0.04]} c="#fafafa" shadow={false} />
+          <mesh position={[0, 0.4, 0.004]} userData={doorTag('slide')}>
+            <planeGeometry args={[0.48, 0.68]} />
+            {bulb}
+          </mesh>
+          <Box m={m} at={[0, 0.4, 0.007]} s={[0.02, 0.68, 0.004]} c="#cfd8dc" shadow={false} />
+          <Box m={m} at={[0, 0.055, 0.1]} s={[0.6, 0.012, 0.18]} c="#cfd8dc" shadow={false} />
+        </group>
+      )}
       {panes.map((x) => (
         <group key={x}>
           <mesh position={[x, 0.58, zf - 0.03]}>
@@ -115,10 +144,12 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
         <boxGeometry args={[len, 0.03, 0.03]} />
         <primitive object={glowMats.neonCyan} attach="material" dispose={null} />
       </mesh>
-      <mesh position={[cx, 0.24, zf + 0.005]}>
-        <boxGeometry args={[len, 0.025, 0.025]} />
-        <primitive object={glowMats.neonPink} attach="material" dispose={null} />
-      </mesh>
+      {runs.map(([a, b]) => (
+        <mesh key={a} position={[(a + b) / 2, 0.24, zf + 0.005]}>
+          <boxGeometry args={[b - a, 0.025, 0.025]} />
+          <primitive object={glowMats.neonPink} attach="material" dispose={null} />
+        </mesh>
+      ))}
       <LitSign text={NAME} w={Math.min(2.2, len * 0.42)} at={[cx, h + d * 0.36, d * 0.26]} bg={PINK} fg="#ffffff" m={m} />
       {/* Way in: the curtain of coloured strips, a lit ENTER sign and the pay kiosk. */}
       <group position={[x0, 0, 0]}>
@@ -182,9 +213,8 @@ function Tunnel({ m, bulb, x0, x1, z, n, level, room }: { m: Mat; bulb: ReactNod
 
 // A vacuum bay: a coloured steel arch over the space, a hose drop, a vacuum post,
 // and often a car having its mats cleaned.
-function VacBay({ m, bulb, at, along, n }: { m: Mat; bulb: ReactNode; at: V3; along: boolean; n: number }) {
+function VacBay({ m, bulb, at, along, n, car }: { m: Mat; bulb: ReactNode; at: V3; along: boolean; n: number; car: boolean }) {
   const c = ARCH[n % ARCH.length]
-  const car = n % 2 === 0
   return (
     <group position={at} rotation-y={along ? Math.PI / 2 : 0}>
       {/* Painted bay line, the arch on its post at the bay's edge, the hose drop. */}
