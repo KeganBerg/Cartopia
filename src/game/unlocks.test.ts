@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { UNLOCKS, unlocked, type Unlock } from './unlocks'
+import { UNLOCKS, hasCrewHouse, unlocked, type Unlock } from './unlocks'
 
 type S = Parameters<typeof unlocked>[0]
 const at = (tutorial: number, level = 1, races = 0) => ({ tutorial, level, stats: { races }, visiting: null }) as unknown as S
@@ -22,5 +23,26 @@ describe('buttons arrive one at a time for new players', () => {
   })
   it("shows everything in a friend's town", () => {
     expect(shown({ ...at(0), visiting: { townName: 'x' } } as unknown as S)).toEqual(Object.keys(UNLOCKS))
+  })
+})
+
+describe('Crew House unlock', () => {
+  it('needs a built Crew House; the admin skips it', () => {
+    expect(hasCrewHouse({ buildings: [] })).toBe(false)
+    expect(hasCrewHouse({ buildings: [{ def: 'rescue' }] })).toBe(false)
+    expect(hasCrewHouse({ buildings: [{ def: 'rescue' }, { def: 'crew' }] })).toBe(true)
+    expect(hasCrewHouse({ buildings: [], admin: true })).toBe(true)
+  })
+
+  it('locks the Crew window until it is built, unless already in a crew', () => {
+    const src = readFileSync('src/ui/Social.tsx', 'utf8')
+    const panel = src.slice(src.indexOf('export function ClanPanel'), src.indexOf('function CrewLocked'))
+    expect(panel).toMatch(/const built = useGame\(hasCrewHouse\)/)
+    // The lock comes before sign-in, the crew list and the crew home.
+    const lock = panel.indexOf('<CrewLocked />')
+    expect(lock).toBeGreaterThan(0)
+    expect(lock).toBeLessThan(panel.indexOf('<ClanBrowser'))
+    expect(lock).toBeLessThan(panel.indexOf('Sign in to join'))
+    expect(panel).toMatch(/!built && \(uid === null \|\| mine === null\)/)
   })
 })

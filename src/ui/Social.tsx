@@ -24,6 +24,8 @@ import { CrewMembers, useRequests } from './CrewMembers'
 import { PlayerCardPopup } from './PlayerCard'
 import { openPlayerCard } from '../lib/playerCard'
 import { sfx } from '../lib/sound'
+import { hasCrewHouse } from '../game/unlocks'
+import { BuildingThumb } from '../scene/BuildingPreview'
 
 // The crew battle strip brings the battle screen's code; it loads when a battle shows.
 const CrewBattleCard = onDemand(() => import('./CrewBattle'), (m) => m.CrewBattleCard)
@@ -46,9 +48,10 @@ export const SOCIAL_TITLE = 'Social'
 export function SocialTabs({ current }: { current: PanelId }) {
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const locked = useGame((s) => !hasCrewHouse(s) && !s.clanBadge)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
-    { id: 'clan', label: <>🛡️ Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'clan', label: <>{locked ? '🔒' : '🛡️'} Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
     { id: 'meet', label: '🚗 Meet' },
     { id: 'leaders', label: '🏅 Leaderboards' },
   ]
@@ -237,6 +240,7 @@ export function LeadersPanel() {
 export function ClanPanel() {
   const uid = useUserId()
   const openPanel = useGame((s) => s.openPanel)
+  const built = useGame(hasCrewHouse)
   const [mine, setMine] = useState<MyClan | null | undefined>(undefined)
   const [failed, setFailed] = useState(false)
 
@@ -265,6 +269,9 @@ export function ClanPanel() {
       {uid === null && demoBattle() && !CREW_DEMO && <CrewBattleCard />}
       {CREW_DEMO && !uid ? (
         <ClanHome data={demoCrew()} uid="me" onChange={() => {}} demo />
+      ) : !built && (uid === null || mine === null) ? (
+        // Crews unlock with the Crew House. Players already in a crew keep it.
+        <CrewLocked />
       ) : !supabase ? (
         <div className="inv-empty" title="Crews need an internet connection"><span className="empty-ico">📡</span><div>No connection</div></div>
       ) : uid === null ? (
@@ -281,33 +288,31 @@ export function ClanPanel() {
       ) : mine === undefined ? (
         <LoadingBand label="Loading your crew" />
       ) : mine ? (
-        <><CrewHouseNudge /><ClanHome data={mine} uid={uid!} onChange={changed} /></>
+        <ClanHome data={mine} uid={uid!} onChange={changed} />
       ) : (
-        <><CrewHouseNudge /><LastWeekChests /><ClanBrowser onJoined={changed} /></>
+        <><LastWeekChests /><ClanBrowser onJoined={changed} /></>
       )}
       <PlayerCardPopup />
     </Panel>
   )
 }
 
-// Points players without a Crew House at the Shop.
-function CrewHouseNudge() {
-  const hasCrew = useGame((s) => s.buildings.some((b) => b.def === 'crew'))
+// Before the Crew House: the building itself and one Build button.
+function CrewLocked() {
   const setMode = useGame((s) => s.setMode)
   const coins = useGame((s) => s.coins)
   const level = useGame(gateLevel)
   const showNeed = useGame((s) => s.showNeed)
   const def = BUILDINGS.find((b) => b.id === 'crew')!
-  if (hasCrew) return null
   const go = () =>
     level < def.unlockLevel ? showNeed('level', def.unlockLevel, def.name)
     : coins < def.price ? showNeed('coins', def.price - coins, def.name)
     : setMode('place', 'crew')
   return (
-    <div className="crew-nudge">
-      <span>🏠</span>
-      <div><b>Build a Crew House</b><small>Fly your crew's flag in town and tap it to open this window.</small></div>
-      <button className="buy small" onClick={go}>Build · ${n(def.price)}</button>
+    <div className="crew-locked">
+      <div className="crew-locked-art"><BuildingThumb def={def} /></div>
+      <b>🔒 Build a Crew House to unlock crews</b>
+      <button className="buy" onClick={go}>{level < def.unlockLevel ? `⭐ ${def.unlockLevel}` : `Build · $${n(def.price)}`}</button>
     </div>
   )
 }

@@ -978,10 +978,10 @@ html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d)
   .hud-right-row .challenge-bell, .hud-right-row > button:not(.pill) { width: 34px; height: 34px; font-size: 16px; border-width: 2px; border-radius: 10px; }
 }
 /* Leaderboards and clans */
-.crew-nudge { display: flex; gap: 10px; align-items: center; background: #eceff1; border: 2px dashed #90a4ae; border-radius: 12px; padding: 8px 10px; margin-bottom: 10px; }
-.crew-nudge > span { font-size: 26px; }
-.crew-nudge > div { flex: 1; display: flex; flex-direction: column; }
-.crew-nudge small { color: #546e7a; font-weight: 800; }
+.crew-locked { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 18px 12px 22px; text-align: center; }
+.crew-locked-art { width: min(240px, 70vw); aspect-ratio: 1; border-radius: 18px; background: #eceff1; overflow: hidden; display: grid; place-items: center; }
+.crew-locked-art > * { width: 100%; height: 100%; }
+.crew-locked b { font: 18px var(--display); }
 .social-tabs { margin-top: 0; }
 .social-tabs .tab { font-size: 14px; padding: 6px 4px; white-space: nowrap; }
 .seg { display: flex; background: #eceff1; border-radius: 12px; padding: 3px; gap: 3px; }
