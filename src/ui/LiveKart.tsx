@@ -57,7 +57,7 @@ export function LiveKart({ live, car, onExit, deps = REAL }: { live: LiveRace; c
   const mine = useMemo(() => playerRacer(car), [car])
   const theirs = useMemo<KartRacer>(() => ({
     name: playerName(o.uid, o.town), pi: o.pi, ai: false,
-    look: { body: o.body, model: CARS.find((c) => c.name === o.carName)?.id, color: o.color, mods: o.mods },
+    look: { body: o.body, model: CARS.find((c) => c.name === o.carName)?.id, color: o.color, mods: o.mods, skin: o.skin, modSkin: o.modSkin },
   }), [o])
   const [setup, setSetup] = useState<Setup | null>(() => live.host ? {
     seed: 1 + Math.floor(Math.random() * 2147483000), track: Math.floor(Math.random() * TRACKS.length), reverse: Math.random() < 0.5,

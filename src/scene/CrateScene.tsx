@@ -15,7 +15,7 @@ import { concreteTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, TyreStack, useFitCamera } from './ArcadeScenery'
 import { tickSkins, withSkin } from './skins'
-import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, GEM_BUILD_COINS, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type Panels } from '../game/data'
+import { CUSTOM_PAINT, CUSTOM_PAINT_SHOW, GEM_BUILD_COINS, MODS, SKINNED_SLOTS, carDef, fittedMods, modFits, modSkinNumber, skinNumber, type Body, type Finish, type SkinnedSlot, type ModSkins, type Panels } from '../game/data'
 import type { HatFit } from '../game/hats'
 import { dropTier, type CrateDef, type CrateDrop, type CrateId } from '../game/crates'
 import { calmFlashing } from '../game/flashing'
@@ -1354,7 +1354,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
 
 // The car a prize shows: a new car in its colour, or your car wearing the part it won.
 // `mine` is the car to show a paint on: the one you have selected, or your race car.
-export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[] }[], mine?: string | null): CarLook | null {
+export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: string; color: string; finish?: Finish; stripe?: string | null; mods?: string[]; skin?: string; modSkin?: ModSkins }[], mine?: string | null): CarLook | null {
   if (!drop) return null
   if (drop.kind === 'skin' || drop.kind === 'skindupe') return skinLook(drop.skin, drop.part, cars, mine)
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
@@ -1365,7 +1365,7 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
     const owned = cars.filter((c) => !carDef(c.model).parked)
     const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
     const d = carDef(car.model)
-    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
   }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
@@ -1377,7 +1377,7 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
     const d = carDef(car.model)
     // The new part goes first so it wins its slot; the rest of the car's fitted parts stay on.
     const mods = Object.values(fittedMods([drop.mod, ...(car.mods ?? [])], d.body))
-    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods }
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, stripe: car.stripe, mods }
   }
   return null
 }
@@ -1392,7 +1392,8 @@ function skinLook(id: string, part: boolean, cars: { uid: string; model: string;
   const owned = cars.filter((c) => !carDef(c.model).parked)
   const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
   const d = carDef(car.model)
-  const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe }
+  // The car's own skin stays off: the prize skin is the only thing moving on it.
+  const look: CarLook = { body: d.body, model: car.model, color: car.color, finish: car.finish, skin: undefined, stripe: car.stripe }
   // Custom Colour shows your car in a colour that isn't on the paint chart.
   if (!part && id === CUSTOM_PAINT.id) return { ...look, mods: [], color: CUSTOM_PAINT_SHOW }
   if (!part) return { ...look, mods: [], skin: id }
