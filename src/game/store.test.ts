@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useGame, readyRewards, today, buildPrice, paintPrice } from './store'
 import { boostsSpent } from './boosts'
-import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext, LEVEL_GEMS } from './data'
+import { CAMPAIGN, CAMPAIGN_RACES, DEALS, DEAL_SLOTS, buildingDef, campaignReward, carDef, dealOffer, dealsFor, finishDef, modDef, upgradeCost, xpToNext, xpGain, LEVEL_GEMS } from './data'
 
 describe('level-up bonuses', () => {
   it('add on top of a race reward instead of replacing it', () => {
@@ -198,7 +198,7 @@ describe('collection sets', () => {
     expect(g().coins).toBe(0)
     g().claimSet('daily')
     expect(g().claimedSets).toEqual(['daily'])
-    expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 30, 5, 60 * 3]) // XP has the x3 level boost at 20
+    expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 30, 5, xpGain(20, 60)]) // XP has the level boost
     g().claimSet('daily')
     expect(g().coins).toBe(1500)
   })
