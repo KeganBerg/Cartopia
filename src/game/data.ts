@@ -1544,7 +1544,7 @@ export const TRACK_STEEL: { look: TrackLook; metal: number; rough: number } = {
   look: { plate: '#3d4147', grouser: '#565b62', horn: '#2c2f33', pin: '#8d939b', pad: '#1c1c1e', stud: '#c9ced6' }, metal: 0.6, rough: 0.55,
 }
 export const TRACK_SKINS: TrackSkinDef[] = [
-  { id: 'desertstorm', n: 1, name: 'Desert Storm', tier: 'rare', blurb: 'Sand-blasted links', unlock: { level: 36 }, metal: 0.3, rough: 0.8,
+  { id: 'desertstorm', n: 1, name: 'Sandblast', tier: 'rare', blurb: 'Sand-blasted links', unlock: { level: 36 }, metal: 0.3, rough: 0.8,
     look: { plate: '#b59a6a', grouser: '#8f7650', horn: '#6e5a3c', pin: '#d8c9a3', pad: '#3b3226', stud: '#e8dcc0' },
     swatch: 'repeating-linear-gradient(90deg, #b59a6a 0 6px, #8f7650 6px 8px)' },
   { id: 'arcticops', n: 2, name: 'Arctic Ops', tier: 'rare', blurb: 'Snow-white links, ice-blue pins', unlock: { level: 38 }, metal: 0.4, rough: 0.6,

@@ -386,30 +386,40 @@ export function OfficeModel({ def, ghost, m, bulb, level = 1 }: Props) {
               {trim && lvl >= 8 && <Flag at={[tx - 0.55, top + 0.5, tz - 0.3]} color="#1e3a5f" star={lvl >= 10} />}
             </group>
           ) : (() => {
-            // Skybridge Towers: two glass towers on the podium joined by a sky bridge.
+            // Skybridge Towers: a tall tower and a shorter stepped one on the podium, joined by a bold
+            // sky bridge. Different heights, glass and crowns so the pair never reads as matching twins.
             const t2 = towerFloors(lvl) * 0.34
-            const bridge = ph + t2 * 0.62
+            const bridge = ph + t2 * 0.55
             return (
               <group>
                 {/* Set on a diagonal so both read from the town camera. */}
                 {([[-1.0, -0.2], [1.05, -0.55]] as const).map(([x, z], i) => {
-                  const th2 = t2 - i * 0.34
+                  const th2 = t2 - i * 0.68
+                  const tint = i ? '#8ec5c9' : '#a9c4de'
                   return (
                     <group key={x}>
-                      <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph} w={1.1} d={0.85} h={th2} tint="#a9c4de" frame="#263238" />
-                      {!ghost && [-0.33, -0.11, 0.11, 0.33].map((fx) => <Box key={fx} m={m} at={[x + fx, ph + th2 / 2, z + 0.455]} s={[0.025, th2, 0.06]} c="#b0bec5" shadow={false} />)}
-                      {/* Crown and mast as one piece, so a merged pair keeps the mast on it. */}
-                      <group>
-                        <GlassBlock m={m} ghost={ghost} x={x} z={z - 0.02} y0={ph + th2 + 0.08} w={0.78} d={0.6} h={0.36} tint="#a9c4de" frame="#263238" />
-                        <Beacon m={m} at={[x, ph + th2 + 0.44, z - 0.02]} h={1.0} r={0.02} r2={0.06} c={lvl >= 10 ? GOLD : '#cfd8dc'} />
-                      </group>
-                      {trim && <Bulbs from={[x - 0.55, ph + th2 + 0.02, z + 0.47]} to={[x + 0.55, ph + th2 + 0.02, z + 0.47]} n={7} />}
+                      <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph} w={i ? 1.0 : 1.1} d={0.85} h={th2} tint={tint} frame="#263238" />
+                      {!ghost && (i ? [-0.25, 0, 0.25] : [-0.33, -0.11, 0.11, 0.33]).map((fx) => <Box key={fx} m={m} at={[x + fx, ph + th2 / 2, z + 0.455]} s={[0.025, th2, 0.06]} c="#b0bec5" shadow={false} />)}
+                      {/* Crown (and the tall tower's spire) as one piece, so a merged pair keeps it. */}
+                      {i === 0 ? (
+                        <group>
+                          <GlassBlock m={m} ghost={ghost} x={x} z={z - 0.02} y0={ph + th2 + 0.08} w={0.78} d={0.6} h={0.36} tint={tint} frame="#263238" />
+                          <Beacon m={m} at={[x, ph + th2 + 0.44, z - 0.02]} h={0.6} r={0.02} r2={0.06} c={lvl >= 10 ? GOLD : '#cfd8dc'} />
+                        </group>
+                      ) : (
+                        <group>
+                          <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph + th2} w={0.8} d={0.68} h={0.3} tint={tint} frame="#263238" />
+                          <GlassBlock m={m} ghost={ghost} x={x} z={z} y0={ph + th2 + 0.3} w={0.56} d={0.5} h={0.26} tint={tint} frame="#263238" />
+                          <Box m={m} at={[x, ph + th2 + 0.67, z]} s={[0.3, 0.06, 0.26]} c={lvl >= 10 ? GOLD : '#cfd8dc'} shadow={false} />
+                        </group>
+                      )}
+                      {trim && <Bulbs from={[x - 0.5, ph + th2 + 0.02, z + 0.47]} to={[x + 0.5, ph + th2 + 0.02, z + 0.47]} n={7} />}
                     </group>
                   )
                 })}
                 <group position={[0.02, bridge, -0.38]} rotation-y={Math.atan2(0.35, 2.05)}>
-                  <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={0} w={1.0} d={0.36} h={0.24} tint="#cfd8dc" frame="#263238" />
-                  {[-0.3, 0.3].map((x) => <Box key={x} m={m} at={[x, -0.2, 0]} rot={[0, 0, x < 0 ? 0.7 : -0.7]} s={[0.04, 0.45, 0.04]} c="#263238" shadow={false} />)}
+                  <GlassBlock m={m} ghost={ghost} x={0} z={0} y0={0} w={1.0} d={0.42} h={0.34} tint="#ffe082" frame="#263238" />
+                  {[-0.3, 0.3].map((x) => <Box key={x} m={m} at={[x, -0.22, 0]} rot={[0, 0, x < 0 ? 0.7 : -0.7]} s={[0.05, 0.5, 0.05]} c="#263238" shadow={false} />)}
                 </group>
                 <LitSign text="APEXCORP" w={0.7} at={[-1.0, ph + t2 + 0.26, -0.2 + 0.285]} bg="#0d1b2a" fg="#4fc3f7" ghost={ghost} m={m} />
                 {trim && lvl >= 8 && <Flag at={[0.4, ph + 0.05, -0.75]} color="#1e3a5f" star={lvl >= 10} />}
