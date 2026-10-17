@@ -1,4 +1,5 @@
-// XP audit: hours of play per level for a typical player, now and with levelXpBoost.
+// XP audit: hours of play per level for a typical player with no boost, with the #618 boost
+// (x3 from level 7 on) and with levelXpBoost.
 // Not a test. Run with: npx vite-node scripts/xpAudit.ts
 //
 // A typical player plays an hour a day. They log in to a full tank (base cap + 3 gas stations),
@@ -10,6 +11,7 @@ import { BUILDINGS, GOALS, QUEST_PAY, RACE_FUEL, baseFuelCap, buildingUpgradeXp,
 import { endlessPay } from '../src/game/endless'
 
 const WIN = 0.75
+const boost618 = (l: number) => (l <= 3 ? 1 : Math.min(3, 1 + 0.5 * (l - 3)))
 const jobXpPerFuel = (l: number) => {
   const best = BUILDINGS.filter((b) => b.jobSeconds && b.fuelCost && b.unlockLevel <= l && !b.bucks && !b.event)
     .map((b) => (b.xp ?? 0) / b.fuelCost!).sort((a, b) => b - a).slice(0, 6)
@@ -31,8 +33,8 @@ const LEVELS = [2, 3, 5, 8, 10, 15, 20, 25, 30, 40, 50, 60]
 const rows = LEVELS.map((l) => {
   const h = hourXp(l)
   const per = h.play + h.extra
-  return { level: l, need: xpToNext(l), xpPerHour: Math.round(per), hoursNow: +(xpToNext(l) / per).toFixed(2), boost: +levelXpBoost(l).toFixed(2), hoursNew: +(xpToNext(l) / (per * levelXpBoost(l))).toFixed(2) }
+  return { level: l, need: xpToNext(l), xpPerHour: Math.round(per), hoursNoBoost: +(xpToNext(l) / per).toFixed(2), hours618: +(xpToNext(l) / (per * boost618(l))).toFixed(2), boost: +levelXpBoost(l).toFixed(2), hoursNew: +(xpToNext(l) / (per * levelXpBoost(l))).toFixed(2) }
 })
 console.table(rows)
-const total = (to: number, b: boolean) => { let t = 0; for (let l = 1; l < to; l++) { const h = hourXp(l); t += xpToNext(l) / ((h.play + h.extra) * (b ? levelXpBoost(l) : 1)) } return Math.round(t) }
-for (const to of [10, 20, 30, 40, 50]) console.log(`hours to L${to}: now ${total(to, false)}, new ${total(to, true)}`)
+const total = (to: number, b: (l: number) => number) => { let t = 0; for (let l = 1; l < to; l++) { const h = hourXp(l); t += xpToNext(l) / ((h.play + h.extra) * b(l)) } return Math.round(t) }
+for (const to of [10, 20, 30, 40, 50, 60]) console.log(`hours to L${to}: no boost ${total(to, () => 1)}, #618 ${total(to, boost618)}, new ${total(to, levelXpBoost)}`)

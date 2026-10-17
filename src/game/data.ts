@@ -834,12 +834,14 @@ export const xpToNext = (level: number) => Math.round(100 * Math.pow(Math.min(le
 // every 20 minutes, up to 3 banked) sits far above any of this, so it needs no SQL.
 export const playXpMult = (level: number) => Math.max(1, (12 * level - 20) / 30)
 export const playXp = (base: number, level: number) => Math.round(base * playXpMult(level))
-// Every XP gain is multiplied by this, so levels past the first few stop feeling like a grind:
-// x1 up to level 3 (the first ten minutes unlock one feature at a time on them), then x1.5, x2,
-// x2.5 and x3 from level 7. A typical hour of play now covers a level at 10 in about 1.2 hours
-// and a level at 40 in about 3 (scripts/xpAudit.ts). Client-only: the server guard banks a level
-// every 20 minutes, up to 3, far above this.
-export const levelXpBoost = (level: number) => (level <= 3 ? 1 : Math.min(3, 1 + 0.5 * (level - 3)))
+// Every XP gain is multiplied by this to give a modern progression pace: quick early levels, a
+// steady mid-game and a longer late game. x1 up to level 3 (the first ten minutes unlock one
+// feature at a time on them), x1.5, x2, x2.5 to x3 at 7-10, then easing off as 3 x sqrt(10/level)
+// (x2.1 at 20, x1.7 at 30, x1.3 at 50, never under x1). For a typical hour of play a day: level 10 on day 6,
+// 20 in about 4 weeks, 30 in 2 months, 50 in 6 (scripts/xpAudit.ts).
+// Client-only: the server guard banks a level every 20 minutes, up to 3, far above this.
+export const levelXpBoost = (level: number) =>
+  level <= 3 ? 1 : level < 10 ? Math.min(3, 1 + 0.5 * (level - 3)) : Math.max(1, 3 * Math.sqrt(10 / level))
 export const xpGain = (level: number, base: number) => Math.round(base * levelXpBoost(level))
 export const RACE_WIN_XP = 30
 export const RACE_LOSS_XP = 8

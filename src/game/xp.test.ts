@@ -44,10 +44,12 @@ describe('XP for playing', () => {
 })
 
 describe('level XP boost', () => {
-  it('leaves levels 1-3 alone and ramps to x3 by level 7', async () => {
+  it('leaves levels 1-3 alone, peaks at x3 for 7-10, then eases off for a longer late game', async () => {
     const { levelXpBoost, xpGain } = await import('./data')
-    expect([1, 2, 3, 4, 5, 6, 7, 40].map(levelXpBoost)).toEqual([1, 1, 1, 1.5, 2, 2.5, 3, 3])
-    expect(xpGain(20, 220)).toBe(660)
+    expect([1, 2, 3, 4, 5, 6, 7, 10].map(levelXpBoost)).toEqual([1, 1, 1, 1.5, 2, 2.5, 3, 3])
+    expect([20, 40, 90, 200].map((l) => +levelXpBoost(l).toFixed(2))).toEqual([2.12, 1.5, 1, 1])
+    for (let l = 11; l <= 90; l++) expect(levelXpBoost(l)).toBeLessThan(levelXpBoost(l - 1))
+    expect(xpGain(20, 220)).toBe(467)
   })
 
   it('pays chests a share of the level', async () => {
