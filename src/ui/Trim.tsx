@@ -29,7 +29,7 @@ export function TrimShop({ car, trim, setTrim }: { car: OwnedCar; trim: Trim | u
           <span className="try-what">Trying <b>new trim</b></span>
           <button className="try-cancel" onClick={() => setTrim(null)}>Undo</button>
           <button className="buy small" disabled={!!lock} onClick={() => { if (buy(car.uid, trim ?? {})) setTrim(null) }}>
-            {lock ? `🔒 Level ${lock.level}` : `Buy · ${cost ? `$${cost.toLocaleString()}` : 'Free'}`}
+            {lock ? `🔒 Level ${lock.level}` : (cost ? `$${cost.toLocaleString()}` : 'Free')}
           </button>
         </div>
       )}

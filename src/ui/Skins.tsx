@@ -61,7 +61,7 @@ function SkinChooser({ title, defs, owned, now, trying, setTrying, apply }: {
           {free ? (
             <button className="buy small" onClick={go}>{d ? 'Put on' : 'Take off'}</button>
           ) : forSale ? (
-            <button className="buy small premium" onClick={go}>Buy · 💎 {forSale}</button>
+            <button className="buy small premium" onClick={go}>💎 {forSale}</button>
           ) : (
             <span className="skin-how">{skinSource(d!)}</span>
           )}
