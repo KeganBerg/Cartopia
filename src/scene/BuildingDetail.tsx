@@ -726,7 +726,7 @@ export function ShopLot({ id, W, F }: { id: string; W: number; F: number }) {
 export function GasLot() {
   return (
     <group>
-      <group position={[1.62, 0, -0.2]}>
+      <group position={[1.25, 0, -0.2]}>
         <Box p={[0, 0.17, 0]} s={[0.4, 0.34, 0.2]} cast>{c('#eceff1')}</Box>
         <Box p={[0, 0.35, 0]} s={[0.42, 0.03, 0.22]}>{c('#0277bd')}</Box>
         <Box p={[0, 0.24, 0.102]} s={[0.26, 0.08, 0.004]}>{c('#29b6f6')}</Box>

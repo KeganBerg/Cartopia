@@ -6,6 +6,7 @@ import { glowMats } from './dayNight'
 import { Facade, Upright, useBays } from './mergeScale'
 import { PAL, SEASON } from './season'
 import { awningTex, brickTex, concreteTex, gravelTex } from './textures'
+import { doorTag } from './doors'
 
 // Building blocks for businesses that grow (see src/game/growth.ts): a ground
 // floor shop to stand a building on, brick walk-up floors, stone and glass
@@ -63,7 +64,7 @@ export function Storefront({ k, w, d, z0 = 0, h = 0.95, wall, tex, trim = '#fafa
       <Box m={m} at={[0, 0.08, zf + 0.015]} s={[w + 0.01, 0.16, 0.03]} c={trim} shadow={false} />
       {/* Door, frame and step. */}
       <Box m={m} at={[0, 0.34, zf + 0.02]} s={[0.52, 0.7, 0.02]} c={trim} shadow={false} />
-      <mesh position={[0, 0.32, zf + 0.032]}>
+      <mesh position={[0, 0.32, zf + 0.032]} userData={doorTag()}>
         <planeGeometry args={[0.42, 0.62]} />
         {m('#3e2723')}
       </mesh>

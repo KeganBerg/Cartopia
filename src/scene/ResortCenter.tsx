@@ -8,6 +8,7 @@ import { DECOR_PROPS } from './decorProps'
 import { TrueSize, useMergeScale } from './mergeScale'
 import { glowMats } from './dayNight'
 import { concreteTex } from './textures'
+import { doorTag } from './doors'
 
 // Palm Cove Resort: the motel's form for a merged block at level 7-10 (see
 // src/game/resortCenter.ts for the layout). Hotel wings round a pool deck,
@@ -41,8 +42,9 @@ function Resort({ m, win, bulb, level, ghost, t }: Props & { t: ResortLayout }) 
   return (
     <group>
       <Box m={m} at={[0, 0.03, 0]} s={[L - 0.12, 0.04, D - 0.12]} c="#ffffff" t={concreteTex(L / 2, D / 2)} shadow={false} />
-      <Wing m={m} win={win} r={wing} floors={floors} faces={[1]} sign={NAME} level={level} />
-      {t.sides.map((r, i) => <Wing key={i} m={m} win={win} r={r} floors={2} faces={[1, i ? -2 : 2]} sign={null} level={level} />)}
+      {/* With no lobby the doors are in a wing's front (the main one, or the right-hand side wing). */}
+      <Wing m={m} win={win} r={wing} floors={floors} faces={[1]} sign={NAME} level={level} door={!t.lobby && !t.sides.length} />
+      {t.sides.map((r, i) => <Wing key={i} m={m} win={win} r={r} floors={2} faces={[1, i ? -2 : 2]} sign={null} level={level} door={!t.lobby && i === 1} />)}
       {t.lobby && <Lobby m={m} bulb={bulb} r={t.lobby} drive={D >= 6} />}
       <Doors m={m} bulb={bulb} t={t} />
       <Deck m={m} bulb={bulb} t={t} level={level} />
@@ -54,7 +56,9 @@ function Resort({ m, win, bulb, level, ghost, t }: Props & { t: ResortLayout }) 
 
 // A hotel wing: a lobby-height ground floor, then floors of rooms with
 // balconies on the faces listed (1: +z, 2: +x, -2: -x), a teal roof edge.
-function Wing({ m, win, r, floors, faces, sign, level }: { m: Mat; win: ReactNode; r: Rect; floors: number; faces: number[]; sign: string | null; level: number }) {
+// `door`: the doors are in the middle of its +z face, so the first balcony
+// breaks over them.
+function Wing({ m, win, r, floors, faces, sign, level, door }: { m: Mat; win: ReactNode; r: Rect; floors: number; faces: number[]; sign: string | null; level: number; door?: boolean }) {
   const h = 0.5 + floors * FH
   return (
     <group position={[r.x, BASE, r.z]}>
@@ -72,6 +76,7 @@ function Wing({ m, win, r, floors, faces, sign, level }: { m: Mat; win: ReactNod
           <group key={f} rotation-y={rot}>
             {Array.from({ length: floors }, (_, i) => {
               const y = 0.5 + i * FH
+              const runs: [number, number][] = door && f === 1 && i === 0 ? [[-along / 2 + 0.05, -0.4], [0.4, along / 2 - 0.05]] : [[-along / 2 + 0.05, along / 2 - 0.05]]
               return (
                 <group key={i}>
                   <mesh position={[0, y + 0.2, out + 0.004]}>
@@ -79,9 +84,13 @@ function Wing({ m, win, r, floors, faces, sign, level }: { m: Mat; win: ReactNod
                     {win}
                   </mesh>
                   {/* Balcony slab and its glass rail. */}
-                  <Box m={m} at={[0, y + 0.02, out + 0.09]} s={[along - 0.1, 0.035, 0.18]} c="#fafafa" />
-                  <Box m={m} at={[0, y + 0.1, out + 0.178]} s={[along - 0.1, 0.13, 0.012]} c="#b2ebf2" shadow={false} />
-                  <Box m={m} at={[0, y + 0.17, out + 0.178]} s={[along - 0.1, 0.015, 0.024]} c={TEAL} shadow={false} />
+                  {runs.map(([a, b]) => b - a > 0.15 && (
+                    <group key={a} position-x={(a + b) / 2}>
+                      <Box m={m} at={[0, y + 0.02, out + 0.09]} s={[b - a, 0.035, 0.18]} c="#fafafa" />
+                      <Box m={m} at={[0, y + 0.1, out + 0.178]} s={[b - a, 0.13, 0.012]} c="#b2ebf2" shadow={false} />
+                      <Box m={m} at={[0, y + 0.17, out + 0.178]} s={[b - a, 0.015, 0.024]} c={TEAL} shadow={false} />
+                    </group>
+                  ))}
                 </group>
               )
             })}
@@ -127,7 +136,8 @@ function Lobby({ m, bulb, r, drive }: { m: Mat; bulb: ReactNode; r: Rect; drive:
             {bulb}
           </mesh>
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * (r.w + 0.2)) / 2, 0.47, zf + 0.7]} s={[0.07, 0.94, 0.07]} c="#fff3e0" />)}
-          <group position={[0.45, 0, zf + 0.42]} rotation-y={Math.PI / 2}>
+          {/* Pulled up to one side, clear of the walk to the doors. */}
+          <group position={[0.75, 0, zf + 0.42]} rotation-y={Math.PI / 2}>
             <TownCar n={3} />
           </group>
         </group>
@@ -142,12 +152,11 @@ function Doors({ m, bulb, t }: { m: Mat; bulb: ReactNode; t: ResortLayout }) {
   const zf = z - 0.12
   return (
     <group position={[x, BASE, zf]}>
-      {[-1, 1].map((sd) => (
-        <mesh key={sd} position={[sd * 0.13, 0.38, 0.02]}>
-          <planeGeometry args={[0.24, 0.66]} />
-          {bulb}
-        </mesh>
-      ))}
+      {/* One lit pane for the pair, split by the mullion: they slide apart for guests. */}
+      <mesh position={[0, 0.38, 0.02]} userData={doorTag('slide')}>
+        <planeGeometry args={[0.5, 0.66]} />
+        {bulb}
+      </mesh>
       <Box m={m} at={[0, 0.38, 0.026]} s={[0.025, 0.66, 0.008]} c="#cfd8dc" shadow={false} />
       <Box m={m} at={[0, 0.78, 0.12]} s={[0.7, 0.05, 0.24]} c={TEAL} />
     </group>

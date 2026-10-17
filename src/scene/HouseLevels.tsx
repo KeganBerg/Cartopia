@@ -4,6 +4,7 @@ import { homeStage, type BuildingDef } from '../game/data'
 import { brickTex, shingleTex, sidingTex } from './textures'
 import { SEASON } from './season'
 import { Facade } from './mergeScale'
+import { doorTag } from './doors'
 
 // Upgraded houses (level 2-10) on the same 1x1 lot: a bigger, nicer house at
 // levels 2-3, a brick apartment block at 4-6 (one more floor each level) and a
@@ -80,7 +81,7 @@ function BigHouse({ def, level, ghost, m, win, bulb }: Props) {
         {m('#a1665e', brickTex(0.3, 0.6))}
       </mesh>
       {/* Door, then windows: two downstairs, three up, and the sides. */}
-      <mesh position={[0, 0.3, 0.625]}><planeGeometry args={[0.3, 0.6]} />{m('#5d4037')}</mesh>
+      <mesh position={[0, 0.3, 0.625]} userData={doorTag()}><planeGeometry args={[0.3, 0.6]} />{m('#5d4037')}</mesh>
       {[-0.42, 0.42].map((x) => <mesh key={x} position={[x, 0.5, 0.625]}><planeGeometry args={[0.28, 0.26]} />{win}</mesh>)}
       {[-0.42, 0, 0.42].map((x) => <mesh key={x} position={[x, 1.1, 0.625]}><planeGeometry args={[0.26, 0.26]} />{win}</mesh>)}
       <Windows w={1.36} d={1.24} ys={[0.5, 1.1]} n={2} win={win} size={[0.26, 0.26]} front={false} />
@@ -121,14 +122,16 @@ function BigHouse({ def, level, ghost, m, win, bulb }: Props) {
   )
 }
 
-// Levels 4-6: a brick apartment block, three to five floors.
+// Levels 4-6: a brick apartment block, three to five floors. The ground
+// floor is a taller lobby, so a townsperson fits through its doors.
 function Apartments({ level, ghost, m, win, bulb }: Props) {
   const floors = level - 1
   const FH = 0.42
+  const GF = 0.68
   const W = 1.62
   const D = 1.42
-  const H = floors * FH + 0.08
-  const ups = Array.from({ length: floors - 1 }, (_, i) => (i + 1) * FH + FH * 0.5)
+  const H = GF + (floors - 1) * FH + 0.08
+  const ups = Array.from({ length: floors - 1 }, (_, i) => GF + i * FH + FH * 0.5)
   return (
     <group>
       <mesh position={[0, H / 2, 0]} castShadow receiveShadow>
@@ -138,15 +141,15 @@ function Apartments({ level, ghost, m, win, bulb }: Props) {
       {/* Parapet cap and a stone band at every floor. */}
       <mesh position={[0, H + 0.04, 0]} castShadow><boxGeometry args={[W + 0.06, 0.08, D + 0.06]} />{m('#eceff1')}</mesh>
       {Array.from({ length: floors - 1 }, (_, i) => (
-        <mesh key={i} position={[0, (i + 1) * FH, 0]}><boxGeometry args={[W + 0.03, 0.03, D + 0.03]} />{m('#e0d6cc')}</mesh>
+        <mesh key={i} position={[0, GF + i * FH, 0]}><boxGeometry args={[W + 0.03, 0.03, D + 0.03]} />{m('#e0d6cc')}</mesh>
       ))}
       <Windows w={W} d={D} ys={ups} n={3} win={win} size={[0.24, 0.24]} />
-      <Windows w={W} d={D} ys={[FH * 0.5]} n={3} win={win} size={[0.24, 0.24]} front={false} />
+      <Windows w={W} d={D} ys={[GF * 0.48]} n={3} win={win} size={[0.24, 0.32]} front={false} />
       {/* Ground floor front: glass doors under a canopy, and two shop windows. */}
-      <mesh position={[0, 0.2, D / 2 + 0.006]}><planeGeometry args={[0.36, 0.4]} />{m('#37474f')}</mesh>
-      {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, 0.22, D / 2 + 0.006]}><planeGeometry args={[0.36, 0.26]} />{win}</mesh>)}
-      <mesh position={[0, 0.44, D / 2 + 0.14]} castShadow><boxGeometry args={[0.6, 0.04, 0.28]} />{m('#1565c0')}</mesh>
-      <mesh position={[0, 0.4, D / 2 + 0.02]}><boxGeometry args={[0.08, 0.05, 0.04]} />{bulb}</mesh>
+      <mesh position={[0, 0.3, D / 2 + 0.006]} userData={doorTag('slide')}><planeGeometry args={[0.36, 0.6]} />{m('#37474f')}</mesh>
+      {[-0.5, 0.5].map((x) => <mesh key={x} position={[x, 0.34, D / 2 + 0.006]}><planeGeometry args={[0.36, 0.34]} />{win}</mesh>)}
+      <mesh position={[0, GF + 0.02, D / 2 + 0.14]} castShadow><boxGeometry args={[0.6, 0.04, 0.28]} />{m('#1565c0')}</mesh>
+      <mesh position={[0, GF - 0.02, D / 2 + 0.02]}><boxGeometry args={[0.08, 0.05, 0.04]} />{bulb}</mesh>
       {!ghost && (
         <>
           {/* Balconies on the upper floors. */}
@@ -185,12 +188,13 @@ function Apartments({ level, ghost, m, win, bulb }: Props) {
   )
 }
 
-// Levels 7-10: a glass apartment tower on a stone base, 8 to 18 floors.
+// Levels 7-10: a glass apartment tower on a stone base (lobby height, for
+// people), 8 to 18 floors.
 const TOWER_FLOORS = [8, 11, 14, 18]
 function Tower({ level, ghost, m, win, bulb }: Props) {
   const floors = TOWER_FLOORS[level - 7]
   const FH = 0.36
-  const BASE = 0.5
+  const BASE = 0.72
   // From level 9 the top third steps in.
   const low = level >= 9 ? Math.ceil(floors * 0.65) : floors
   const W = 1.34
@@ -208,11 +212,11 @@ function Tower({ level, ghost, m, win, bulb }: Props) {
     <group>
       {/* Stone base with a lobby. */}
       <mesh position={[0, BASE / 2, 0]} castShadow receiveShadow><boxGeometry args={[1.76, BASE, 1.62]} />{m('#d7d2c8')}</mesh>
-      <mesh position={[0, 0.2, 0.816]}><planeGeometry args={[0.42, 0.4]} />{m('#263238')}</mesh>
-      {[-0.55, 0.55].map((x) => <mesh key={x} position={[x, 0.24, 0.816]}><planeGeometry args={[0.42, 0.3]} />{win}</mesh>)}
-      <Windows w={1.76} d={1.62} ys={[0.24]} n={3} win={win} size={[0.36, 0.3]} front={false} />
-      <mesh position={[0, 0.46, 0.95]} castShadow><boxGeometry args={[0.7, 0.04, 0.3]} />{m(level >= 10 ? GOLD : '#37474f')}</mesh>
-      <mesh position={[0, 0.42, 0.83]}><boxGeometry args={[0.1, 0.05, 0.04]} />{bulb}</mesh>
+      <mesh position={[0, 0.3, 0.816]} userData={doorTag('slide')}><planeGeometry args={[0.42, 0.6]} />{m('#263238')}</mesh>
+      {[-0.55, 0.55].map((x) => <mesh key={x} position={[x, 0.34, 0.816]}><planeGeometry args={[0.42, 0.38]} />{win}</mesh>)}
+      <Windows w={1.76} d={1.62} ys={[0.34]} n={3} win={win} size={[0.36, 0.38]} front={false} />
+      <mesh position={[0, BASE - 0.04, 0.95]} castShadow><boxGeometry args={[0.7, 0.04, 0.3]} />{m(level >= 10 ? GOLD : '#37474f')}</mesh>
+      <mesh position={[0, BASE - 0.07, 0.83]}><boxGeometry args={[0.1, 0.05, 0.04]} />{bulb}</mesh>
       {/* The tower: glass, with a white band at each floor. */}
       <mesh position={[0, BASE + H1 / 2, 0]} castShadow receiveShadow><boxGeometry args={[W, H1, D]} />{m(glass)}</mesh>
       <Windows w={W} d={D} ys={Array.from({ length: low }, (_, i) => BASE + (i + 0.5) * FH)} n={4} win={win} size={[0.24, 0.22]} />

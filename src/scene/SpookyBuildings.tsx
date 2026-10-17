@@ -6,6 +6,7 @@ import { Box, Cyl, Sign, Flag, GOLD, type Mat, type NewModelProps, type V3 } fro
 import { Facade, Upright } from './mergeScale'
 import { onNight } from './dayNight'
 import { decal } from './layers'
+import { doorTag } from './doors'
 import { brickTex, dirtTex, glowTex, shingleTex, sidingTex, windowGlowTex, windowTex } from './textures'
 
 // More Spooky Season buildings (haunted manor, corn maze, cauldron, jack-o'-lantern lamp).
@@ -269,16 +270,16 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
         {lvl >= 3 && <Box m={m} at={[0, H - 0.04, 0.025]} s={[L + 0.03, 0.06, 0.05]} c={castle ? '#9a93aa' : '#d7ccc8'} shadow={false} />}
         {!castle && (
           <group>
-            {/* The porch: a deck up a step, two posts and a sagging roof over the double door. */}
-            <Box m={m} at={[0, G0 + 0.05, 0.21]} s={[0.84, 0.1, 0.42]} c="#3e2f2a" />
-            <Box m={m} at={[0, G0 + 0.025, 0.49]} s={[0.5, 0.05, 0.14]} c="#4e3b30" />
-            {[-0.38, 0.38].map((x) => <Cyl key={x} m={m} at={[x, (G0 + 0.1 + 0.86) / 2, 0.38]} r={0.028} h={0.86 - G0 - 0.1} c="#d7ccc8" seg={6} />)}
+            {/* The porch: a low deck up a step, two posts and a sagging roof over the double door. */}
+            <Box m={m} at={[0, G0 + 0.0325, 0.21]} s={[0.84, 0.065, 0.42]} c="#3e2f2a" />
+            <Box m={m} at={[0, G0 + 0.015, 0.49]} s={[0.5, 0.03, 0.14]} c="#4e3b30" />
+            {[-0.38, 0.38].map((x) => <Cyl key={x} m={m} at={[x, (G0 + 0.065 + 0.86) / 2, 0.38]} r={0.028} h={0.86 - G0 - 0.065} c="#d7ccc8" seg={6} />)}
             <Box m={m} at={[0, 0.885, 0.22]} rot={[0.12, 0, 0]} s={[0.94, 0.05, 0.5]} c="#2f2540" />
-            <Box m={m} at={[0, G0 + 0.43, 0.015]} s={[0.4, 0.66, 0.03]} c={TRIM} shadow={false} />
-            <mesh position={[0, G0 + 0.35, 0.034]}><planeGeometry args={[0.32, 0.5]} />{m('#4a1414')}</mesh>
-            <mesh position={[0, G0 + 0.61, 0.034]}><circleGeometry args={[0.14, 10, 0, Math.PI]} />{amber}</mesh>
-            <Box m={m} at={[0, G0 + 0.35, 0.04]} s={[0.012, 0.5, 0.01]} c="#2a0a0a" shadow={false} />
-            {[-0.27, 0.27].map((x) => <mesh key={x} position={[x, G0 + 0.58, 0.05]}><boxGeometry args={[0.06, 0.09, 0.06]} />{bulb}</mesh>)}
+            <Box m={m} at={[0, G0 + 0.395, 0.015]} s={[0.4, 0.66, 0.03]} c={TRIM} shadow={false} />
+            <mesh position={[0, G0 + 0.315, 0.034]} userData={doorTag('double')}><planeGeometry args={[0.32, 0.5]} />{m('#4a1414')}</mesh>
+            <mesh position={[0, G0 + 0.575, 0.034]}><circleGeometry args={[0.14, 10, 0, Math.PI]} />{amber}</mesh>
+            <Box m={m} at={[0, G0 + 0.315, 0.0355]} s={[0.012, 0.5, 0.003]} c="#2a0a0a" shadow={false} />
+            {[-0.27, 0.27].map((x) => <mesh key={x} position={[x, G0 + 0.545, 0.05]}><boxGeometry args={[0.06, 0.09, 0.06]} />{bulb}</mesh>)}
             {/* A cross gable over the porch with a round attic window. */}
             <group position={[0, H, -0.29]} rotation-y={Math.PI / 2}>
               <Gable m={m} len={0.62} hw={0.38} rise={0.5} over={0.05} wall={wall} wallTex={sidingTex(1, 1)} roof="#2f2540" />
@@ -288,7 +289,7 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
             {!ghost && [-0.34, 0.34].map((x, i) => <JackO key={x} m={m} gl={gl} at={[x, G0, 0.5]} r={i ? 0.09 : 0.11} />)}
             {!ghost && st === 2 && (
               // A sheet ghost hanging from the porch roof.
-              <group position={[0.22, 0, 0.36]}>
+              <group position={[0.265, 0, 0.3]}>
                 <Cyl m={m} at={[0, 0.81, 0]} r={0.004} h={0.08} c="#212121" seg={4} />
                 <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.07, 10, 8]} />{m('#f5f5f5')}</mesh>
                 <mesh position={[0, 0.6, 0]}><coneGeometry args={[0.1, 0.2, 10]} />{m('#f5f5f5')}</mesh>
@@ -304,10 +305,10 @@ function Haunted({ ghost, m, lvl, gl, bulb }: { ghost?: boolean; m: Mat; lvl: nu
             {[-0.31, 0, 0.31].map((x) => <Box key={x} m={m} at={[x, H + 0.53, 0.16]} s={[0.18, 0.16, 0.32]} c={wall} />)}
             <Box m={m} at={[0, 0.3, 0.325]} s={[0.56, 0.6, 0.01]} c="#8f88a0" shadow={false} />
             <mesh position={[0, 0.6, 0.326]}><circleGeometry args={[0.28, 12, 0, Math.PI]} />{m('#8f88a0')}</mesh>
-            <mesh position={[0, 0.3, 0.332]}><planeGeometry args={[0.44, 0.6]} />{m('#1a1220')}</mesh>
+            <mesh position={[0, 0.3, 0.332]} userData={doorTag('double')}><planeGeometry args={[0.44, 0.6]} />{m('#1a1220')}</mesh>
             <mesh position={[0, 0.6, 0.333]}><circleGeometry args={[0.22, 12, 0, Math.PI]} />{m('#1a1220')}</mesh>
-            {[-0.15, -0.05, 0.05, 0.15].map((x) => <Box key={x} m={m} at={[x, 0.36, 0.342]} s={[0.022, 0.62, 0.016]} c="#3d3d3d" shadow={false} />)}
-            {[0.3, 0.55].map((y) => <Box key={y} m={m} at={[0, y, 0.352]} s={[0.4, 0.022, 0.012]} c="#3d3d3d" shadow={false} />)}
+            {[-0.15, -0.05, 0.05, 0.15].map((x) => <Box key={x} m={m} at={[x, 0.36, 0.337]} s={[0.022, 0.62, 0.006]} c="#3d3d3d" shadow={false} />)}
+            {[0.3, 0.55].map((y) => <Box key={y} m={m} at={[0, y, 0.343]} s={[0.4, 0.022, 0.006]} c="#3d3d3d" shadow={false} />)}
             <mesh position={[0, 1.32, 0.322]}><circleGeometry args={[0.19, 16]} />{m('#8f88a0')}</mesh>
             <mesh position={[0, 1.32, 0.327]}><circleGeometry args={[0.15, 16]} />{green}</mesh>
             {[-0.33, 0.33].map((x) => (

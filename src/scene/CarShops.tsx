@@ -7,6 +7,7 @@ import { CarModel } from './CarModel'
 import { Facade, Upright } from './mergeScale'
 import { PEOPLE_SIZED } from './keepShape'
 import { WaterTank } from './GrowthKit'
+import { doorTag } from './doors'
 import { brickTex, concreteTex, gravelTex, shutterTex, awningTex, checkerTex } from './textures'
 
 // Car shops from the third wave of buildings (exhaust, brakes, wraps, dyno, engines, race fab).
@@ -51,14 +52,15 @@ function Bay({ m, bulb, x, zf, w, h, trim, open, lamp = true }: { m: Mat; bulb: 
   )
 }
 
-// A shop door in a wall facing +z: frame, door, a glass slot, push bar and a step.
+// A shop door in a wall facing +z: frame, door, a glass slot, pull handle and a step.
+// The slot and handle sit tight on the door so it can swing open on its hinge side.
 function Door({ m, win, x, zf, c = '#37474f', frame = '#eceff1' }: { m: Mat; win: ReactNode; x: number; zf: number; c?: string; frame?: string }) {
   return (
     <group>
       <Box m={m} at={[x, 0.32, zf + 0.01]} s={[0.36, 0.64, 0.02]} c={frame} shadow={false} />
-      <mesh position={[x, 0.31, zf + 0.024]}><planeGeometry args={[0.28, 0.58]} />{m(c)}</mesh>
-      <mesh position={[x, 0.44, zf + 0.028]}><planeGeometry args={[0.18, 0.22]} />{win}</mesh>
-      <Box m={m} at={[x, 0.27, zf + 0.034]} s={[0.22, 0.018, 0.014]} c="#cfd8dc" shadow={false} />
+      <mesh position={[x, 0.31, zf + 0.024]} userData={doorTag()}><planeGeometry args={[0.28, 0.58]} />{m(c)}</mesh>
+      <mesh position={[x, 0.44, zf + 0.027]}><planeGeometry args={[0.12, 0.22]} />{win}</mesh>
+      <Box m={m} at={[x + 0.1, 0.3, zf + 0.027]} s={[0.018, 0.12, 0.004]} c="#cfd8dc" shadow={false} />
       <Box m={m} at={[x, 0.05, zf + 0.1]} s={[0.46, 0.1, 0.18]} c="#cfd8dc" />
     </group>
   )
@@ -260,18 +262,18 @@ function Muffler({ k }: { k: K }) {
       <Bay m={m} bulb={bulb} x={-0.36} zf={F1} w={0.92} h={0.82} trim={orange} open />
       {/* Chrome tailpipes hung on the back wall of the open bay. */}
       {[0.46, 0.58, 0.7].map((y, i) => <Cyl key={y} m={m} at={[-0.36 + (i - 1) * 0.06, y, F1 + 0.06]} r={0.022} h={0.62} c={CHROME} seg={8} rot={[0, 0, Math.PI / 2]} />)}
-      <Door m={m} win={win} x={0.36} zf={F1} />
-      <Pane m={m} win={win} x={0.71} y={0.5} zf={F1} w={0.24} h={0.34} />
+      <Door m={m} win={win} x={0.54} zf={F1} />
+      <Pane m={m} win={win} x={0.82} y={0.5} zf={F1} w={0.12} h={0.34} />
       <Fascia m={m} text="EXHAUST" at={[0, 1.16, F1]} w={1.24} bg="#212121" fg={orange} board={orange} />
       {/* A car up on the four-post lift, its new pipes poking out the back.
           Raised only part way, so the car stays under the EXHAUST board. */}
       {!ghost && (
-        <group position={[-0.28, 0.05, 0.68]}>
+        <group position={[-0.31, 0.05, 0.68]}>
           <Upright>
             <group>
-              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 0.68, 0.215, sz * 0.36]} s={[0.07, 0.43, 0.07]} c={orange} />))}
-              {[-1, 1].map((sx) => <Box key={sx} m={m} at={[sx * 0.68, 0.28, 0]} s={[0.08, 0.06, 0.8]} c="#455a64" />)}
-              {[-1, 1].map((sz) => <Box key={sz} m={m} at={[0, 0.28, sz * 0.24]} s={[1.28, 0.04, 0.16]} c="#546e7a" />)}
+              {[-1, 1].flatMap((sx) => [-1, 1].map((sz) => <Box key={`${sx}${sz}`} m={m} at={[sx * 0.58, 0.215, sz * 0.36]} s={[0.07, 0.43, 0.07]} c={orange} />))}
+              {[-1, 1].map((sx) => <Box key={sx} m={m} at={[sx * 0.58, 0.28, 0]} s={[0.08, 0.06, 0.8]} c="#455a64" />)}
+              {[-1, 1].map((sz) => <Box key={sz} m={m} at={[0, 0.28, sz * 0.24]} s={[1.08, 0.04, 0.16]} c="#546e7a" />)}
               <Box m={m} at={[0, 0.03, 0]} s={[0.3, 0.06, 0.22]} c="#ff7043" />
               <Cyl m={m} at={[0, 0.175, 0]} r={0.03} h={0.23} c={STEEL} seg={8} />
               <Box m={m} at={[0, 0.305, 0]} s={[0.14, 0.03, 0.14]} c="#455a64" shadow={false} />
@@ -282,9 +284,9 @@ function Muffler({ k }: { k: K }) {
           </Upright>
         </group>
       )}
-      {/* A stand of new pipes and a bin of mufflers by the office. */}
+      {/* A stand of new pipes and a bin of mufflers by the office, end on to the street. */}
       {!ghost && (
-        <group position={[0.74, 0.05, 0.78]}>
+        <group position={[0.82, 0.05, 0.66]} rotation-y={-Math.PI / 2}>
           {[-0.17, 0.17].map((x) => (
             <group key={x}>
               <Box m={m} at={[x, 0.015, 0]} s={[0.06, 0.03, 0.3]} c="#455a64" shadow={false} />
@@ -353,7 +355,7 @@ function Brakes({ k }: { k: K }) {
       <Lot m={m} w={1.9} d={1.9} />
       <Box m={m} at={[0, 0.88, F1 + 0.008]} s={[W1 + 0.012, 0.04, 0.016]} c={red} shadow={false} />
       <Bay m={m} bulb={bulb} x={-0.4} zf={F1} w={0.88} h={0.8} trim={red} open />
-      <Door m={m} win={win} x={0.62} zf={F1} c={red} />
+      <Door m={m} win={win} x={0.68} zf={F1} c={red} />
       <Pane m={m} win={win} x={0.18} y={0.52} zf={F1} w={0.22} h={0.3} />
       <Fascia m={m} text="BRAKES" at={[0, 1.15, F1]} w={1.2} bg="#fafafa" fg={red} board={red} />
       {/* The alignment rack: a car on runways with turn plates, targets clamped
@@ -382,7 +384,7 @@ function Brakes({ k }: { k: K }) {
                 </group>
               ))}
               </group>
-              <group position={[0.84, 0, 0]}>
+              <group position={[0.7, 0, 0]}>
                 <Box m={m} at={[0, 0.02, 0]} s={[0.3, 0.04, 0.3]} c="#455a64" />
                 <Box m={m} at={[0, 0.48, 0]} s={[0.07, 0.88, 0.07]} c={DARK} />
                 <Box m={m} at={[0, 0.9, 0]} s={[0.085, 0.07, 1.0]} c={red} />
@@ -465,7 +467,7 @@ function Wraps({ k }: { k: K }) {
           </group>
         )}
       </Facade>
-      <Door m={m} win={win} x={0.18} zf={F2} c="#37474f" />
+      <Door m={m} win={win} x={0.16} zf={F2} c="#37474f" />
       <Bay m={m} bulb={bulb} x={1.1} zf={F2} w={1.0} h={0.95} trim={pink} open />
       {/* The bay's lit back wall: a white booth with neon strips. */}
       <mesh position={[1.1, 0.48, F2 + 0.034]}><planeGeometry args={[0.88, 0.7]} />{m('#eceff1')}</mesh>
@@ -489,14 +491,14 @@ function Wraps({ k }: { k: K }) {
       {/* A car halfway through its wrap: magenta film laid over the back half,
           the next sheet hung ready on its frame beside it. */}
       {!ghost && (
-        <Car at={[1.0, 0.05, 0.76]} rot={Math.PI / 2} body="coupe" color="#eceff1">
+        <Car at={[1.03, 0.05, 0.76]} rot={Math.PI / 2} body="coupe" color="#eceff1">
           <Box m={m} at={[0, 0.425, -0.16]} s={[0.5, 0.01, 0.3]} c={pink} shadow={false} />
           <Box m={m} at={[0, 0.3, -0.46]} rot={[-0.5, 0, 0]} s={[0.62, 0.01, 0.3]} c={pink} shadow={false} />
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.366, 0.22, -0.3]} s={[0.01, 0.18, 0.6]} c={pink} shadow={false} />)}
         </Car>
       )}
       {!ghost && (
-        <group position={[1.72, 0.05, 0.85]}>
+        <group position={[1.75, 0.05, 0.85]}>
           {[-0.28, 0.28].map((z) => <Box key={z} m={m} at={[0, 0.4, z]} s={[0.04, 0.8, 0.04]} c="#37474f" />)}
           <Box m={m} at={[0, 0.8, 0]} s={[0.05, 0.05, 0.62]} c="#37474f" />
           <Cyl m={m} at={[0, 0.74, 0]} r={0.05} h={0.52} c={cyan} seg={10} rot={[Math.PI / 2, 0, 0]} />
@@ -523,7 +525,7 @@ function Wraps({ k }: { k: K }) {
           <Cyl m={m} at={[0.17, 0.25, 0.02]} r={0.07} h={0.5} c={cyan} seg={12} />
         </group>
       )}
-      {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[0.3, 0, 0.98]} arm={Math.PI} />}
+      {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-0.08, 0, 0.98]} arm={Math.PI} />}
       {!ghost && <Pool r={0.85} x={-0.9} z={0.75} />}
       {/* Level 4: a wrapped delivery van and a magenta stripe up the facade. */}
       {st >= 2 && !ghost && <Car at={[-1.25, 0.05, 0.55]} rot={-Math.PI / 2} body="van" color={cyan} stripe={pink} />}
@@ -573,10 +575,10 @@ function Dynolab({ k }: { k: K }) {
       <Lot m={m} w={3.9} d={1.88} z={0.01} />
       <Bay m={m} bulb={bulb} x={-0.85} zf={F2} w={1.4} h={1.05} trim={yellow} open />
       <Box m={m} at={[0, 1.27, F2 + 0.008]} s={[W2 + 0.012, 0.08, 0.016]} c="#212121" shadow={false} />
-      {/* The lounge: windows either side of a door, to watch the runs. */}
+      {/* The lounge: windows to watch the runs, and its door at the end. */}
       <Pane m={m} win={win} x={0.82} y={0.55} zf={F2} w={0.3} h={0.4} />
-      <Door m={m} win={win} x={1.26} zf={F2} c="#212121" />
-      <Pane m={m} win={win} x={1.68} y={0.55} zf={F2} w={0.24} h={0.4} />
+      <Pane m={m} win={win} x={1.22} y={0.55} zf={F2} w={0.3} h={0.4} />
+      <Door m={m} win={win} x={1.64} zf={F2} c="#212121" />
       <Bay m={m} bulb={bulb} x={0.22} zf={F2} w={0.62} h={0.85} trim={yellow} />
       {/* The dyno: a car strapped down on the rollers, a fan blowing at its nose,
           its exhaust drawn off up a duct to a fan on the roof. */}
@@ -607,12 +609,11 @@ function Dynolab({ k }: { k: K }) {
         <Box m={m} at={[-1.73, h + 0.42, F2 - 0.02]} s={[0.24, 0.16, 0.36]} c="#607d8b" />
         {!ghost && <Cyl m={m} at={[-1.73, 0.18, (F2 + 0.15 + 0.74) / 2]} r={0.05} h={0.74 - F2 - 0.15} c="#424242" seg={10} rot={[Math.PI / 2, 0, 0]} />}
       </group>
-      {/* The power graph screen, its curves in neon. */}
+      {/* The power graph screen over the lounge windows, its curves in neon. */}
       {!ghost && (
-        <group position={[0.45, 0.05, 1.0]} rotation-y={0.35}>
-          {[-0.22, 0.22].map((x) => <Box key={x} m={m} at={[x, 0.25, 0]} s={[0.04, 0.5, 0.04]} c={DARK} />)}
+        <group position={[1.02, 0.27, F2 + 0.025]}>
           <Box m={m} at={[0, 0.72, 0]} s={[0.62, 0.42, 0.05]} c="#212121" />
-          <mesh position={[0, 0.72, 0.026]}><planeGeometry args={[0.56, 0.36]} />{m('#0d1b2a')}</mesh>
+          <mesh position={[0, 0.72, 0.028]}><planeGeometry args={[0.56, 0.36]} />{m('#0d1b2a')}</mesh>
           {[[-0.24, 0.6, 0.12, 0.4], [-0.13, 0.66, 0.12, 0.6], [-0.02, 0.74, 0.12, 0.45], [0.09, 0.8, 0.12, 0.2], [0.2, 0.82, 0.12, -0.15]].map(([x, y, l, a]) => (
             <group key={x} position={[x, y, 0.032]} rotation-z={a}><Neon at={[0, 0, 0]} s={[l, 0.012, 0.004]} c="#76ff03" /></group>
           ))}
@@ -622,12 +623,12 @@ function Dynolab({ k }: { k: K }) {
         </group>
       )}
       <RoofSign m={m} text="DYNO" at={[-0.85, top, F2 - 0.18]} w={1.2} bg="#212121" fg={yellow} board={yellow} />
-      {!ghost && <Tyres m={m} at={st >= 2 ? [0.5, 0.05, 0.56] : [1.45, 0.05, 0.8]} n={4} band={yellow} />}
+      {!ghost && <Tyres m={m} at={st >= 2 ? [-1.76, 0.05, 0.92] : [0.5, 0.05, 0.62]} n={4} band={yellow} />}
       {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.86, 0, 0.45]} arm={-Math.PI / 2} />}
       {!ghost && <Pool r={0.9} x={-0.85} z={0.8} />}
       {/* Level 4: a checkered stripe and a second car waiting its run; level 7: the lab floor. */}
       {st >= 2 && <Box m={m} at={[0, 1.27, F2 + 0.018]} s={[W2 - 0.6, 0.08, 0.004]} c="#ffffff" t={checkerTex(16)} shadow={false} />}
-      {st >= 2 && !ghost && <Car at={[1.32, 0.05, 0.74]} rot={Math.PI / 2} body="sports" color="#212121" stripe={yellow} />}
+      {st >= 2 && !ghost && <Car at={[0.76, 0.05, 0.72]} rot={Math.PI / 2} body="sports" color="#212121" stripe={yellow} />}
       {st === 3 && <RoofBox m={m} win={win} at={[-0.85, top, Z2 - 0.32]} w={1.7} d={0.6} h={0.55} wall="#455a64" cap={yellow} />}
       {/* Giant tachometer leaning back on its stand, needle in the red. */}
       <group position={[1.0, top, Z2 - 0.05]}>
@@ -704,7 +705,7 @@ function Engines({ k }: { k: K }) {
           <Box m={m} at={[x, 0.83, zf + 0.02]} s={[0.48, 0.06, 0.04]} c="#d7ccc8" shadow={false} />
         </group>
       ))}
-      <Door m={m} win={win} x={1.6} zf={zf} c="#3e2723" frame="#d7ccc8" />
+      <Door m={m} win={win} x={1.52} zf={zf} c="#3e2723" frame="#d7ccc8" />
       <Fascia m={m} text="ENGINES" at={[-0.15, 1.17, zf + 0.03]} w={1.1} bg="#fff8e1" fg="#3e2723" board="#212121" />
       {/* Gantry hoist with an engine hanging from its chain. */}
       {!ghost && (
@@ -731,8 +732,8 @@ function Engines({ k }: { k: K }) {
           <group position={[0, 0.3, 0]} scale={0.85} rotation-y={i ? -0.5 : 0.4}><Engine m={m} cover={i ? '#c62828' : '#2e7d32'} /></group>
         </group>
       ))}
-      {!ghost && <Drum m={m} at={[1.75, 0.05, 0.62]} c="#455a64" />}
-      {!ghost && <Drum m={m} at={[1.62, 0.05, 0.86]} c="#c62828" />}
+      {!ghost && <Drum m={m} at={[1.82, 0.05, 0.55]} c="#455a64" />}
+      {!ghost && <Drum m={m} at={[1.8, 0.05, 0.8]} c="#c62828" />}
       {!ghost && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.25, 0, 0.98]} arm={Math.PI} />}
       {!ghost && <Pool r={0.9} x={-0.8} z={0.8} />}
       {/* Level 4: a brick chimney; level 7: a second one and a water tower: an engine factory. */}
@@ -786,9 +787,15 @@ function RaceFab({ k }: { k: K }) {
         <Box m={m} at={[0, 1.42, zf + 0.008]} s={[w + 0.012, 0.03, 0.016]} c="#212121" shadow={false} />
         <Bay m={m} bulb={bulb} x={-0.9} zf={zf} w={0.95} h={1.08} trim="#212121" open />
         <Bay m={m} bulb={bulb} x={0.2} zf={zf} w={0.95} h={1.08} trim="#212121" />
-        <mesh position={[1.08, 0.62, zf + 0.006]}><planeGeometry args={[0.5, 0.6]} />{win}</mesh>
-        <Door m={m} win={win} x={1.08} zf={zf} c="#212121" />
+        <mesh position={[1.01, 0.62, zf + 0.006]}><planeGeometry args={[0.36, 0.6]} />{win}</mesh>
       </ShellBuilding>
+      {/* The team's reception: a white porch off the office end, its door to the street. */}
+      <group position={[1.08, 0, zf]}>
+        <Box m={m} at={[0, 0.42, 0.17]} s={[0.38, 0.84, 0.34]} c="#fafafa" />
+        <Box m={m} at={[0, 0.87, 0.19]} s={[0.44, 0.06, 0.38]} c={red} />
+        {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.193, 0.5, 0.17]} rotation-y={(sd * Math.PI) / 2}><planeGeometry args={[0.22, 0.4]} />{win}</mesh>)}
+        <Door m={m} win={win} x={0} zf={0.34} c="#212121" />
+      </group>
       <RoofSign m={m} text="RACE FAB" at={[-1.1, top, zf - 0.2]} w={1.6} bg="#fafafa" fg={red} board={red} />
       {/* The race car out of its bay, on the apron. */}
       {!ghost && <Car at={[-1.35, 0.05, 0.12]} rot={0} body="formula" color={red} stripe="#fafafa" />}
@@ -802,7 +809,7 @@ function RaceFab({ k }: { k: K }) {
       )}
       {/* The team transporter along the side: cab up front, the trailer in team colours. */}
       {!ghost && (
-        <group position={[1.48, 0, -0.35]}>
+        <group position={[1.62, 0, -0.35]}>
           <Upright size={1}>
             <group userData={{ whole: true }}>
               <Box m={m} at={[0, 0.5, -0.45]} s={[0.66, 0.78, 2.3]} c="#fafafa" />
@@ -823,15 +830,15 @@ function RaceFab({ k }: { k: K }) {
           </Upright>
         </group>
       )}
-      {/* The pit wall along the front: a barrier, the debris fence and the team's stand. */}
-      <group position={[-0.45, 0, 1.62]}>
-        <Box m={m} at={[0, 0.16, 0]} s={[2.9, 0.22, 0.14]} c="#eceff1" />
-        <Box m={m} at={[0, 0.2, 0.072]} s={[2.88, 0.06, 0.006]} c={red} shadow={false} />
-        {Array.from({ length: 7 }, (_, i) => <Box key={i} m={m} at={[-1.4 + i * (2.8 / 6), 0.55, -0.03]} s={[0.03, 0.6, 0.03]} c={STEEL} shadow={false} />)}
-        <Box m={m} at={[0, 0.84, -0.03]} s={[2.86, 0.025, 0.025]} c={STEEL} shadow={false} />
+      {/* The pit wall along the front (open at the reception end): a barrier, the debris fence and the team's stand. */}
+      <group position={[-0.52, 0, 1.62]}>
+        <Box m={m} at={[0, 0.16, 0]} s={[2.76, 0.22, 0.14]} c="#eceff1" />
+        <Box m={m} at={[0, 0.2, 0.072]} s={[2.74, 0.06, 0.006]} c={red} shadow={false} />
+        {Array.from({ length: 7 }, (_, i) => <Box key={i} m={m} at={[-1.33 + i * (2.66 / 6), 0.55, -0.03]} s={[0.03, 0.6, 0.03]} c={STEEL} shadow={false} />)}
+        <Box m={m} at={[0, 0.84, -0.03]} s={[2.72, 0.025, 0.025]} c={STEEL} shadow={false} />
       </group>
       {!ghost && (
-        <group position={[0.58, 0.05, 1.18]}>
+        <group position={[0.47, 0.05, 1.18]}>
           <Box m={m} at={[0, 0.15, 0]} s={[0.84, 0.3, 0.4]} c="#37474f" />
           {[-0.38, 0.38].flatMap((x) => [-0.17, 0.17].map((z) => <Box key={`${x}${z}`} m={m} at={[x, 0.6, z]} s={[0.04, 0.6, 0.04]} c={STEEL} shadow={false} />))}
           <Box m={m} at={[0, 0.92, 0]} s={[0.9, 0.04, 0.46]} c={red} />
