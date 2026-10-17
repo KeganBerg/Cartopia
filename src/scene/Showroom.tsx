@@ -5,6 +5,7 @@ import { decal } from './layers'
 import { brickTex, checkerTex, corrugatedTex, glowTex, shutterTex } from './textures'
 import { signTexture } from './signTexture'
 import { ToolChest, Tyre, TyreStack } from './ArcadeScenery'
+import { CarModel } from './CarModel'
 
 // The Showroom: where every car preview stands (the garage turntable, the full-screen look and
 // photo mode). A sibling of the Crate Depot: the same night-time workshop feel, but a place to
@@ -323,9 +324,11 @@ function Workbench({ x, z }: { x: number; z: number }) {
   )
 }
 
-// A two-post lift with a car up on it under a dust cover.
+// A two-post lift with a car up on it, by the right wall (metres, before the room turns).
+export const LIFT_AT: [number, number] = [12.5, -9]
+const LIFT_ARMS = 1.67 // top of the arms, metres
+const LIFT_K = 4.3 / 1.48
 function Lift({ x, z, ry }: { x: number; z: number; ry: number }) {
-  const cloth = '#6d1b2b'
   return (
     <group position={[x, 0, z]} rotation-y={ry}>
       {[-1.6, 1.6].map((dx) => (
@@ -340,13 +343,12 @@ function Lift({ x, z, ry }: { x: number; z: number; ry: number }) {
         </group>
       ))}
       <mesh position-y={3.86}><boxGeometry args={[3.6, 0.14, 0.24]} /><meshStandardMaterial color="#ffb300" roughness={0.45} /></mesh>
-      {/* The covered car: a body, a cabin hump and wheels peeking out below the hem. */}
-      <group position-y={1.68}>
-        <mesh position-y={0.42}><boxGeometry args={[1.9, 0.72, 4.3]} /><meshStandardMaterial color={cloth} roughness={0.95} /></mesh>
-        <mesh position={[0, 0.95, -0.25]} rotation-x={Math.PI / 2} scale={[1.6, 1, 1]}><cylinderGeometry args={[0.5, 0.5, 2.2, 18]} /><meshStandardMaterial color={cloth} roughness={0.95} /></mesh>
-        {[-1, 1].map((sx) => [-1.35, 1.35].map((wz) => (
-          <mesh key={`${sx}${wz}`} position={[sx * 0.82, 0.05, wz]} rotation-z={Math.PI / 2}><cylinderGeometry args={[0.32, 0.32, 0.22, 16]} /><meshStandardMaterial color="#1c1c1c" roughness={0.9} /></mesh>
-        )))}
+      {/* A real car up on the arms, wheels hanging clear: the camera's free to look at it up close.
+          CarModel is in its own units (the classic is 1.48 long with its sills 0.1 up); LIFT_K makes it 4.3 m. */}
+      <group position-y={LIFT_ARMS - LIFT_K * 0.1} rotation-y={Math.PI}>
+        <group scale={LIFT_K}>
+          <CarModel body="classic" color="#8e1b2b" finish="gloss" stripe="#eceff1" />
+        </group>
       </group>
     </group>
   )
@@ -518,7 +520,7 @@ export function Room() {
         {[-2.95, 2.95].map((dz) => <mesh key={dz} position={[-0.15, 2.3, dz]}><boxGeometry args={[0.2, 4.6, 0.25]} /><meshStandardMaterial map={checkerTex(1)} color="#ffd54f" /></mesh>)}
         <mesh position={[-0.01, 6.2, 0]} rotation-y={-Math.PI / 2}><planeGeometry args={[2.4, 0.8]} /><meshBasicMaterial map={bay} toneMapped={false} /></mesh>
       </group>
-      <Lift x={12.5} z={-9} ry={Math.PI / 2} />
+      <Lift x={LIFT_AT[0]} z={LIFT_AT[1]} ry={Math.PI / 2} />
       <TyreStack x={15.5} z={5} n={5} band="#ffc400" />
       <TyreStack x={16.2} z={6.2} n={3} band="#e53935" />
       {/* Traffic cones by the door. */}

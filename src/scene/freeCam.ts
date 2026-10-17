@@ -15,6 +15,20 @@ export const VIEW = new Vector3()
 // (just above the horizon, so the sky and the hills come into view). `near`
 // sets how fine depth is far off (see coplanar.test.tsx): at 1 two faces 0.002
 // apart still sort right at the furthest zoom; halving it doubles that gap.
-export const FREE = { fovWide: 42, fovTall: 52, near: 1, far: 2600, minDist: 5, maxDist: 170, minPolar: 0.12, maxPolar: 1.45 }
+// Closer in, `near` shrinks with the distance (down to `nearClose` at `nearAt`
+// and under), so a lamp post or a wall a step from the camera isn't cut open;
+// depth there is still finer than at the furthest zoom.
+export const FREE = { fovWide: 42, fovTall: 52, near: 1, nearClose: 0.2, nearAt: 25, far: 2600, minDist: 5, maxDist: 170, minPolar: 0.12, maxPolar: 1.45 }
+
+// The near plane for a camera this far from the spot it looks at.
+export const nearFor = (dist: number) => Math.min(FREE.near, Math.max(FREE.nearClose, (dist / FREE.nearAt) * FREE.near))
+
+// Fingers on the town in the free view (it has its own gestures, see FreeCam), so a
+// finger resting on a building while the other pinches or twists doesn't pick it up.
+let fingers = 0
+export const freeFingers = () => fingers
+export const setFreeFingers = (n: number) => {
+  fingers = n
+}
 
 export const isFree = (c: Camera): c is PerspectiveCamera => (c as PerspectiveCamera).isPerspectiveCamera === true
