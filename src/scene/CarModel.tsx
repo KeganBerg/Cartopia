@@ -348,8 +348,9 @@ export function carFrame(body: Body, model?: string): ModFrame {
   const b = s.round ? Math.min(0.1, s.body * 0.4) : 0.035
   const p = bodyProfile(s, b)
   const cowl = Math.min(s.cabinZ + s.cabinLen / 2, s.len / 2 - s.len * 0.2)
-  // A cabin that runs to the back leaves no trunk, so spoilers go on the roof.
-  const roofMount = !s.open && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
+  // A cabin that runs to the back leaves no trunk, so spoilers go on the roof (but never on a
+  // round glass dome: they stand on the deck behind it).
+  const roofMount = !s.open && !s.round && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
   const c = cabinProfile(s, p.deck - 0.01, 0.025)
   return {
     body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: wheelX(s),

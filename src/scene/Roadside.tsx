@@ -6,6 +6,7 @@ import { drainTex, paverTex, roadWearTex, tactileTex } from './textures'
 import { PropMesh } from './propKit'
 import { STREET_PROPS, hydrant, plateGeo, speedPlate } from './streetProps'
 import { LampPost, useLampDesign } from './LampPosts'
+import { SIDE_ROT, type Furniture, type PropKind } from '../game/streetFurniture'
 
 // Street-level detail for road tiles: wear on the asphalt (grime along the
 // kerbs, hairline cracks, tar patches, oil drips where cars wait) and small
@@ -16,8 +17,7 @@ import { LampPost, useLampDesign } from './LampPosts'
 type Side = 'e' | 'w' | 's' | 'n'
 const HALF = TILE / 2
 const WALK = 0.4
-// Turns a side's local frame (+z facing that edge of the tile) into the tile's.
-export const SIDE_ROT: Record<Side, number> = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }
+export { SIDE_ROT }
 
 // A flat quad lying on the ground (unit square), its UVs picking one of the four
 // cells of the wear texture. `alongZ` runs the texture's v across z instead of x.
@@ -212,15 +212,11 @@ export function RoadWear({ kerbs, plain, alongX, h }: { kerbs: Side[]; plain: bo
   )
 }
 
-// One piece of sidewalk furniture on side `side`, `at` along the tile. Kept to the
-// lawn edge of the sidewalk so walkers pass on the kerb side.
-export type PropKind = 'bin' | 'news' | 'mail' | 'bollards' | 'planter' | 'sign' | 'box' | 'bikes' | 'meter'
-export const PROPS: PropKind[] = ['bin', 'news', 'mail', 'bollards', 'planter', 'sign', 'box', 'bikes', 'meter']
-
-export function StreetProp({ kind, side, at }: { kind: PropKind; side: Side; at: number }) {
+// One piece of sidewalk furniture, where streetFurniture.ts puts it.
+export function StreetProp({ kind, side, x, z }: { kind: PropKind; side: Side; x: number; z: number }) {
   return (
     <group rotation-y={SIDE_ROT[side]}>
-      <group position={[at, 0.08, HALF - 0.1]}>
+      <group position={[x, 0.08, z]}>
         <PropMesh parts={STREET_PROPS[kind]()} />
         {kind === 'sign' && (
           <mesh geometry={plateGeo} material={speedPlate()} position={[0, 0.56, -0.0195]} rotation-y={Math.PI} dispose={null} />
@@ -234,29 +230,38 @@ export function StreetProp({ kind, side, at }: { kind: PropKind; side: Side; at:
   )
 }
 
-// Fire hydrant on the sidewalk.
-export function Hydrant({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const at = TILE / 2 - 0.2
-  const [x, z] = { e: [at, 0.6], w: [-at, -0.6], s: [-0.6, at], n: [0.6, -at] }[side]
+// Fire hydrant at the kerb.
+export function Hydrant({ side, x, z }: { side: Side; x: number; z: number }) {
   // Pumper outlet towards the road.
   return (
-    <group position={[x, 0.08, z]} rotation-y={SIDE_ROT[side]}>
-      <PropMesh parts={hydrant()} />
+    <group rotation-y={SIDE_ROT[side]}>
+      <group position={[x, 0.08, z]}>
+        <PropMesh parts={hydrant()} />
+      </group>
     </group>
   )
 }
 
-// Street lamp on the sidewalk, arm reaching over the road. Lit at night.
-export function StreetLamp({ side }: { side: 'e' | 'w' | 's' | 'n' }) {
-  const half = TILE / 2 - 0.18
-  const rot = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 }[side]
+// Street lamp at the kerb, arm reaching over the road. Lit at night.
+export function StreetLamp({ side, x, z }: { side: Side; x: number; z: number }) {
   const design = useLampDesign('cobra')
   return (
-    <group rotation-y={rot}>
+    <group rotation-y={SIDE_ROT[side]}>
       {/* The pool sits above the kerb so the glow spills over the sidewalk too. */}
-      <group position={[0.55, 0, half]}>
+      <group position={[x, 0, z]}>
         <LampPost design={design} />
       </group>
     </group>
+  )
+}
+
+// Everything streetFurniture.ts stands on one road tile's sidewalks.
+export function Furnishings({ list }: { list: Furniture[] }) {
+  return (
+    <>
+      {list.map((f, i) => f.kind === 'lamp' ? <StreetLamp key={i} side={f.side} x={f.x} z={f.z} />
+        : f.kind === 'hydrant' ? <Hydrant key={i} side={f.side} x={f.x} z={f.z} />
+          : <StreetProp key={i} kind={f.kind} side={f.side} x={f.x} z={f.z} />)}
+    </>
   )
 }
