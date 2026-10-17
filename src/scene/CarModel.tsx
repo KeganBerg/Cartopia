@@ -11,7 +11,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
 import { FINISH_LOOK, SKINNED_SLOTS, STANCE, TRACK_STEEL, fittedMods, isBike, modSkinNumber, skinNumber, trackSkinDef, type Body, type Finish, type ModSkins, type ModSlot, type Panels, type SkinnedSlot } from '../game/data'
-import { PLATE, glowLink, linkCount, padsFor, paintedLink, placeLinks, rollers, sprocketGeo, trackLoop } from './tankTrack'
+import { PLATE, armsGeo, glowLink, idlerGeo, linkCount, padsFor, paintedLink, placeLinks, roadWheelGeo, rollers, sprocketGeo, trackLoop, type GearLook } from './tankTrack'
 import { paintsPanels, panelUniforms, setPanels, withPanels, type Zones } from './panelPaint'
 import { tickSkins, withSkin } from './skins'
 import { CarMods, KIND_MAT, RIM_LOOK, RIM_STYLE, UnderglowPool, carbon, modGeo, modIds, splitSkinned } from './CarMods'
@@ -231,6 +231,8 @@ function extrude(sh: ThreeShape, width: number, b: number) {
 }
 
 // Footprint of a body (before any scaling), for keeping town cars apart.
+// Bodies that run on tank tracks instead of wheels.
+export const isTracked = (body: Body) => !!shapeOf(body).tracks
 export const carSize = (body: Body) => ({ len: shapeOf(body).len, wid: shapeOf(body).wid })
 
 
@@ -1393,12 +1395,6 @@ function Wheels({ at, r, w, rig, rims, rimColor, rusty, look, camber = 0 }: { at
   )
 }
 
-// The rim material a wheel wears: rust, a custom rim colour, a rims mod's finish or the car's stock rim.
-function rimMaterial(rims: string | undefined, rimColor: string | undefined, rusty: boolean | undefined, look: CarStyle) {
-  const mod = rims ? RIM_LOOK[rims] : undefined
-  return rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : rimColor ? rimPaint(rimColor, mod) : mod ? matOf('rim', mod[0], Math.max(0.6, mod[1] + 0.4), mod[2]) : matOf('rim', look.rimColor ?? '#d5d9de', 0.75, 0.28)
-}
-
 // One material per track skin palette finish (the colours ride on the link's vertices).
 const trackMats = new Map<string, MeshStandardMaterial | MeshBasicMaterial>()
 const trackMat = (metal: number, rough: number) => {
@@ -1414,12 +1410,24 @@ const glowMat = (color: string) => {
   return m
 }
 
-// Tank tracks (see tankTrack.ts): moving links, a toothed drive sprocket at the back, double road
-// wheels and an idler wearing the rims mod's style, and return rollers. Rolls with the rig: the
-// links slide round the loop and every wheel turns, all from how far the rig's wheels rolled.
+// Tank tracks (see tankTrack.ts): moving links round a toothed drive sprocket at the back and
+// a steel idler at the front, over pairs of rubber-tyred steel road wheels on trailing arms and
+// two return rollers. No car wheels or rims: the Rims mod and rim paint never show here. Rolls
+// with the rig: the links slide round the loop and every wheel turns, all from how far the
+// rig's wheels rolled.
 // own: give the rig its wheel groups here (a whole car; a lean car's LeanCar already has them).
-function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, rig, own }: {
-  wheel: number; wz: number; tx: number; rims?: string; rimColor?: string; rusty?: boolean; look: CarStyle; tires?: string; skin?: string; rig?: WheelRig; own: boolean
+const gearMat = new MeshStandardMaterial({ vertexColors: true, metalness: 0.45, roughness: 0.6 })
+const GEAR_STEEL = '#4f545b'
+// The road wheels' geometry is built this size; each instance scales to its own wheel.
+const ROAD_R = 0.07
+export function gearLook(skin?: string, rusty?: boolean): GearLook {
+  if (rusty) return { rubber: '#2a2420', steel: '#7a5a44', hub: '#5e4535' }
+  const sk = trackSkinDef(skin)
+  if (!sk) return { rubber: '#1c1c1e', steel: GEAR_STEEL, hub: '#8d939b' }
+  return { rubber: '#1c1c1e', steel: '#' + new Color(GEAR_STEEL).lerp(new Color(sk.look.plate), 0.5).getHexString(), hub: sk.look.pin }
+}
+function TankTracks({ wheel, wz, tx, rusty, tires, skin, rig, own }: {
+  wheel: number; wz: number; tx: number; rusty?: boolean; tires?: string; skin?: string; rig?: WheelRig; own: boolean
 }) {
   const pads = padsFor(tires)
   const loop = useMemo(() => trackLoop(wheel, wz, pads), [wheel, wz, pads])
@@ -1429,28 +1437,34 @@ function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, r
   const glow = sk?.glow ? glowLink(pads, sk.glow.role) : null
   const n = linkCount(loop) * 2
   const rolls = useMemo(() => rollers(loop), [loop])
-  const style = (rims && RIM_STYLE[rims]) || look.rim
-  const rw = 0.07
-  const wg = wheelGeo(style, rw, 0.05)
-  const rim = rimMaterial(rims, rimColor, rusty, look)
+  const gl = gearLook(skin, rusty)
+  const road = roadWheelGeo(0.05, ROAD_R, gl)
+  const idler = idlerGeo(0.045, Math.max(...rolls.map(([, , r]) => r)), gl)
   const spr = loop.rc - PLATE / 2 - 0.004
   const sprocket = sprocketGeo(spr, 13)
   const links = useRef<InstancedMesh>(null)
   const glows = useRef<InstancedMesh>(null)
-  const tires2 = useRef<InstancedMesh>(null)
-  const rimL = useRef<InstancedMesh>(null)
-  const rimR = useRef<InstancedMesh>(null)
+  const roads = useRef<InstancedMesh>(null)
+  const idlers = useRef<InstancedMesh>(null)
   const sprockets = useRef<InstancedMesh>(null)
   const st = useRef({ dist: 0, last: null as number | null })
-  // Each round wheel: [x, y, z, radius]; the pairs straddle the guide horns, the return rollers ride the middle.
-  const wheels = useMemo(() => {
-    const out: { x: number; y: number; z: number; r: number }[] = []
+  // Each round wheel: [x, y, z, radius]; the road wheel pairs straddle the guide horns, the
+  // return rollers ride the middle, and the idler (the big one at the front) is drawn on its own.
+  const { wheels, idle } = useMemo(() => {
+    const wheels: { x: number; y: number; z: number; r: number }[] = []
+    const idle: { x: number; y: number; z: number; r: number }[] = []
+    const big = Math.max(...rolls.map(([, , r]) => r))
     for (const sd of [-1, 1]) for (const [z, y, r] of rolls) {
-      if (r < 0.05) out.push({ x: sd * tx, y, z, r })
-      else for (const dx of [-0.04, 0.04]) out.push({ x: sd * tx + dx, y, z, r })
+      if (r === big) idle.push({ x: sd * tx, y, z, r })
+      else if (r < 0.05) wheels.push({ x: sd * tx, y, z, r })
+      else for (const dx of [-0.04, 0.04]) wheels.push({ x: sd * tx + dx, y, z, r })
     }
-    return out
+    return { wheels, idle }
   }, [rolls, tx])
+  const arms = useMemo(() => {
+    const at = rolls.filter(([, , r]) => r >= 0.05 && r < Math.max(...rolls.map(([, , q]) => q))).map(([z, y]) => [z, y] as [number, number])
+    return armsGeo(at, [-(tx - 0.076), tx - 0.076], gl)
+  }, [rolls, tx, gl])
   const place = useCallback(() => {
     const d = st.current.dist
     const lm = links.current
@@ -1464,24 +1478,23 @@ function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, r
     const ax = new Vector3(1, 0, 0)
     const p = new Vector3()
     const sc = new Vector3()
-    let li = 0
-    let ri = 0
+    // Every wheel rolls on the track's inside at its speed.
     wheels.forEach((w, i) => {
-      // Rolling on the track's inside at its speed; the idler is the big one at the front.
       q.setFromAxisAngle(ax, d / w.r)
-      m.compose(p.set(w.x, w.y, w.z), q, sc.set(1, w.r / rw, w.r / rw))
-      tires2.current?.setMatrixAt(i, m)
-      if (w.x < 0) rimL.current?.setMatrixAt(li++, m)
-      else rimR.current?.setMatrixAt(ri++, m)
+      roads.current?.setMatrixAt(i, m.compose(p.set(w.x, w.y, w.z), q, sc.set(1, w.r / ROAD_R, w.r / ROAD_R)))
     })
-    for (const im of [tires2.current, rimL.current, rimR.current]) if (im) im.instanceMatrix.needsUpdate = true
+    idle.forEach((w, i) => {
+      q.setFromAxisAngle(ax, d / w.r)
+      idlers.current?.setMatrixAt(i, m.compose(p.set(w.x, w.y, w.z), q, sc.set(1, 1, 1)))
+    })
+    for (const im of [roads.current, idlers.current]) if (im) im.instanceMatrix.needsUpdate = true
     const sp = sprockets.current
     if (sp) {
       q.setFromAxisAngle(ax, d / spr)
       for (const [i, sd] of [[0, -1], [1, 1]] as const) sp.setMatrixAt(i, m.compose(p.set(sd * tx, loop.cy, -wz), q, sc.set(1, 1, 1)))
       sp.instanceMatrix.needsUpdate = true
     }
-  }, [loop, tx, wheels, spr, wz])
+  }, [loop, tx, wheels, idle, spr, wz])
   useLayoutEffect(() => {
     // The glow draws a skin's lit parts with the links' own placements.
     if (glows.current && links.current) glows.current.instanceMatrix = links.current.instanceMatrix
@@ -1492,7 +1505,7 @@ function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, r
       if (lm.instanceColor) lm.instanceColor.needsUpdate = true
     }
     place()
-  }, [place, sk, n, glow])
+  }, [place, sk, n, glow, road, idler])
   useFrame(() => {
     const w = rig?.spin[0]
     if (!w) return
@@ -1520,10 +1533,10 @@ function TankTracks({ wheel, wz, tx, rims, rimColor, rusty, look, tires, skin, r
       ))}
       <instancedMesh key={`l${n}${link.uuid}${sk?.alt ? 1 : 0}`} ref={links} args={[link, trackMat(pal.metal, pal.rough), n]} castShadow frustumCulled={false} />
       {glow && sk?.glow && <instancedMesh key={`g${n}${glow.uuid}`} ref={glows} args={[glow, glowMat(sk.glow.color), n]} frustumCulled={false} />}
-      <instancedMesh key={`t${wheels.length}${wg.tire.uuid}`} ref={tires2} args={[wg.tire, MAT.rubber, wheels.length]} castShadow frustumCulled={false} />
-      <instancedMesh key={`a${wheels.length}${wg.rims[0].uuid}`} ref={rimL} args={[wg.rims[0], rim, wheels.length / 2]} frustumCulled={false} />
-      <instancedMesh key={`b${wheels.length}${wg.rims[1].uuid}`} ref={rimR} args={[wg.rims[1], rim, wheels.length / 2]} frustumCulled={false} />
-      <instancedMesh key={`s${sprocket.uuid}`} ref={sprockets} args={[sprocket, rusty ? rim : sprocketMat, 2]} castShadow frustumCulled={false} />
+      <instancedMesh key={`r${wheels.length}${road.uuid}`} ref={roads} args={[road, gearMat, wheels.length]} castShadow frustumCulled={false} userData={{ tankGear: true }} />
+      <instancedMesh key={`i${idle.length}${idler.uuid}`} ref={idlers} args={[idler, gearMat, idle.length]} castShadow frustumCulled={false} userData={{ tankGear: true }} />
+      <mesh geometry={arms} material={gearMat} userData={{ tankGear: true }} />
+      <instancedMesh key={`s${sprocket.uuid}`} ref={sprockets} args={[sprocket, rusty ? matOf('rim', '#7a5a44', 0.2, 0.9) : sprocketMat, 2]} castShadow frustumCulled={false} />
     </>
   )
 }
@@ -1693,7 +1706,7 @@ function CarBody({ body, model, color, finish, skin, modSkin, panels, highlight,
   const topper = hat && !rusty && <Hat hat={hat} spot={hatSpot(body, model, p)} />
   const pool = fit.lights === 'underglow' && <UnderglowPool body={body} />
   const tracks = (own: boolean) => s.tracks && (
-    <TankTracks wheel={s.wheel} wz={wz} tx={wx} rims={fit.rims} rimColor={rimColor} rusty={rusty} look={look} tires={fit.tires} skin={modSkin?.tracks} rig={rig} own={own} />
+    <TankTracks wheel={s.wheel} wz={wz} tx={wx} rusty={rusty} tires={fit.tires} skin={modSkin?.tracks} rig={rig} own={own} />
   )
   if (lean && rig) {
     // Chrome (its studio reflections) and custom panels can't be baked: that paint is drawn on its own.

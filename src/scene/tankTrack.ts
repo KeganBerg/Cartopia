@@ -214,3 +214,100 @@ export function rollers(l: Loop) {
   for (const z of [-l.wz * 0.35, l.wz * 0.35]) out.push([z, l.cy + l.rc - PLATE / 2 - ry, ry])
   return out
 }
+
+// Running gear: what a real tank has inside its tracks in place of car wheels. Every piece
+// carries its colours on its vertices (rubber tyre band, armour steel, the hub caps in the
+// track skin's accent), so the road wheels are one instanced mesh and the idlers another.
+// Built at radius R across y and z (an instance scales on to its own wheel's size) with its
+// true width along x, the axle.
+export type GearLook = { rubber: string; steel: string; hub: string }
+type Part = 'rubber' | 'steel' | 'hub'
+function paint(list: [BufferGeometry, Part][], look: GearLook) {
+  const out = list.map(([g, part]) => {
+    const c = new Color(look[part])
+    const n = g.getAttribute('position').count
+    const col = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3)
+    g.setAttribute('color', new Float32BufferAttribute(col, 3))
+    return g
+  })
+  const g = mergeGeometries(out)!
+  out.forEach((x) => x.dispose())
+  return g
+}
+function putPart(list: [BufferGeometry, Part][], part: Part, geo: BufferGeometry, p: V3, r: V3 = [0, 0, 0]) {
+  const tmp: [BufferGeometry, LinkRole][] = []
+  put(tmp, 'plate', geo, p, r)
+  list.push([tmp[0][0], part])
+}
+// A disc whose axle is x: radius rad, thickness t, centred at x.
+const disc = (rad: number, t: number, seg: number) => new CylinderGeometry(rad, rad, t, seg)
+const AX: V3 = [0, 0, Math.PI / 2]
+
+const gearCache = new Map<string, BufferGeometry>()
+const gearKey = (kind: string, w: number, R: number, l: GearLook) => `${kind}|${w}|${R}|${l.rubber}|${l.steel}|${l.hub}`
+
+// A road wheel: a solid rubber tyre band round a stepped steel disc, a domed hub cap and a
+// ring of six bolts on each face. w: its width.
+export function roadWheelGeo(w: number, R: number, look: GearLook) {
+  const key = gearKey('road', w, R, look)
+  const hit = gearCache.get(key)
+  if (hit) return hit
+  const L: [BufferGeometry, Part][] = []
+  // Tyre band, a little rounded at its edges.
+  putPart(L, 'rubber', new CylinderGeometry(1, 1, w * 0.86, 24, 1, true), [0, 0, 0], AX)
+  for (const sx of [-1, 1]) putPart(L, 'rubber', new CylinderGeometry(0.97, 1, w * 0.07, 24, 1, true), [sx * w * 0.465, 0, 0], [0, 0, (-sx * Math.PI) / 2])
+  // The band's inner lip, then the steel disc stepping in to a raised boss.
+  putPart(L, 'rubber', disc(0.97, w * 0.94, 24), [0, 0, 0], AX)
+  putPart(L, 'steel', disc(0.8, w * 1.02, 22), [0, 0, 0], AX)
+  putPart(L, 'steel', disc(0.52, w * 1.12, 18), [0, 0, 0], AX)
+  putPart(L, 'hub', disc(0.23, w * 1.24, 14), [0, 0, 0], AX)
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2
+    for (const sx of [-1, 1]) putPart(L, 'hub', disc(0.06, 0.008, 6), [sx * w * 0.56, Math.cos(a) * 0.38, Math.sin(a) * 0.38], AX)
+  }
+  const g = paint(L, look).scale(1, R, R)
+  gearCache.set(key, g)
+  return g
+}
+
+// The idler at the front: an all-steel wheel with a raised rim, six lightening holes (dark
+// recesses) and a big hub, as wide as a pair of road wheels.
+export function idlerGeo(w: number, R: number, look: GearLook) {
+  const key = gearKey('idler', w, R, look)
+  const hit = gearCache.get(key)
+  if (hit) return hit
+  const L: [BufferGeometry, Part][] = []
+  const half = 0.035
+  for (const sx of [-1, 1]) {
+    putPart(L, 'steel', disc(1, w, 28), [sx * half, 0, 0], AX)
+    putPart(L, 'steel', new CylinderGeometry(0.82, 0.82, w * 1.2, 28, 1, true), [sx * half, 0, 0], AX)
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.PI / 6
+      putPart(L, 'rubber', disc(0.17, 0.004, 12), [sx * (half + w / 2 + 0.001), Math.cos(a) * 0.55, Math.sin(a) * 0.55], AX)
+    }
+  }
+  putPart(L, 'steel', disc(0.3, half * 2, 16), [0, 0, 0], AX)
+  putPart(L, 'hub', disc(0.19, half * 2 + w + 0.016, 14), [0, 0, 0], AX)
+  const g = paint(L, look).scale(1, R, R)
+  gearCache.set(key, g)
+  return g
+}
+
+// Suspension: a trailing arm from each road wheel's hub up and forward into the hull, and a
+// bump stop above it, on the inside of the inner wheel. Static (the wheels turn on its end).
+// at: [z, y] of each road wheel; x: the side's inner face (signed).
+export function armsGeo(at: [number, number][], xs: number[], look: GearLook) {
+  const key = `arms|${at.map((a) => a.join()).join(';')}|${xs.join()}|${look.steel}`
+  const hit = gearCache.get(key)
+  if (hit) return hit
+  const L: [BufferGeometry, Part][] = []
+  for (const x of xs) for (const [z, y] of at) {
+    putPart(L, 'steel', new BoxGeometry(0.022, 0.024, 0.11), [x, y + 0.03, z + 0.045], [-0.55, 0, 0])
+    putPart(L, 'hub', disc(0.016, 0.03, 8), [x, y, z], AX)
+    putPart(L, 'steel', new BoxGeometry(0.03, 0.02, 0.03), [x, y + 0.075, z + 0.09])
+  }
+  const g = paint(L, look)
+  gearCache.set(key, g)
+  return g
+}
