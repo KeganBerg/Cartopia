@@ -529,6 +529,9 @@ export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean;
       else setSkip((k) => k + 1)
     } else if (!ten && !shown) setSkip((k) => k + 1)
   }
+  // Coins and gems: along the top, or (in the Cars menu on a phone, where the top is the
+  // depot's sign) on the dock above the crates. CSS shows one of the two.
+  const wallet = (at: 'top' | 'dock') => <span className={`crate-wallet at-${at}`}><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>
   return (
     <div className={embedded ? 'race-full crate-full embedded' : 'race-full crate-full'} onClick={tap}>
       {/* Taps go through the canvas to the screen behind it: "Tap to skip". */}
@@ -536,7 +539,7 @@ export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean;
       {!embedded && <LoadingScene ready={stageReady} label="Opening the Crate Depot" onClose={close} />}
       <div className="rf-top">
         <h2>📦 Crate Depot</h2>
-        <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>
+        {wallet('top')}
         {!embedded && <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>}
       </div>
       {phase === 'open' && open?.drop.kind === 'callcard' && (shown || summary != null) && <CardOnLift key={`${run}-${open.drop.card}`} card={open.drop.card} inSum={summary != null} />}
@@ -565,6 +568,7 @@ export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean;
       )}
       {phase !== 'open' && !chained && (
         <div className="crate-dock" onClick={(e) => e.stopPropagation()}>
+          {wallet('dock')}
           <div className="crate-pick">
             {CRATES.map((c) => (
               <button key={c.id} className={`crate-tab${c.id === pick ? ' sel' : ''}${level < c.unlockLevel ? ' locked' : ''}`} onClick={() => choose(c.id)} disabled={phase !== 'idle'}>
