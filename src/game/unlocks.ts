@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from './store'
 import { sfx } from '../lib/sound'
+import { canBuyPacks } from './payGate'
 
 type Game = ReturnType<typeof useGame.getState>
 
@@ -24,10 +25,12 @@ export const UNLOCKS = {
   trophies: (s: Game) => s.tutorial >= DONE || (s.stats.races ?? 0) > 0,
   social: (s: Game) => s.tutorial >= DONE && s.level >= 2,
   season: (s: Game) => s.tutorial >= DONE && s.level >= 3,
+  // The Bank and Car Packs (real money) wait for the town's own Crew House, even while visiting.
+  bank: (s: Game) => s.tutorial >= DONE && canBuyPacks(s),
 } satisfies Record<string, (s: Game) => boolean>
 export type Unlock = keyof typeof UNLOCKS
 
-export const unlocked = (s: Game, id: Unlock) => !!s.visiting || UNLOCKS[id](s)
+export const unlocked = (s: Game, id: Unlock) => (id !== 'bank' && !!s.visiting) || UNLOCKS[id](s)
 
 // True once `id` is unlocked. `fresh` is true for a few seconds when it unlocks while the
 // player watches, so the button can pop in with a NEW tag; on load it's just there.

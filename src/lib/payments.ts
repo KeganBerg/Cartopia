@@ -8,7 +8,7 @@ import { flushSave, signedInUser } from './cloud'
 // sends the player to Stripe; stripe-webhook.mts records the paid pack in the purchases table
 // (purchase_record()), and syncPurchases() adds rows the save hasn't counted yet. The save guard
 // only lets the gems in when the row is there, so a page can't grant itself a pack.
-export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'owned' | 'failed' }
+export type PurchaseResult = { ok: true } | { ok: false; reason: 'not-connected' | 'sign-in' | 'blocked' | 'owned' | 'crew' | 'failed' }
 
 export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
   if (!supabase) return { ok: false, reason: 'not-connected' }
@@ -16,6 +16,8 @@ export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
   const token = data.session?.access_token
   if (!token || !signedInUser()) return { ok: false, reason: 'sign-in' }
   try {
+    // The server checks the saved town for its Crew House (src/game/payGate.ts), so save first.
+    await flushSave()
     const res = await fetch('/.netlify/functions/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -23,9 +25,11 @@ export async function purchase(pack: BucksPack): Promise<PurchaseResult> {
     })
     if (res.status === 503 || res.status === 404) return { ok: false, reason: 'not-connected' }
     if (res.status === 401) return { ok: false, reason: 'sign-in' }
-    const { url } = (await res.json().catch(() => ({}))) as { url?: string }
+    const { url, error } = (await res.json().catch(() => ({}))) as { url?: string; error?: string }
     // A car pack this account already has.
     if (res.status === 409) return { ok: false, reason: 'owned' }
+    // The saved town has no Crew House yet.
+    if (res.status === 403 && error === 'crew') return { ok: false, reason: 'crew' }
     // A refunded or charged-back pack's gems were already spent on this account.
     if (res.status === 403) return { ok: false, reason: 'blocked' }
     if (!res.ok || !url) return { ok: false, reason: 'failed' }

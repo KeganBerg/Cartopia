@@ -30,6 +30,7 @@ import { ThoughtBubble } from './ui/Thought'
 import { NeedPanel } from './ui/Need'
 import { UpgradePanel } from './ui/Upgrade'
 import { BankPanel } from './ui/Bank'
+import { unlocked } from './game/unlocks'
 import { CarPacksPanel } from './ui/CarPacks'
 import { DealsPanel } from './ui/Deals'
 import { LevelUpSplash } from './ui/LevelUp'
@@ -104,6 +105,8 @@ const prefetchPanels = () => {
 export default function App() {
   useAdminCheck()
   const panel = useGame((s) => s.panel)
+  // Real-money menus need the Crew House (src/game/payGate.ts).
+  const bankOn = useGame((s) => unlocked(s, 'bank'))
   const paceStep = useTownPace((p) => p.step)
   const pace = PACES[paceStep]
   const free = useFreeCam((f) => f.on)
@@ -210,8 +213,8 @@ export default function App() {
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
-      {panel === 'bank' && <BankPanel />}
-      {panel === 'carpacks' && <CarPacksPanel />}
+      {panel === 'bank' && bankOn && <BankPanel />}
+      {panel === 'carpacks' && bankOn && <CarPacksPanel />}
       {panel === 'deals' && <DealsPanel />}
       {panel === 'battle' && <BattlePanel />}
       <VisitBanner />

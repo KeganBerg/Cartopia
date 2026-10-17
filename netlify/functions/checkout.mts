@@ -5,6 +5,7 @@
 // nobody can pay before the gems can be granted.
 // The gems are granted by stripe-webhook.mts once Stripe says the payment cleared.
 import { packById, sessionForm } from '../../src/lib/stripeCheckout'
+import { canBuyPacks } from '../../src/game/payGate'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
 
@@ -35,8 +36,14 @@ export default async (req: Request) => {
   if (owed.ok && ((await owed.json()) as unknown[]).length) return json({ error: 'blocked' }, 403)
 
   // The pack's coins and parts grow with the buyer's level (game_saves.level, kept by the save guard).
-  const save = await fetch(`${url}/rest/v1/game_saves?select=level&owner_id=eq.${user}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
-  const level = save.ok ? ((await save.json()) as { level?: number }[])[0]?.level ?? 1 : 1
+  const save = await fetch(`${url}/rest/v1/game_saves?select=level,buildings:state->buildings&owner_id=eq.${user}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
+  const row = save.ok ? ((await save.json()) as { level?: number; buildings?: { def?: unknown }[] | null }[])[0] : undefined
+  const level = row?.level ?? 1
+  // Packs open with the Crew House (src/game/payGate.ts); the admin (public.is_admin()) skips it.
+  if (!canBuyPacks({ buildings: row?.buildings })) {
+    const admin = await fetch(`${url}/rest/v1/rpc/is_admin`, { method: 'POST', headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(6000) })
+    if (!(admin.ok && (await admin.json()) === true)) return json({ error: 'crew' }, 403)
+  }
   // Each account gets a car pack's car once. Any level can buy one (Kegan, 2026-10-15).
   if (pack.car) {
     const had = await fetch(`${url}/rest/v1/purchases?select=seq&pack=eq.${pack.id}&limit=1`, { headers: { apikey: anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(6000) })
