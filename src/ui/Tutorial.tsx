@@ -4,6 +4,7 @@ import { fuelPerMin, PAINTS, RACE_FUEL, STARTER_PAINTS, buildingDef, carDef, upg
 import { raceCarOf } from '../game/raceCar'
 import { CarThumb } from '../scene/BuildingPreview'
 import { sfx } from '../lib/sound'
+import { sayLine, type VoiceLine } from '../lib/tutorialVoice'
 
 type Game = ReturnType<typeof useGame.getState>
 // What the current step points at: it pulses so the player knows where to tap.
@@ -15,35 +16,38 @@ const editing = (s: Game) => s.mode !== 'play'
 // Steps either wait for the player to do something (`done`) or for a tap on Next.
 // One short line each; the pulsing target does the rest of the explaining.
 // pick: the step is the paint and rims picker. gas: the step shows the gas numbers.
+// voice: the spoken line for the text on screen (lib/tutorialVoice.ts); change both together.
 // Saves keep the step number, so new steps go in before the race prompt: a save part way
 // through lands on a step that moves on by itself or by a tap, and 99 (done) never changes.
-type Step = { icon: string; text: (s: Game) => string; target?: (s: Game) => TutTarget | null; done?: (s: Game) => boolean; pick?: true; gas?: true }
+type Step = { icon: string; text: (s: Game) => string; voice: (s: Game) => VoiceLine; target?: (s: Game) => TutTarget | null; done?: (s: Game) => boolean; pick?: true; gas?: true }
 const STEPS: Step[] = [
-  { icon: '👋', text: () => "Welcome to Cartopia! Let's earn your first coins." },
+  { icon: '👋', text: () => "Welcome to Cartopia! Let's earn your first coins.", voice: () => '01-welcome' },
   {
-    icon: '⛽', text: () => 'Tap a pulsing ⛽ bubble to send a car on a pizza job.',
+    icon: '⛽', text: () => 'Tap a pulsing ⛽ bubble to send a car on a pizza job.', voice: () => '02-pizza-job',
     target: () => 'pizza', done: (s) => s.buildings.some((b) => b.jobEndsAt !== null) || s.stats.jobs > 0,
   },
-  { icon: '💰', text: () => 'When the gold $ pops up, tap it to collect.', target: () => 'pizza', done: (s) => s.stats.jobs > 0 },
+  { icon: '💰', text: () => 'When the gold $ pops up, tap it to collect.', voice: () => '03-collect', target: () => 'pizza', done: (s) => s.stats.jobs > 0 },
   {
     icon: '🔧',
     text: (s) => s.mode === 'place' ? (TOUCH ? "Tap the glowing lot to build Rusty's there." : "Click the glowing lot to build Rusty's there.") : "Build Rusty's Rescue: tap SHOP, then START HERE.",
+    voice: (s) => s.mode === 'place' ? (TOUCH ? '05-build-lot-tap' : '06-build-lot-click') : '04-build-shop',
     target: (s) => (editing(s) ? null : 'shop'), done: (s) => s.buildings.some((b) => b.def === 'rescue'),
   },
   {
     icon: '🔍', text: (s) => editing(s) ? 'Built! Tap Done, then 🔍 Find cars over Rusty’s.' : 'Tap 🔍 Find cars over Rusty’s to hunt for old cars.',
+    voice: (s) => (editing(s) ? '07-built-find' : '08-find-cars'),
     target: (s) => (editing(s) ? 'done' : 'rescue'), done: (s) => (s.stats.searches ?? 0) > 0,
   },
   {
-    icon: '🛠', text: () => 'Restore a find in Rusty’s bay. Fixed-up cars drive around town.',
+    icon: '🛠', text: () => 'Restore a find in Rusty’s bay. Fixed-up cars drive around town.', voice: () => '09-restore',
     target: () => 'rescue',
     // A search that turned up no cars has nothing to restore: move on rather than stall.
     done: (s) => !!s.restoring || (s.stats.rescued ?? 0) > 0 || (!s.search && s.junkyard.length === 0),
   },
-  { icon: '🎨', text: () => 'Make it yours: one paint, one set of rims.', pick: true },
-  { icon: '⛽', text: () => 'Races use gas. It refills, and Gas Stations hold more.', gas: true },
+  { icon: '🎨', text: () => 'Make it yours: one paint, one set of rims.', voice: () => '10-paint-rims', pick: true },
+  { icon: '⛽', text: () => 'Races use gas. It refills, and Gas Stations hold more.', voice: () => '11-gas', gas: true },
   // Done after the first race, not on opening the menu: the hand leads the way to it there.
-  { icon: '🏁', text: () => 'While Rusty works, tap RACE for your first race!', target: () => 'race', done: (s) => (s.stats.races ?? 0) > 0 },
+  { icon: '🏁', text: () => 'While Rusty works, tap RACE for your first race!', voice: () => '12-first-race', target: () => 'race', done: (s) => (s.stats.races ?? 0) > 0 },
 ]
 
 // After the last step the goal screen shows (GoalSplash), then the tutorial is done (99).
@@ -88,6 +92,15 @@ export function handTarget(s: Game): string[] | 'lot' | null {
   // The paint pick: a colour in each row still unpicked, then Done. Other steps: Next.
   if (STEPS[step].pick) return ['.tut-swatches:not(:has(.sel)) .dot:nth-child(3)', '.tutorial .buy:not(:disabled)']
   return STEPS[step].done ? null : ['.tutorial .buy']
+}
+
+// The line to say now: the step's, while the town or the step's own menu is showing; none in
+// any other menu, on a visit or over a level-up (a line cut off there starts over once it closes).
+export function voiceLine(s: Game): VoiceLine | null {
+  const st = STEPS[s.tutorial]
+  if (!st || s.visiting || s.levelUp) return null
+  if (s.panel && !STEP_PANELS[s.panel]?.includes(s.tutorial)) return null
+  return st.voice(s)
 }
 
 // Is the tutorial card on screen? Other hints stay quiet so one instruction shows at a time.
@@ -136,6 +149,17 @@ export function Tutorial() {
   const [paint, setPaint] = useState<string | null>(null)
   const [rim, setRim] = useState<string | null>(null)
   const cur = STEPS[step]
+
+  // Say each step's line as it comes up; quiet once the tutorial is done or skipped.
+  useEffect(() => {
+    const say = () => sayLine(voiceLine(useGame.getState()))
+    say()
+    const off = useGame.subscribe(say)
+    return () => {
+      off()
+      sayLine(null)
+    }
+  }, [])
 
   // Auto-advance steps that wait on an action.
   useEffect(() => {
