@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { UNLOCKS, hasCrewHouse, unlocked, type Unlock } from './unlocks'
+import { UNLOCKS, unlocked, type Unlock } from './unlocks'
 
 type S = Parameters<typeof unlocked>[0]
 const at = (tutorial: number, level = 1, races = 0, buildings: { def: string }[] = []) => ({ tutorial, level, stats: { races }, visiting: null, buildings }) as unknown as S
@@ -39,14 +39,7 @@ describe('real-money buys wait for the Crew House (Kegan, 2026-10-17)', () => {
   })
 })
 
-describe('Crew House unlock', () => {
-  it('needs a built Crew House; the admin skips it', () => {
-    expect(hasCrewHouse({ buildings: [] })).toBe(false)
-    expect(hasCrewHouse({ buildings: [{ def: 'rescue' }] })).toBe(false)
-    expect(hasCrewHouse({ buildings: [{ def: 'rescue' }, { def: 'crew' }] })).toBe(true)
-    expect(hasCrewHouse({ buildings: [], admin: true })).toBe(true)
-  })
-
+describe('crews wait for the Crew House (Kegan, 2026-10-17)', () => {
   it('locks the Crew window until it is built, unless already in a crew', () => {
     const src = readFileSync('src/ui/Social.tsx', 'utf8')
     const panel = src.slice(src.indexOf('export function ClanPanel'), src.indexOf('function CrewLocked'))

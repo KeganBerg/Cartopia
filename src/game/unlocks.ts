@@ -57,7 +57,3 @@ export function useUnlock(id: Unlock): { on: boolean; fresh: boolean } {
 
 // The class a newly arrived button wears: it pops in and shows a NEW tag.
 export const freshClass = (fresh: boolean) => (fresh ? ' just-unlocked' : '')
-
-// The Crew House unlocks crews (joining, starting, battles, crew chat) and the real-money shop.
-// The admin skips the lock. Shared by the Crew window and the gem shop.
-export const hasCrewHouse = (s: { buildings: { def: string }[]; admin?: boolean }) => !!s.admin || s.buildings.some((b) => b.def === 'crew')
