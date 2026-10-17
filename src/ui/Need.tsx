@@ -1,5 +1,5 @@
 import { useGame, fuelCap, gateLevel } from '../game/store'
-import { buildingDef, isOpen, xpToNext, raceXp, fuelRegenSeconds, fuelPerMin, nextFuelStep, RACE_FUEL, refillBucks, LEVEL_GEMS, type BuildingDef } from '../game/data'
+import { buildingDef, isOpen, xpToNext, raceXp, xpGain, fuelRegenSeconds, fuelPerMin, nextFuelStep, RACE_FUEL, refillBucks, LEVEL_GEMS, type BuildingDef } from '../game/data'
 import { useNow } from '../scene/useNow'
 import { Panel } from './Menus'
 import { WHEEL } from '../game/wheel'
@@ -86,7 +86,7 @@ export function NeedPanel() {
     sources = [
       { icon: '🏪', title: 'Collect from businesses', detail: 'Every job you collect gives XP.', action: { label: 'Show me', run: showJobs } },
       { icon: '🏗', title: 'Build and buy', detail: 'New buildings, cars and upgrades all give XP.', action: { label: 'Shop', run: () => s.openPanel('shop') } },
-      { icon: '🏆', title: 'Race', detail: `Wins give ${raceXp(true, s.level).toLocaleString()} XP.`, action: { label: 'Race', run: () => s.openPanel('race') } },
+      { icon: '🏆', title: 'Race', detail: `Wins give ${xpGain(s.level, raceXp(true, s.level)).toLocaleString()} XP.`, action: { label: 'Race', run: () => s.openPanel('race') } },
       { icon: '📋', title: 'Goals', detail: 'Goals give big XP rewards.', action: { label: 'Goals', run: () => s.openPanel('goals') } },
     ]
   }

@@ -42,3 +42,29 @@ describe('XP for playing', () => {
     expect(masteryXp(1, [], [], false)).toBe(0)
   })
 })
+
+describe('level XP boost', () => {
+  it('leaves levels 1-3 alone and ramps to x3 by level 7', async () => {
+    const { levelXpBoost, xpGain } = await import('./data')
+    expect([1, 2, 3, 4, 5, 6, 7, 40].map(levelXpBoost)).toEqual([1, 1, 1, 1.5, 2, 2.5, 3, 3])
+    expect(xpGain(20, 220)).toBe(660)
+  })
+
+  it('pays chests a share of the level', async () => {
+    const { chestXp, xpToNext } = await import('./data')
+    expect(chestXp('daily', 20)).toBe(Math.round(0.1 * xpToNext(20)))
+    expect(chestXp('weekly', 20)).toBe(Math.round(0.3 * xpToNext(20)))
+  })
+
+  it('applies in the store and floats the gain by the gauge', async () => {
+    const { useGame } = await import('./store')
+    const { onFx } = await import('./fx')
+    const seen: number[] = []
+    const off = onFx((e) => { if (e.kind === 'xp') seen.push(e.amount) })
+    useGame.setState({ level: 10, xp: 0 })
+    useGame.getState().finishRace(false, 0)
+    off()
+    expect(useGame.getState().xp).toBe(Math.round(raceXp(false, 10) * 3))
+    expect(seen).toEqual([Math.round(raceXp(false, 10) * 3)])
+  })
+})

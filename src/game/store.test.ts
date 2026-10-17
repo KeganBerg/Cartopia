@@ -198,7 +198,7 @@ describe('collection sets', () => {
     expect(g().coins).toBe(0)
     g().claimSet('daily')
     expect(g().claimedSets).toEqual(['daily'])
-    expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 30, 5, 60])
+    expect([g().coins, g().bucks, g().trophies, g().xp]).toEqual([1500, 30, 5, 60 * 3]) // XP has the x3 level boost at 20
     g().claimSet('daily')
     expect(g().coins).toBe(1500)
   })

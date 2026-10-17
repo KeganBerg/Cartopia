@@ -8,7 +8,7 @@ import {
 import { ENDLESS_PAY, KINDS, endlessCapped, endlessHave, endlessPay, endlessText, type EndlessGoal, type EndlessKind } from '../game/endless'
 import {
   GOALS, QUEST_PAY, TASKS_PER_PERIOD, payAt, msToNextDay, msToNextWeek, buildingDef, buildingLevel, upgradable, maxLevel,
-  carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, gasCanCost,
+  carDef, takesDriver, SEASON_STARS, activeEvent, eventEndsAt, plotPrice, START_LAND, type StatKey, type GoalDef, flatFixCost, servicePay, serviceXp, xpGain, chestXp, gasCanCost,
 } from '../game/data'
 import { Panel, SheetTabs, openGarageTab } from './Menus'
 import { openRaceTab, type RaceTab } from './raceNav'
@@ -160,13 +160,16 @@ const left = (ms: number) => {
   const m = Math.max(1, Math.ceil(ms / 60000))
   return m >= 1440 ? `${Math.floor(m / 1440)}d ${Math.floor((m % 1440) / 60)}h` : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
 }
-function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number; bucks?: number; parts?: number; stars?: number }) {
+// xp is base XP (shown with the level boost); exactXp is already final (chests).
+function Reward({ coins, xp, exactXp, bucks, parts, stars }: { coins: number; xp?: number; exactXp?: number; bucks?: number; parts?: number; stars?: number }) {
+  const level = useGame((s) => s.level)
+  const shownXp = exactXp ?? (xp ? xpGain(level, xp) : 0)
   return (
     <span className="goal-pay">
       <i className="coin-ico ico">$</i>{n(coins)}
       {!!bucks && <><i className="buck-ico ico">💎</i>{bucks}</>}
       {!!parts && <><i className="parts-ico ico">⚙</i>{parts}</>}
-      {!!xp && <b>+{n(xp)} XP</b>}
+      {!!shownXp && <b>+{n(shownXp)} XP</b>}
       {!!stars && <b className="star-pay">+{stars} ⭐</b>}
     </span>
   )
@@ -175,6 +178,7 @@ function Reward({ coins, xp, bucks, parts, stars }: { coins: number; xp?: number
 function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay, children }: {
   icon: React.ReactNode; text: string; have: number; target: number; done: boolean; claimed?: boolean; wait?: string; onGo: () => void; onClaim: () => void; pay?: Amounts; children: React.ReactNode
 }) {
+  const level = useGame((s) => s.level)
   return (
     <div className={claimed ? 'goal claimed' : done ? 'goal done' : 'goal'}>
       <span className={typeof icon === 'string' ? 'goal-icon' : 'goal-icon goal-thumb'}>{icon}</span>
@@ -191,7 +195,7 @@ function Row({ icon, text, have, target, done, claimed, wait, onGo, onClaim, pay
         : done && wait
           ? <button className="buy small" disabled title="Endless goals: back tomorrow (UTC)">🔒 {wait}</button>
           : done
-          ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay); onClaim() }}>Collect</button>
+          ? <button className="buy small" onClick={(e) => { if (pay) flyFrom(e.currentTarget, pay.xp ? { ...pay, xp: xpGain(level, pay.xp) } : pay); onClaim() }}>Collect</button>
           : <button className="buy small alt" onClick={onGo}>Go ›</button>}
     </div>
   )
@@ -291,9 +295,9 @@ function Tasks({ period }: { period: Period }) {
         <div className="chest-main">
           <b>{period === 'daily' ? 'Daily chest' : 'Weekly chest'}</b>
           <div className="chest-pips">{Array.from({ length: TASKS_PER_PERIOD }, (_, i) => <i key={i} className={i < done.length ? 'on' : ''} />)}</div>
-          <Reward coins={chestPay.coins} bucks={chest.bucks} parts={chest.parts} stars={period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest} />
+          <Reward coins={chestPay.coins} exactXp={chestXp(period, s.level)} bucks={chest.bucks} parts={chest.parts} stars={period === 'daily' ? SEASON_STARS.dailyChest : SEASON_STARS.weeklyChest} />
         </div>
-        {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={(e) => { openChestFx(e.currentTarget, { coins: chestPay.coins, parts: chest.parts, bucks: chest.bucks, xp: chestPay.xp }); s.claimChest(period) }}>{ready ? 'Open' : '🔒'}</button>}
+        {opened ? <span className="goal-check">✔</span> : <button className="buy small" disabled={!ready} onClick={(e) => { openChestFx(e.currentTarget, { coins: chestPay.coins, parts: chest.parts, bucks: chest.bucks, xp: chestXp(period, s.level) }); s.claimChest(period) }}>{ready ? 'Open' : '🔒'}</button>}
       </div>
       {period === 'weekly' && <CrewGoalMini />}
     </>
@@ -403,7 +407,7 @@ export function FlatPanel() {
         <div className="sources">
           <div className="source">
             <span className="source-icon">⛽</span>
-            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `+$${servicePay(s.level, 'gas')} · ⭐ ${serviceXp('gas', s.level)} XP` : 'Earns on every fill-up'}</div></div>
+            <div><b>Fill up at your Gas Station</b><div className="card-stat">{owns('gas') ? `+$${servicePay(s.level, 'gas')} · ⭐ ${xpGain(s.level, serviceXp('gas', s.level))} XP` : 'Earns on every fill-up'}</div></div>
             {owns('gas') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'gas')}>Fill up · +${servicePay(s.level, 'gas')}</button> : <button className="buy small" onClick={() => s.openShop('gas')}>Build</button>}
           </div>
           <div className="source">
@@ -421,12 +425,12 @@ export function FlatPanel() {
       <div className="sources">
         <div className="source">
           <span className="source-icon">🛞</span>
-          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `+$${servicePay(s.level, 'tires')} · ⭐ ${serviceXp('tires', s.level)} XP` : s.level < 2 ? '🔒 Level 2' : 'Earns on every flat'}</div></div>
+          <div><b>Send it to your Tire Shop</b><div className="card-stat">{owns('tires') ? `+$${servicePay(s.level, 'tires')} · ⭐ ${xpGain(s.level, serviceXp('tires', s.level))} XP` : s.level < 2 ? '🔒 Level 2' : 'Earns on every flat'}</div></div>
           {owns('tires') ? <button className="buy small" onClick={() => s.serviceCar(car.uid, 'tires')}>Fix · +${servicePay(s.level, 'tires')}</button> : s.level >= 2 ? <button className="buy small" onClick={() => s.openShop('tires')}>Build</button> : null}
         </div>
         <div className="source">
           <span className="source-icon">🔧</span>
-          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? `Free · ⭐ ${serviceXp('tow', s.level)} XP` : "🔒 Needs Rusty's Rescue"}</div></div>
+          <div><b>Call Rusty's tow</b><div className="card-stat">{hasRusty ? `Free · ⭐ ${xpGain(s.level, serviceXp('tow', s.level))} XP` : "🔒 Needs Rusty's Rescue"}</div></div>
           <button className="buy small alt" onClick={() => s.fixFlat(car.uid, true)} disabled={!hasRusty}>Tow · free</button>
         </div>
         <div className="source">

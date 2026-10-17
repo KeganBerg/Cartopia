@@ -45,8 +45,11 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
   await p.waitForTimeout(2500)
   await p.screenshot({ path: `${out}/${form}-4-mastery.png` })
   await p.evaluate(() => { const g = window.__game; g.getState().closeMasteryPrize(); g.getState().finishRace(true, 500) })
-  await p.waitForTimeout(600)
+  await p.waitForTimeout(450)
   await p.screenshot({ path: `${out}/${form}-5-race-toast.png` })
+  await p.evaluate(() => window.__game.getState().openPanel('goals'))
+  await p.waitForTimeout(1500)
+  await p.screenshot({ path: `${out}/${form}-6-goals.png` })
   await p.close()
 }
 await b.close()
