@@ -8,7 +8,7 @@ import { openModSlot } from './Mods'
 
 const left = (ms: number) => {
   const m = Math.max(1, Math.ceil(ms / 60000))
-  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
+  return m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m}m`
 }
 
 const cost = (c: { coins: number; bucks: number }, parts = 0) =>

@@ -7,6 +7,8 @@
 .race-panel .panel-head .close { margin-left: auto; flex: none; }
 .race-panel .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .rm-head-chip { background: rgba(10,30,70,.35); border: 2px solid rgba(20,33,61,.55); color: #fff; border-radius: 999px; padding: 2px 10px; font: 900 13px Nunito, sans-serif; white-space: nowrap; text-shadow: 0 1px 0 rgba(0,0,0,.4); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* phones: menus with a chip step the title down a size so the chip (a timer) shows whole, not "2d..." */
+@media (max-width: 600px) { .race-panel .panel-head:has(.rm-head-chip) h2 { font-size: 25px; -webkit-text-stroke-width: 4.5px; } .race-panel .rm-head-chip { flex-shrink: 0; max-width: 44vw; } }
 .rm-screen { flex: 1; min-height: 0; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .rm-s-quick { display: block; }
 
@@ -27,7 +29,7 @@
 .rm-qc-top .rm-mi { position: absolute; inset: 0; display: grid; place-items: center; font-size: 54px; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
 .rm-cc-gem { position: absolute; z-index: 2; top: 7px; left: 7px; width: 28px; height: 28px; display: grid; place-items: center; font-size: 15px; border-radius: 50%; background: rgba(8,14,32,.55); border: 2px solid var(--cc-edge, #fff); }
 .rm-qc-body { position: relative; z-index: 2; padding: 22px 10px 10px; margin-top: -18px; display: flex; flex-direction: column; gap: 6px; background: linear-gradient(180deg, rgba(6,10,26,0), rgba(6,10,26,.78) 30%, rgba(6,10,26,.9)); }
-.rm-qc-body b { font: 18px var(--display); line-height: 1.1; color: #fff; text-shadow: 0 2px 0 #14213d; -webkit-text-stroke: .6px #14213d; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rm-qc-body b { font: 18px var(--display); line-height: 1.1; padding-inline: 1px; margin-inline: -1px; color: #fff; text-shadow: 0 2px 0 #14213d; -webkit-text-stroke: .6px #14213d; letter-spacing: .2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rm-qc-chips { display: flex; gap: 5px; align-items: center; font: 900 12px Nunito, sans-serif; color: #dfe9ff; }
 .rm-qc-chips > span:first-child { background: rgba(255,255,255,.16); border-radius: 6px; padding: 0 6px; }
 .rm-qc-body .buy { margin-top: auto; width: 100%; }
@@ -452,6 +454,10 @@ div.rm-node { cursor: default; }
 .rm-hub .rm-ev .rm-meta { gap: 8px; }
 .rm-hub .rm-pips i { width: 11px; height: 11px; border-width: 2px; }
 .rm-hub .rm-rounds i { width: 24px; height: 24px; font: 13px var(--display); }
+/* six rounds must fit the narrow GP tile on desktop too: the dots shrink rather than run off its edge */
+.rm-hub .rm-gp .rm-meta:has(.rm-rounds), .rm-hub .rm-gp .rm-rounds { max-width: 100%; min-width: 0; }
+.rm-hub .rm-gp .rm-rounds { display: flex; gap: 3px; padding-right: 5px; }
+.rm-hub .rm-gp .rm-rounds i { flex: 0 1 24px; width: auto; min-width: 18px; aspect-ratio: 1; height: auto; }
 .rm-hub .rm-ev-skin { font: 13px var(--display); background: rgba(255,255,255,.14); }
 
 /* progress bar */
@@ -508,6 +514,8 @@ div.rm-node { cursor: default; }
 .rm-bar .rm-pi { font: 13px var(--display); letter-spacing: .3px; padding: 1px 7px; border: 2px solid #ffd84a; border-radius: 8px; }
 .rm-bar .rm-swap { font: 16px var(--display); letter-spacing: .3px; padding: 6px 16px 7px; border: 2.5px solid var(--line, #14213d); border-radius: 12px; background: linear-gradient(#ffd84a, #f0a400); color: #fff; -webkit-text-stroke: 3px #7a4a00; paint-order: stroke fill; box-shadow: inset 0 2px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.15), 0 3px 0 rgba(0,0,0,.35); }
 .rm-bar .rm-note { color: #cfe0ff; font: 14px var(--display); letter-spacing: .3px; }
+/* phones: the note wraps to two short lines so the car name beside it isn't cut to "Kazumi C..." */
+@media (max-width: 600px) { .rm-bar .rm-note { white-space: normal; max-width: 84px; font-size: 12px; line-height: 1.1; text-align: center; flex: none; } }
 .invites-car .rm-bar { background: linear-gradient(#24406f, #16264a); }
 
 /* hub redesign on phones (portrait) */

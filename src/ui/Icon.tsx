@@ -51,6 +51,17 @@ const GLYPHS = {
       <path d="M12 13.5 16.5 18 12 22.5 7.5 18Z" />
     </>
   ),
+  // Screenshot mode: a camera body with its lens.
+  shutter: (
+    <path fillRule="evenodd" d="M8.6 4h6.8l1.5 2.5h3.1A2 2 0 0 1 22 8.5v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h3.1ZM12 9a4.2 4.2 0 1 0 0 8.4A4.2 4.2 0 0 0 12 9Zm0 2.2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" />
+  ),
+  // Save a picture: an arrow down into a tray.
+  save: (
+    <>
+      <path d="M10.4 3h3.2v8h3.6L12 16.5 6.8 11h3.6Z" />
+      <path d="M3 14.5h2.6v3.7h12.8v-3.7H21V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    </>
+  ),
   goals: (
     <path fillRule="evenodd" d="M9 2h6a1 1 0 0 1 1 1v1h2.5A1.5 1.5 0 0 1 20 5.5v15a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 20.5v-15A1.5 1.5 0 0 1 5.5 4H8V3a1 1 0 0 1 1-1Zm1 2v1.5h4V4Zm5.8 6.2a1 1 0 0 0-1.5-1.3l-3.6 4.3-1.7-1.6a1 1 0 0 0-1.4 1.4l2.5 2.4a1 1 0 0 0 1.5-.1Zm-7.3 7.3a1 1 0 0 0 0 2h7a1 1 0 0 0 0-2Z" />
   ),
