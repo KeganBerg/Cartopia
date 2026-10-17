@@ -33,7 +33,7 @@ import { DEPOT_WALK, depotWalk } from './doorTrip'
 
 // Crate size (metres) and where its floor sits on the lift.
 const S = 1.5
-const LIFT = 0.14
+export const LIFT = 0.14
 // Opening timeline (seconds from the tap): `drop` is how long the crate takes to land, `charge`
 // how long it strains before it bursts, `rise` when the prize starts up out of it after the
 // burst and `lift` how long it takes to come up, `settle` when the prize is shown (from the tap)
@@ -45,6 +45,8 @@ const PACE = {
   quick: { drop: 0.28, charge: 0.36, rise: 0.04, lift: 0.5, settle: 0.86, hops: [0.1, 0.22] },
 } as const
 export const REVEAL_AT = PACE.full.settle
+// How long the crate's bounce lasts once it lands on the lift.
+const BOUNCE = 0.35
 
 // How exciting a prize is, as a glow colour: coins, a part or jackpot, a gem part, a car.
 export const TIER_GLOW = ['#4fc3f7', '#b388ff', '#ff4fd8', '#ffb300'] as const
@@ -247,7 +249,7 @@ function CrateModel({ def, glow, parts }: { def: CrateDef; glow: string; parts: 
     { pos: [0, 0, S / 2], ry: 0 }, { pos: [0, 0, -S / 2], ry: Math.PI }, { pos: [-S / 2, 0, 0], ry: -Math.PI / 2 }, { pos: [S / 2, 0, 0], ry: Math.PI / 2 },
   ]
   return (
-    <group ref={(o) => void (p.root = o)}>
+    <group name="crate" ref={(o) => void (p.root = o)}>
       {/* Skids and the floor of the crate. */}
       <group ref={(o) => void (p.base = o)}>
         {[-0.55, 0, 0.55].map((x) => <Plank key={x} w={0.16} h={0.12} d={S + 0.08} pos={[x * S, 0.06, 0]} mat={mats.frame} />)}
@@ -1099,7 +1101,8 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
   // A part shows the part itself; cars and paints show the car.
   const part = drop?.kind === 'mod' ? drop.mod : null
   // A part also shows on the car it's for (prizeLook fits it), so its shape reads at a glance.
-  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'callcard' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
+  // A Call Card has no car here: the card itself, with your car on it, stands over the lift (Crates.tsx CardOnLift).
+  const showCar = (drop?.kind === 'car' || drop?.kind === 'dupe' || drop?.kind === 'skin' || drop?.kind === 'skindupe' || drop?.kind === 'hat' || drop?.kind === 'piece' || drop?.kind === 'mod') && !!prizeCar
   const key = useRef<PointLight>(null)
   const rim = useRef<PointLight>(null)
   const lamps = useRef<Group>(null)
@@ -1123,23 +1126,26 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
     const root = p.root
     if (!root) return
     root.visible = !show
+    // A quick open starts straining as soon as it lands.
+    if (phase === 'open' && s.openAt < 0) s.openAt = pace === 'quick' ? now + Math.max(0, P.drop - (now - s.born)) : now
+    // A tap to skip lands the crate at once and jumps to the burst: it never bursts in mid-air
+    // with the prize rising from an empty lift under it.
+    if (skip !== s.skipped) {
+      s.skipped = skip
+      s.born = Math.min(s.born, now - P.drop - BOUNCE)
+      if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - P.settle)
+    }
     // Drop in from above on arrival, with a little bounce.
     const age = now - s.born
     const fall = Math.min(1, age / P.drop)
     let y = LIFT + (1 - fall * fall) * 5
-    if (fall >= 1) y = LIFT + Math.abs(Math.sin(Math.min(1, (age - P.drop) / 0.35) * Math.PI)) * 0.12 * Math.max(0, 1 - (age - P.drop) / 0.35)
+    if (fall >= 1) y = LIFT + Math.abs(Math.sin(Math.min(1, (age - P.drop) / BOUNCE) * Math.PI)) * 0.12 * Math.max(0, 1 - (age - P.drop) / BOUNCE)
     if (fall >= 1 && s.hops === 0) {
       s.hops = 1
       if (!show) bumpSound()
     }
     let shake = 0
     let charge = 0
-    // A quick open starts straining as soon as it lands.
-    if (phase === 'open' && s.openAt < 0) s.openAt = pace === 'quick' ? now + Math.max(0, P.drop - age) : now
-    if (skip !== s.skipped) {
-      s.skipped = skip
-      if (s.openAt > 0) s.openAt = Math.min(s.openAt, now - P.settle)
-    }
     const t = s.openAt > 0 ? now - s.openAt : -1
     if (t >= 0 && !s.charged) {
       s.charged = true
@@ -1307,7 +1313,7 @@ function Stage({ def, phase, drop, prizeCar, onReveal, skip, base, baseQ, pace =
       <pointLight ref={flash} position={[0, 2.2, 0.6]} intensity={0} distance={12} color={glow} />
       <CrateModel key={`${def.id}-${glow}`} def={def} glow={glow} parts={parts} />
       {/* Light beam up out of the crate. */}
-      <mesh ref={beam} position-y={LIFT + 4} visible={false} renderOrder={4}>
+      <mesh name="crate-beam" ref={beam} position-y={LIFT + 4} visible={false} renderOrder={4}>
         <cylinderGeometry args={[0.55, 0.9, 8, 24, 1, true]} />
         <meshBasicMaterial color={glow} transparent opacity={0} blending={AdditiveBlending} depthWrite={false} side={DoubleSide} toneMapped={false} />
       </mesh>
@@ -1353,12 +1359,12 @@ export function prizeLook(drop: CrateDrop | null, cars: { uid: string; model: st
   if (drop.kind === 'car') return { body: carDef(drop.model).body, model: drop.model, color: drop.color }
   // A resto-mod piece shows its secret car as a dark shadow; the fourth piece shows it built.
   if (drop.kind === 'piece') return { body: carDef(drop.model).body, model: drop.model, color: drop.uid && drop.color ? drop.color : '#263238' }
-  if (drop.kind === 'hat' || drop.kind === 'callcard') {
-    // A hat, on your own car; a Call Card shows your car too (the card itself is under the reveal).
+  if (drop.kind === 'hat') {
+    // A hat, on your own car.
     const owned = cars.filter((c) => !carDef(c.model).parked)
     const car = owned.find((c) => c.uid === mine) ?? owned[0] ?? { model: 'civic', color: '#eceff1' }
     const d = carDef(car.model)
-    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, ...(drop.kind === 'hat' ? { hat: { id: drop.hat } } : {}) }
+    return { body: d.body, model: car.model, color: car.color, finish: car.finish, stripe: car.stripe, mods: car.mods, hat: { id: drop.hat } }
   }
   if (drop.kind === 'dupe') {
     const d = carDef(drop.model)
