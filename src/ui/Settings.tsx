@@ -274,14 +274,14 @@ export function LegalLinks({ open }: { open: (id: LegalDoc['id']) => void }) {
 }
 
 const TIPS = [
-  ['⛽', 'Tap a business to send a car on a job. Jobs use fuel, which refills 1 a minute.'],
-  ['💰', 'Tap the coin bubble to collect coins and XP.'],
-  ['🚗', 'Buy cars in the Showroom. Every car you own drives your roads.'],
-  ['🔧', "Build Rusty's Rescue first to find, tow and restore old cars."],
-  ['⚙️', 'Upgrade cars in the Garage with coins and parts.'],
-  ['➕', 'Short on something? Tap its counter at the top.'],
-  ['🏁', 'Race rivals for coins and trophies. Shift in the green zone.'],
-  ['⭐', 'Level up to unlock new businesses and cars.'],
+  ['⛽', 'Tap a business to send a car on a job'],
+  ['💰', 'Tap coin bubbles for coins and XP'],
+  ['🚗', 'Every car you own drives your roads'],
+  ['🔧', "Rusty's Rescue finds and restores old cars"],
+  ['⚙️', 'Upgrade cars in the Garage'],
+  ['➕', 'Short on something? Tap its counter'],
+  ['🏁', 'Race rivals. Shift in the green zone'],
+  ['⭐', 'Level up to unlock businesses and cars'],
 ] as const
 
 export function HelpTab({ openLegal }: { openLegal: (id: LegalDoc['id']) => void }) {

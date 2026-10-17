@@ -45,7 +45,7 @@ export function WorldTour({ onRace }: { onRace: (i: number) => void }) {
           {done && car && <button className="buy small" onClick={() => openGarageTab('paint', { car: car.uid, color: TOUR_BLUE })}>🎨 Paint it</button>}
         </div>
       </div>
-      {!open && <p className="wt-gate">{need.icon} Reach <b>{need.name}</b> to start the tour ({rep.toNext.toLocaleString()} reputation to go)</p>}
+      {!open && <p className="wt-gate" title={`Reach ${need.name} to start the tour`}>🔒 {need.icon} <b>{need.name}</b> · {rep.toNext.toLocaleString()} rep to go</p>}
       <ol className="wt-list">
         {WORLD_TOUR.map((r, i) => {
           const won = i < beaten
@@ -54,10 +54,14 @@ export function WorldTour({ onRace }: { onRace: (i: number) => void }) {
           return (
             <li key={r.country} className={`wt-stop${won ? ' done' : next ? ' next' : ' locked'}`}>
               <span className="wt-flag" aria-hidden>{r.flag}</span>
-              <span className="wt-info">
+              {/* The rival's line is a tap tip, not on screen (docs/ui-rules.md). Each fact is its own chip, so a row wraps between chips, never inside one. */}
+              <span className="wt-info" title={won || next ? `“${won ? r.beaten : r.hello}”` : undefined}>
                 <b>{r.country} · {r.name}</b>
-                <small>{v.icon} {v.name}{r.night ? ' · 🌙' : ''} · {DIST[r.dist].label} · PI {r.pi}</small>
-                {(won || next) && <i className="wt-line">“{won ? r.beaten : r.hello}”</i>}
+                <span className="wt-chips">
+                  <span>{v.icon} {v.name}{r.night ? ' 🌙' : ''}</span>
+                  <span>{DIST[r.dist].label}</span>
+                  <span>PI {r.pi}</span>
+                </span>
               </span>
               {won ? (
                 <button className="buy small alt" disabled={!open} onClick={() => onRace(i)}>↻ ${worldPrize(i, false).toLocaleString()}</button>
