@@ -179,6 +179,8 @@ export function UpgradePanel() {
   // Back to the menu it was opened from; opened from the town (a tap, or Edit > Move), it
   // closes straight back to the town and whatever mode the player was in.
   const close = () => (useGame.getState().panelBack.length ? useGame.getState().closePanel() : useGame.setState({ panel: null, upgrading: null }))
+  // The X always goes straight to the town; the back arrow shows when there is a menu to go back to.
+  const toTown = () => useGame.setState({ panel: null, panelBack: [], upgrading: null })
   if (!b) return null
   const d = buildingDef(b.def)
   if (!themable(d)) return null
@@ -224,7 +226,7 @@ export function UpgradePanel() {
   const name = landmark ? landmark : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
-    <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={close}>
+    <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={toTown} onBack={s.panelBack.length ? s.closePanel : undefined}>
       <div className="upgrade">
         <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} theme={themeFor(b.tint, s.cityTheme, d.kind === 'decor')} />
         {canUp && <Pips level={lvl} max={maxLevel(d)} />}
