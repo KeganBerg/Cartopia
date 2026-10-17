@@ -36,7 +36,7 @@ export const VENUES: Venue[] = ([
 
 export const WORLD_VENUES: Venue[] = [
   { id: 'giza', base: 'desert', world: true, name: 'Pyramid Road', icon: '🐪', ground: '#e2b878', shoulder: '#d2a468', road: '#f3e2c4', pole: '#8d6e4a', sky: '#3f9ef0', fog: '#f4e3c6', fogNear: 34, fogFar: 135 },
-  { id: 'jaipur', base: 'main', world: true, name: 'Pink City Bazaar', icon: '🛺', ground: '#d9a87a', shoulder: '#c98f6a', road: '#f6e6d6', pole: '#3e4a52', sky: '#46a6f2', fog: '#f6e2cf', fogNear: 30, fogFar: 120 },
+  { id: 'jaipur', base: 'main', world: true, name: 'Pink City Bazaar', icon: '🛺', ground: '#d9a87a', shoulder: '#c98f6a', road: '#f6e6d6', pole: '#3e4a52', sky: '#46a6f2', fog: '#f6e2cf', fogNear: 30, fogFar: 140 },
   { id: 'moscow', base: 'snow', world: true, name: 'Onion Dome Square', icon: '⛪', ground: '#eef3f7', shoulder: '#dde6ee', road: '#e4ecf4', pole: '#263238', sky: '#8fbde6', fog: '#e6edf4', fogNear: 24, fogFar: 110 },
   { id: 'shanghai', base: 'docks', world: true, name: 'Lantern Harbour', icon: '🏮', ground: '#9aa3a9', shoulder: '#b3babf', pole: '#b71c1c', sky: '#5b9bd5', fog: '#d0dce5', fogNear: 30, fogFar: 125 },
   { id: 'sydney', base: 'beach', world: true, name: 'Sails Harbour', icon: '🦘', ground: '#ecd9a6', shoulder: '#b8b0a4', road: '#f4ece0', pole: '#eceff1', sky: '#2fa8ff', fog: '#e4f6ff', fogNear: 34, fogFar: 130 },

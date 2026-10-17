@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { CircleGeometry, CylinderGeometry, type Group } from 'three'
 import { Batch } from '../Batch'
-import { EDGE, Horizon, Many, PropMesh, Scatter, frustum, prop, rand, useProp, type Look, type PropKit, type Spot, type V3 } from './kit'
+import { EDGE, Horizon, Many, PropMesh, Scatter, frustum, person, prop, rand, useProp, type Dress, type Look, type PropKit, type Spot, type V3 } from './kit'
 import type { WorldProps } from './WorldVenue'
 
 // India, Pink City Bazaar: the strip runs down a bazaar street of the old pink city. Rose-pink
@@ -12,7 +12,7 @@ import type { WorldProps } from './WorldVenue'
 // overhead. Halfway the racers pass under the city gate; the honeycomb Palace of Winds faces
 // the finish, a hill fort crowns the ridge to one side and the white marble tomb stands far ahead.
 
-const PINKS = ['#e3977f', '#d98872', '#e8a48c', '#cf7f6a', '#e59a86', '#dd8f78']
+const PINKS = ['#ee9a7e', '#e68a6e', '#f2a98c', '#df7f66', '#f09c84', '#e98f74']
 const WHITE: Look = { c: '#f7ede2', r: 0.85 }
 const DARK: Look = { c: '#3a2420', r: 1 }
 const GOLD: Look = { c: '#e0b040', r: 0.35, m: 0.6 }
@@ -33,6 +33,7 @@ const HAVELIS: Haveli[] = [
   { w: 3.0, d: 2.5, floors: 3, pink: 5, arches: 3, balconies: 1, kiosks: false, awning: true, blade: 0, bike: false },
 ]
 const WIRE: Look = { c: '#1e1a18', r: 0.9 }
+const WOOD: Look = { c: '#6d4c35', r: 0.9 }
 const CLAY: Look = { c: '#b5582e', r: 0.95 }
 const BRASS: Look = { c: '#c9a040', r: 0.4, m: 0.25 }
 const MARIGOLD = ['#ff8f00', '#ffb300', '#f57c00']
@@ -297,30 +298,6 @@ function gate(k: PropKit) {
   for (let i = 0; i < 7; i++) kiosk(k, -2.7 + i * 0.9, 5.72, 0, 0.75, pink)
 }
 
-// An auto-rickshaw: black and yellow, three wheels, a canvas roof, facing +z.
-function rickshaw(k: PropKit) {
-  const body: Look = { c: '#1c1c1c', r: 0.5 }
-  const canopy: Look = { c: '#f6c400', r: 0.7 }
-  const tyre: Look = { c: '#111111', r: 0.9 }
-  frustum(k, body, 0.95, 1.1, 0.42, 0.9, [0, 0.2, -0.15])
-  frustum(k, canopy, 0.5, 0.35, 0.55, 0.75, [0, 0.2, 0.58])
-  k.box(canopy, [0.98, 0.12, 1.25], [0, 0.66, -0.1])
-  for (const s of [-1, 1]) for (const z of [0.4, -0.6]) k.box(canopy, [0.04, 0.55, 0.04], [s * 0.45, 0.92, z])
-  k.box({ c: '#9fc6d8', r: 0.2, m: 0.3 }, [0.8, 0.42, 0.03], [0, 0.98, 0.42], [-0.15, 0, 0])
-  k.box(canopy, [1.0, 0.08, 1.2], [0, 1.22, -0.1])
-  k.add(canopy, ROUND, [0, 1.25, -0.1], [Math.PI / 2, 0, 0], [0.5, 1.2, 0.16])
-  k.box({ c: '#2e7d32', r: 0.8 }, [0.92, 0.05, 0.06], [0, 0.66, 0.53])
-  k.box({ c: '#fff8e1', r: 0.3, e: '#3a3020' }, [0.12, 0.08, 0.04], [0, 0.6, 0.78])
-  k.rod(DARK, [-0.18, 0.95, 0.62], [0.18, 0.95, 0.62], 0.015, 5)
-  k.cyl(tyre, 0.16, 0.16, 0.1, [0, 0.16, 0.7], [0, 0, Math.PI / 2], 12)
-  for (const s of [-1, 1]) {
-    k.cyl(tyre, 0.17, 0.17, 0.12, [s * 0.5, 0.17, -0.5], [0, 0, Math.PI / 2], 12)
-    k.cyl({ c: '#9e9e9e', r: 0.4, m: 0.6 }, 0.08, 0.08, 0.13, [s * 0.5, 0.17, -0.5], [0, 0, Math.PI / 2], 8)
-  }
-  k.box({ c: '#c62828', r: 0.6 }, [0.18, 0.06, 0.03], [-0.3, 0.36, -0.73])
-  k.box({ c: '#c62828', r: 0.6 }, [0.18, 0.06, 0.03], [0.3, 0.36, -0.73])
-}
-
 // A fruit cart on two big wheels, heaped with oranges, bananas and melons.
 function cart(k: PropKit) {
   const wood: Look = { c: '#8a5a32', r: 0.9 }
@@ -433,20 +410,323 @@ function neem(k: PropKit) {
   ;[[0, 2.4, 0, 1.1], [0.6, 2.2, 0.2, 0.8], [-0.6, 2.3, -0.2, 0.8], [0.1, 2.9, -0.1, 0.8], [0, 2.2, 0.6, 0.7]].forEach(([x, y, z, r], i) => k.ico({ c: leaf[i % 3], r: 1 }, r, [x, y, z], [1, 0.7, 1], 1))
 }
 
+
+// India everywhere you look: three-wheeler autos in green and yellow, holy cows ambling at the
+// kerb with painted horns, a painted elephant and her keeper, a decorated lorry, a temple with
+// its tall spire, tricolour bunting across the street and people in saris, kurtas and turbans.
+
+const PEOPLE_IN: Dress[] = [
+  { top: '#e91e63', low: '#e91e63', skin: '#a86b45', hair: '#1a1210', robe: true, sash: '#fdd835', hat: 'scarf', hatC: '#e91e63' },
+  { top: '#f5f0e6', low: '#f5f0e6', skin: '#8d5a3b', hair: '#1a1210', robe: true, hat: 'turban', hatC: '#e53935' },
+  { top: '#ff9800', low: '#ff9800', skin: '#c08457', hair: '#1a1210', robe: true, sash: '#7b1fa2', hat: 'scarf', hatC: '#ff9800' },
+  { top: '#e3f2fd', low: '#f5f0e6', skin: '#7a4a2e', hair: '#1a1210', hat: 'turban', hatC: '#ffb300' },
+  { top: '#9c27b0', low: '#9c27b0', skin: '#a86b45', hair: '#1a1210', robe: true, sash: '#26c6da' },
+  { top: '#00897b', low: '#00897b', skin: '#8d5a3b', hair: '#1a1210', robe: true, sash: '#ff7043', hat: 'scarf', hatC: '#00897b' },
+  { top: '#fafafa', low: '#5d4037', skin: '#c08457', hair: '#1a1210', hat: 'turban', hatC: '#ec407a', wave: true },
+  { top: '#90caf9', low: '#37474f', skin: '#a86b45', hair: '#1a1210' },
+]
+
+// An auto-rickshaw facing +z, true to size beside the people: a pressed-steel body, one wheel
+// under the nose, a canvas roof, a rear bench and two wheels behind.
+function auto(k: PropKit, body: string) {
+  const paint: Look = { c: body, r: 0.55 }
+  const roof: Look = { c: '#f2c300', r: 0.8 }
+  const blk: Look = { c: '#1b1b1b', r: 0.7 }
+  const tyre: Look = { c: '#151515', r: 0.9 }
+  const steel: Look = { c: '#a9adb1', r: 0.45, m: 0.25 }
+  // Floor pan and the rear tub the passengers sit in.
+  k.box(blk, [0.66, 0.05, 1.2], [0, 0.22, -0.05])
+  k.box(paint, [0.74, 0.34, 0.58], [0, 0.43, -0.36])
+  k.box(roof, [0.75, 0.04, 0.6], [0, 0.6, -0.36])
+  k.box(blk, [0.6, 0.06, 0.3], [0, 0.42, -0.25])
+  k.box(blk, [0.6, 0.22, 0.06], [0, 0.55, -0.5])
+  // The nose: a cowl narrowing forward over the front wheel, headlamp and the windscreen frame.
+  frustum(k, paint, 0.46, 0.34, 0.5, 0.7, [0, 0.2, 0.42])
+  k.box(roof, [0.34, 0.04, 0.26], [0, 0.71, 0.44])
+  k.cyl({ c: '#fff8dc', r: 0.3 }, 0.05, 0.05, 0.03, [0, 0.55, 0.61], [Math.PI / 2, 0, 0], 8)
+  k.box(steel, [0.18, 0.05, 0.02], [0, 0.32, 0.61])
+  k.box({ c: '#8fb7c9', r: 0.2 }, [0.56, 0.3, 0.02], [0, 0.88, 0.36], [-0.12, 0, 0])
+  for (const f of [-1, 1]) k.rod(blk, [f * 0.29, 0.7, 0.36], [f * 0.33, 1.03, 0.33], 0.014, 4)
+  // Handlebar and the driver's seat.
+  k.rod(blk, [-0.18, 0.75, 0.25], [0.18, 0.75, 0.25], 0.012, 4)
+  k.rod(blk, [0, 0.62, 0.32], [0, 0.75, 0.25], 0.015, 4)
+  k.box(blk, [0.3, 0.06, 0.22], [0, 0.52, 0.06])
+  // Canvas roof: flat over the cab, curving down behind, with side rails.
+  k.box(blk, [0.76, 0.04, 1.02], [0, 1.06, -0.06])
+  k.add(blk, ROUND, [0, 0.82, -0.57], [0, Math.PI / 2, 0], [0.24, 0.76, 0.24])
+  for (const f of [-1, 1]) {
+    k.rod(blk, [f * 0.36, 0.6, -0.1], [f * 0.36, 1.05, -0.1], 0.012, 4)
+    k.rod(steel, [f * 0.36, 0.72, 0.05], [f * 0.36, 0.72, -0.5], 0.009, 3)
+  }
+  // Wheels.
+  k.cyl(tyre, 0.13, 0.13, 0.08, [0, 0.13, 0.5], [0, 0, Math.PI / 2], 10)
+  for (const f of [-1, 1]) {
+    k.cyl(tyre, 0.14, 0.14, 0.09, [f * 0.34, 0.14, -0.42], [0, 0, Math.PI / 2], 10)
+    k.cyl(steel, 0.07, 0.07, 0.095, [f * 0.34, 0.14, -0.42], [0, 0, Math.PI / 2], 6)
+  }
+  k.box({ c: '#fdd835', r: 0.6 }, [0.2, 0.07, 0.01], [0, 0.32, -0.655])
+  for (const f of [-1, 1]) k.box({ c: '#c62828', r: 0.6 }, [0.06, 0.05, 0.01], [f * 0.3, 0.45, -0.655])
+}
+
+// A holy cow: white, humped, horns painted and tipped with bells, a marigold garland round her
+// neck. Facing +z, standing or lying down to chew.
+function cow(k: PropKit, down: boolean) {
+  const hide: Look = { c: '#efe9df', r: 1 }
+  const grey: Look = { c: '#c9c2b6', r: 1 }
+  const y = down ? 0.28 : 0.55
+  k.sphere(hide, 1, [0, y, 0], [0.22, 0.24, 0.52], 9, 6)
+  k.sphere(grey, 1, [0, y + 0.22, 0.28], [0.12, 0.12, 0.13], 7, 4)
+  // Dewlap hanging under the neck, then the long face.
+  k.box(hide, [0.08, 0.2, 0.22], [0, y - 0.06, 0.48])
+  k.rod(hide, [0, y + 0.06, 0.42], [0, y + 0.16, 0.6], 0.09, 6)
+  k.box(hide, [0.15, 0.16, 0.3], [0, y + 0.14, 0.72], [0.35, 0, 0])
+  k.box(grey, [0.13, 0.08, 0.06], [0, y + 0.06, 0.86])
+  for (const f of [-1, 1]) {
+    k.box({ c: '#1a1a1a', r: 0.9 }, [0.02, 0.025, 0.025], [f * 0.075, y + 0.2, 0.7])
+    k.box(hide, [0.1, 0.04, 0.06], [f * 0.11, y + 0.21, 0.62], [0, 0, f * -0.3])
+    k.rod({ c: f > 0 ? '#e65100' : '#1565c0', r: 0.7 }, [f * 0.05, y + 0.26, 0.62], [f * 0.11, y + 0.4, 0.6], 0.016, 4)
+    k.sphere(BRASS, 0.018, [f * 0.11, y + 0.41, 0.6], [1, 1, 1], 5, 3)
+  }
+  for (let i = 0; i <= 8; i++) {
+    const a = (i / 8) * Math.PI
+    k.ico({ c: MARIGOLD[i % 3], r: 0.9 }, 0.028, [Math.cos(a) * 0.12, y + 0.02 - Math.sin(a) * 0.1, 0.46], [1, 1, 1], 0)
+  }
+  k.rod(grey, [0, y + 0.1, -0.5], [0.03, y - 0.3, -0.56], 0.015, 4)
+  if (down) {
+    for (const f of [-1, 1]) {
+      k.box(hide, [0.08, 0.08, 0.32], [f * 0.16, 0.05, 0.35])
+      k.box(hide, [0.09, 0.08, 0.3], [f * 0.2, 0.05, -0.3])
+    }
+  } else {
+    for (const f of [-1, 1]) for (const z of [0.3, -0.33]) {
+      k.rod(hide, [f * 0.12, y - 0.1, z], [f * 0.12, 0.04, z], 0.04, 5)
+      k.box({ c: '#3a3530', r: 1 }, [0.06, 0.04, 0.07], [f * 0.12, 0.02, z])
+    }
+  }
+}
+
+// A temple elephant facing +z: painted face, a red and gold cloth over her back, a howdah on
+// top with its little canopy, anklets of bells, and her keeper beside her with his stick.
+function elephant(k: PropKit) {
+  const hide: Look = { c: '#7d7a78', r: 1 }
+  const dark: Look = { c: '#64615f', r: 1 }
+  const red: Look = { c: '#b71c1c', r: 0.95 }
+  const gold: Look = { c: '#e0b040', r: 0.6 }
+  k.sphere(hide, 1, [0, 1.08, -0.1], [0.5, 0.55, 0.8], 12, 8)
+  for (const fx of [-1, 1]) for (const fz of [0.45, -0.6]) {
+    k.cyl(hide, 0.15, 0.17, 0.85, [fx * 0.28, 0.43, fz], undefined, 9)
+    k.cyl(gold, 0.175, 0.175, 0.05, [fx * 0.28, 0.12, fz], undefined, 9)
+    k.cyl({ c: '#d8d2c8', r: 0.9 }, 0.17, 0.17, 0.04, [fx * 0.28, 0.02, fz], undefined, 9)
+  }
+  // Head, ears fanned out, the painted forehead and the trunk curling down.
+  k.sphere(hide, 0.42, [0, 1.3, 0.72], [0.95, 1, 0.85], 11, 7)
+  for (const f of [-1, 1]) {
+    k.sphere(dark, 1, [f * 0.42, 1.22, 0.6], [0.06, 0.38, 0.32], 8, 6)
+    k.box({ c: '#1a1a1a', r: 0.9 }, [0.03, 0.04, 0.03], [f * 0.24, 1.38, 1.0])
+    k.cone({ c: '#f2ede2', r: 0.7 }, 0.04, 0.32, [f * 0.14, 0.92, 1.08], [1.1, 0, 0], 6)
+  }
+  // Painted patterns: a dotted arch over the brow and flowers down the trunk.
+  for (let i = 0; i < 7; i++) {
+    const a = (i / 6) * Math.PI
+    k.box({ c: ['#fdd835', '#e91e63', '#4fc3f7'][i % 3], r: 0.8 }, [0.05, 0.05, 0.02], [Math.cos(a) * 0.22, 1.42 + Math.sin(a) * 0.14, 1.06], [0.4, 0, 0])
+  }
+  const trunk: V3[] = [[0, 1.2, 1.05], [0, 0.95, 1.18], [0, 0.65, 1.2], [0, 0.4, 1.14], [0, 0.25, 1.2]]
+  for (let i = 0; i < trunk.length - 1; i++) {
+    k.rod(hide, trunk[i], trunk[i + 1], 0.11 - i * 0.018, 7)
+    k.box({ c: ['#fdd835', '#e91e63', '#43a047', '#fdd835'][i], r: 0.8 }, [0.06, 0.06, 0.02], [0, (trunk[i][1] + trunk[i + 1][1]) / 2, (trunk[i][2] + trunk[i + 1][2]) / 2 + 0.1 - i * 0.01])
+  }
+  k.box(gold, [0.5, 0.04, 0.04], [0, 1.56, 0.9])
+  // The cloth: a broad red blanket with a gold border and tassels, hanging both flanks.
+  k.box(red, [1.08, 0.06, 0.9], [0, 1.6, -0.1])
+  for (const f of [-1, 1]) {
+    k.box(red, [0.04, 0.55, 0.9], [f * 0.53, 1.32, -0.1])
+    k.box(gold, [0.045, 0.06, 0.92], [f * 0.535, 1.06, -0.1])
+    for (let i = 0; i < 5; i++) k.cone(gold, 0.025, 0.08, [f * 0.54, 1.0, -0.5 + i * 0.2], [Math.PI, 0, 0], 5)
+  }
+  // The howdah: a railed seat on top under a small domed canopy.
+  k.box(gold, [0.62, 0.22, 0.6], [0, 1.75, -0.15])
+  k.box(red, [0.56, 0.06, 0.54], [0, 1.88, -0.15])
+  for (const fx of [-1, 1]) for (const fz of [0.12, -0.42]) k.rod(gold, [fx * 0.28, 1.86, fz], [fx * 0.28, 2.3, fz], 0.015, 4)
+  k.box(red, [0.66, 0.05, 0.64], [0, 2.32, -0.15])
+  k.sphere(gold, 0.25, [0, 2.34, -0.15], [1.2, 0.8, 1.2], 10, 5, Math.PI / 2)
+  k.cone(gold, 0.04, 0.16, [0, 2.6, -0.15], undefined, 6)
+  k.rod(hide, [0, 1.0, -0.88], [0.05, 0.55, -0.95], 0.025, 4)
+  person(k, PEOPLE_IN[1], 0.75, 0.75, -0.4)
+  k.rod(WOOD, [0.62, 0.33, 0.85], [0.6, 1.0, 1.0], 0.012, 4)
+}
+
+// A goods lorry facing +z, painted all over: a bonnet with a decorated crown over the windscreen,
+// flowered panels down the wooden body, a bulging tarpaulin and tasselled mud flaps.
+function lorry(k: PropKit) {
+  const cab: Look = { c: '#ef6c00', r: 0.6 }
+  const crown: Look = { c: '#fdd835', r: 0.6 }
+  const body: Look = { c: '#1565c0', r: 0.75 }
+  const tyre: Look = { c: '#151515', r: 0.9 }
+  k.box({ c: '#2b2b2b', r: 0.8 }, [0.8, 0.12, 2.5], [0, 0.32, -0.15])
+  // Cab and bonnet.
+  k.box(cab, [0.9, 0.5, 0.45], [0, 0.6, 0.85])
+  k.box(cab, [0.92, 0.62, 0.6], [0, 0.96, 0.45])
+  k.box({ c: '#7fa9bd', r: 0.2 }, [0.78, 0.26, 0.02], [0, 1.08, 0.755])
+  k.box(crown, [0.94, 0.2, 0.04], [0, 1.38, 0.74])
+  for (let i = 0; i < 6; i++) k.box({ c: CLOTH[i % CLOTH.length], r: 0.8 }, [0.11, 0.11, 0.02], [-0.38 + i * 0.152, 1.38, 0.765], [0, 0, Math.PI / 4])
+  k.box({ c: '#c8c8c8', r: 0.4, m: 0.25 }, [0.5, 0.2, 0.02], [0, 0.6, 1.08])
+  for (const f of [-1, 1]) k.cyl({ c: '#fff8dc', r: 0.3 }, 0.06, 0.06, 0.03, [f * 0.33, 0.64, 1.08], [Math.PI / 2, 0, 0], 8)
+  k.box({ c: '#fafafa', r: 0.7 }, [0.92, 0.06, 0.06], [0, 0.38, 1.1])
+  for (let i = 0; i < 5; i++) k.box({ c: i % 2 ? '#c62828' : '#fafafa', r: 0.7 }, [0.18, 0.062, 0.062], [-0.36 + i * 0.18, 0.38, 1.101])
+  // The wooden body with painted panels.
+  k.box(body, [0.94, 0.62, 1.7], [0, 0.69, -0.55])
+  for (const f of [-1, 1]) for (let i = 0; i < 4; i++) {
+    k.box({ c: '#fdd835', r: 0.8 }, [0.005, 0.38, 0.34], [f * 0.473, 0.7, -1.2 + i * 0.43])
+    k.box({ c: CLOTH[(i * 2 + (f > 0 ? 1 : 0)) % CLOTH.length], r: 0.8 }, [0.005, 0.22, 0.22], [f * 0.477, 0.7, -1.2 + i * 0.43], [Math.PI / 4, 0, 0])
+  }
+  k.box({ c: '#fdd835', r: 0.8 }, [0.8, 0.4, 0.005], [0, 0.72, -1.403])
+  for (let i = 0; i < 3; i++) k.box({ c: '#c62828', r: 0.8 }, [0.16, 0.06, 0.006], [-0.24 + i * 0.24, 0.78, -1.406])
+  k.sphere({ c: '#2e7d32', r: 0.95 }, 1, [0, 1.0, -0.55], [0.46, 0.22, 0.84], 10, 4, Math.PI / 2)
+  for (const z of [0.85, -0.3, -0.85]) for (const f of [-1, 1]) k.cyl(tyre, 0.2, 0.2, 0.14, [f * 0.39, 0.2, z], [0, 0, Math.PI / 2], 10)
+  for (const f of [-1, 1]) {
+    k.box({ c: '#1a1a1a', r: 0.9 }, [0.2, 0.24, 0.02], [f * 0.36, 0.17, -1.12])
+    for (let i = 0; i < 3; i++) k.cone({ c: CLOTH[i + 1], r: 0.9 }, 0.02, 0.07, [f * 0.36 - 0.07 + i * 0.07, 0.02, -1.13], [Math.PI, 0, 0], 4)
+  }
+}
+
+// A sandstone temple facing +z: a pillared porch under a row of little domes, and behind it the
+// sanctum's tall curved spire, ribbed, with its fluted cap, gold pot and saffron flag.
+function temple(k: PropKit) {
+  const sand: Look = { c: '#e7cfa1', r: 0.9 }
+  const deep: Look = { c: '#cfae78', r: 0.9 }
+  const red: Look = { c: '#c0392b', r: 0.85 }
+  for (let i = 0; i < 4; i++) k.box(i % 2 ? deep : sand, [4.6 - i * 0.3, 0.14, 4.6 - i * 0.3], [0, 0.07 + i * 0.14, 0])
+  const base = 0.56
+  // The porch: eight carved pillars, a deep cornice and small domes along it.
+  for (const x of [-1.5, -0.5, 0.5, 1.5]) for (const z of [1.7, 0.8]) {
+    k.box(sand, [0.22, 1.5, 0.22], [x, base + 0.75, z])
+    k.box(deep, [0.3, 0.12, 0.3], [x, base + 0.06, z])
+    k.box(deep, [0.34, 0.14, 0.34], [x, base + 1.43, z])
+  }
+  k.box(sand, [3.8, 0.24, 1.4], [0, base + 1.62, 1.25])
+  k.box(deep, [4.0, 0.08, 1.6], [0, base + 1.5, 1.25])
+  for (const x of [-1.3, 0, 1.3]) {
+    k.sphere(sand, 0.42, [x, base + 1.74, 1.25], [1, 1.1, 1], 10, 6, Math.PI / 2)
+    k.cone(BRASS, 0.05, 0.24, [x, base + 2.3, 1.25], undefined, 6)
+  }
+  // Sanctum and its spire: shrinking ribbed tiers, curving in towards the top.
+  k.box(sand, [2.6, 2.2, 2.4], [0, base + 1.1, -0.9])
+  k.box(DARK, [0.7, 1.1, 0.02], [0, base + 0.55, 0.31])
+  arch(k, DARK, 0.7, 0.02, [0, base + 1.1, 0.31])
+  let y = base + 2.2
+  const tiers = [2.5, 2.3, 2.05, 1.8, 1.5, 1.2, 0.85]
+  tiers.forEach((w, i) => {
+    const h = 0.62
+    frustum(k, i % 2 ? deep : sand, w, w, h, (tiers[i + 1] ?? 0.6) / w, [0, y, -0.9])
+    for (const f of [-1, 1]) k.box(deep, [0.12, h, 0.05], [f * w * 0.18, y + h / 2, -0.9 + w / 2 - 0.02 - (w - (tiers[i + 1] ?? 0.6)) / 4], [-0.18, 0, 0])
+    y += h
+  })
+  // The amalaka: a fluted stone disc, then the gold pot and the flag pole.
+  k.cyl(sand, 0.55, 0.55, 0.22, [0, y + 0.08, -0.9], undefined, 14)
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2
+    k.box(deep, [0.06, 0.24, 0.06], [Math.sin(a) * 0.55, y + 0.08, -0.9 + Math.cos(a) * 0.55])
+  }
+  k.sphere(BRASS, 0.18, [0, y + 0.36, -0.9], [1, 1.1, 1], 8, 5)
+  k.cone(BRASS, 0.06, 0.34, [0, y + 0.68, -0.9], undefined, 6)
+  k.rod(WOOD, [0.3, y, -0.9], [0.3, y + 1.8, -0.9], 0.02, 4)
+  k.add({ c: '#ff8f00', r: 1 }, FLAG, [0.3, y + 1.6, -1.15], [0, Math.PI / 2, 0], [0.45, 0.26, 0.01])
+  // Red and gold trim, a hanging bell and lamps by the door, marigolds on the steps.
+  k.box(red, [2.62, 0.08, 0.02], [0, base + 2.0, 0.305])
+  k.rod(WIRE, [0, base + 1.5, 1.5], [0, base + 1.25, 1.5], 0.006, 3)
+  k.cone(BRASS, 0.08, 0.14, [0, base + 1.18, 1.5], undefined, 8)
+  for (let i = 0; i < 14; i++) k.ico({ c: MARIGOLD[i % 3], r: 0.9 }, 0.05, [-1.6 + i * 0.25, 0.6, 2.05], [1, 1, 1], 0)
+}
+
+const PENNANT = new CylinderGeometry(1, 0, 1, 3, 1)
+// Bunting strung across the street: little flags in saffron, white and green.
+function tricolour(k: PropKit) {
+  const half = EDGE + 1.6
+  k.rod(WIRE, [-half, 4.1, 0], [half, 4.1, 0], 0.006, 3)
+  const cols = ['#ff9933', '#fafafa', '#138808']
+  for (let i = 0; i < 27; i++) {
+    const t = (i + 0.5) / 27
+    const x = -half + t * half * 2
+    const y = 4.1 - Math.sin(t * Math.PI) * 0.55
+    k.add({ c: cols[i % 3], r: 0.95 }, PENNANT, [x, y - 0.12, 0], [0, 0, 0], [0.12, 0.22, 0.01])
+  }
+}
+
+// The old city wall running off from the gate on both sides: crenellations, a round bastion and
+// little domed kiosks, so the gateway stands in a wall rather than on open ground.
+function cityWall(k: PropKit) {
+  const pink: Look = { c: '#df8c75', r: 0.9 }
+  const deep: Look = { c: '#c37460', r: 0.9 }
+  k.box(pink, [14, 4.0, 1.4], [7, 2.0, 0])
+  k.box(WHITE, [14.04, 0.1, 1.44], [7, 4.0, 0])
+  for (let i = 0; i < 28; i++) k.box(pink, [0.28, 0.36, 1.44], [0.25 + i * 0.5, 4.23, 0])
+  for (const f of [-1, 1]) for (let i = 0; i < 6; i++) {
+    k.box(WHITE, [0.7, 1.1, 0.02], [1.6 + i * 2.2, 1.6, f * 0.71])
+    arch(k, WHITE, 0.7, 0.02, [1.6 + i * 2.2, 2.15, f * 0.71], f > 0 ? 0 : Math.PI)
+    k.box(deep, [0.56, 1.0, 0.025], [1.6 + i * 2.2, 1.55, f * 0.715])
+    arch(k, deep, 0.56, 0.025, [1.6 + i * 2.2, 2.05, f * 0.715], f > 0 ? 0 : Math.PI)
+  }
+  k.cyl(pink, 1.4, 1.6, 5.0, [9.5, 2.5, 0], undefined, 12)
+  k.cyl(WHITE, 1.45, 1.45, 0.1, [9.5, 5.0, 0], undefined, 12)
+  kiosk(k, 9.5, 5.05, 0, 1.5, pink)
+  kiosk(k, 4.5, 4.05, 0, 1.0, pink)
+  for (const x of [3, 6, 12]) jharokha(k, x, 2.8, 0.7, pink)
+}
+
+// Shoppers along the arcades in threes, side by side (along x) and facing +z (the street).
+function shoppers(k: PropKit, seed: number) {
+  for (let i = 0; i < 3; i++) person(k, PEOPLE_IN[(seed * 3 + i * 5) % PEOPLE_IN.length], -0.6 + i * 0.6, ((i * 7 + seed) % 3) * 0.12 - 0.12, 0.25 * (i - 1))
+}
+
+
+// The old city behind the street front: taller pink blocks crowding up behind, with white
+// cornices, crenellations, dark windows and a domed kiosk, so no gap shows open ground.
+function backBlocks(k: PropKit, seed: number) {
+  const r = rand(seed)
+  let x = -1.7
+  for (let i = 0; i < 3; i++) {
+    const w = 1.0 + r() * 0.5
+    const h = 4.2 + r() * 2.6
+    const pink: Look = { c: PINKS[(seed + i * 2) % PINKS.length], r: 0.9 }
+    const cx = x + w / 2
+    const d = 2.2 + r() * 0.8
+    k.box(pink, [w, h, d], [cx, h / 2, 0])
+    k.box(WHITE, [w + 0.06, 0.08, d + 0.06], [cx, h, 0])
+    k.box(pink, [w + 0.02, 0.2, 0.12], [cx, h + 0.14, d / 2 - 0.06])
+    for (let fl = 1; fl < Math.floor(h / STOREY); fl++) {
+      k.box(WHITE, [w + 0.03, 0.05, 0.04], [cx, fl * STOREY, d / 2 + 0.01])
+      for (const wx of w > 1.2 ? [-0.3, 0.3] : [0]) k.box(DARK, [0.26, 0.42, 0.02], [cx + wx, fl * STOREY + 0.45, d / 2 + 0.012])
+    }
+    if (i === 1) kiosk(k, cx, h + 0.06, d / 2 - 0.5, 0.9, pink)
+    x += w + 0.05
+  }
+}
+
 // Roadside shrines: which side, and how far down the race.
 const SHRINES = [[1, 0.13], [-1, 0.72]] as const
 
 export default function Jaipur({ len, race }: WorldProps) {
-  const homes = useMemo(() => HAVELIS.map((h, i) => prop(`jaipur-haveli-${i}`, (k) => haveli(k, h))), [])
+  const homes = useMemo(() => HAVELIS.map((h, i) => prop(`jaipur-haveli-d3-${i}`, (k) => haveli(k, h))), [])
   const palaceP = useProp('jaipur-palace', palace)
   const gateP = useProp('jaipur-gate', gate)
-  const autoP = useProp('jaipur-rickshaw', rickshaw)
+  const autoG = useProp('jaipur-auto-green', (k) => auto(k, '#2e7d32'))
+  const autoB = useProp('jaipur-auto-black', (k) => auto(k, '#1f1f1f'))
+  const cowUp = useProp('jaipur-cow-up', (k) => cow(k, false))
+  const cowDown = useProp('jaipur-cow-down', (k) => cow(k, true))
+  const eleP = useProp('jaipur-elephant', elephant)
+  const lorryP = useProp('jaipur-lorry', lorry)
+  const templeP = useProp('jaipur-temple', temple)
+  const flagsP = useProp('jaipur-tricolour', tricolour)
+  const wallP = useProp('jaipur-city-wall', cityWall)
+  const blocks = useMemo(() => [11, 23, 37].map((n) => prop(`jaipur-back-${n}`, (k) => backBlocks(k, n))), [])
+  const crowds = useMemo(() => [0, 1, 2].map((i) => prop(`jaipur-shoppers-${i}`, (k) => shoppers(k, i))), [])
   const cartP = useProp('jaipur-cart', cart)
   const treeP = useProp('jaipur-neem', neem)
   const shrineP = useProp('jaipur-shrine', shrine)
   const chaiP = useProp('jaipur-chai', chaiStall)
   const gz = race * 0.5
   const pz = race + 10
+  const tz = race * 0.3
 
   const geo = useMemo(() => {
     const r = rand(421)
@@ -457,24 +737,39 @@ export default function Jaipur({ len, race }: WorldProps) {
         const h = HAVELIS[i]
         const zc = z + h.w / 2
         // Gaps for the gate, and on the left for the palace front.
-        const clear = Math.abs(zc - gz) > 3.6 + h.w / 2 && !(side < 0 && Math.abs(zc - pz) < 8 + h.w / 2)
+        const clear = Math.abs(zc - gz) > 3.6 + h.w / 2 && !(side < 0 && Math.abs(zc - pz) < 8 + h.w / 2) && !(side > 0 && Math.abs(zc - tz) < 2.5 + h.w / 2)
         if (clear) rows[i].push({ x: side * (EDGE + 1.5 + h.d / 2), z: zc, ry: side > 0 ? -Math.PI / 2 : Math.PI / 2 })
         z += h.w + 0.04
       }
     }
     // Kerbside life on the pavement in front of the shops.
     const autos: Spot[] = []
+    const autos2: Spot[] = []
     const carts: Spot[] = []
     const trees: Spot[] = []
+    const cows: Spot[] = []
+    const cowsDown: Spot[] = []
+    const lorries: Spot[] = []
+    const kerb: { side: number; z: number; r: number }[] = []
     for (const side of [-1, 1] as const) {
       for (let z = 22; z < len + 30; z += 5 + r() * 6) {
         if (Math.abs(z - gz) < 5) continue
         if (SHRINES.some(([sx, sz]) => sx === side && Math.abs(sz * race - z) < 2.4)) continue
+        if (side > 0 && Math.abs(z - tz) < 3.5) continue
         const k = r()
         const x = side * (EDGE + 0.85)
-        if (k < 0.5) autos.push({ x, z, ry: (side > 0 ? 0 : Math.PI) + (r() - 0.5) * 0.3 })
-        else if (k < 0.75) carts.push({ x, z, ry: side > 0 ? 0.2 : Math.PI - 0.2 })
-        else trees.push({ x: side * (EDGE + 0.8), z, ry: r() * 6, s: 0.9 + r() * 0.2 })
+        const ry = (side > 0 ? 0 : Math.PI) + (r() - 0.5) * 0.3
+        if (k < 0.32) (r() < 0.5 ? autos : autos2).push({ x: side * (EDGE + 0.6), z, ry })
+        else if (k < 0.48) carts.push({ x, z, ry: side > 0 ? 0.2 : Math.PI - 0.2 })
+        else if (k < 0.62) trees.push({ x: side * (EDGE + 0.8), z, ry: r() * 6, s: 0.9 + r() * 0.2 })
+        else if (k < 0.82) (r() < 0.5 ? cows : cowsDown).push({ x: side * (EDGE + 0.75), z, ry: (side > 0 ? 0 : Math.PI) + (r() - 0.5) * 1.2 })
+        else {
+          lorries.push({ x: side * (EDGE + 0.7), z: z + 0.6, ry: side > 0 ? 0 : Math.PI })
+          kerb.push({ side, z: z + 0.6, r: 1.7 })
+          z += 2
+          continue
+        }
+        kerb.push({ side, z, r: 0.9 })
       }
     }
     // Marigold garlands strung across the street, each a sagging double string of flowers.
@@ -482,15 +777,33 @@ export default function Jaipur({ len, race }: WorldProps) {
     for (let z = 8; z < len + 30; z += 13) {
       if (Math.abs(z - gz) < 5) continue
       for (const [dz, top] of [[0, 4.6], [0.35, 4.35]] as const) {
-        for (let i = 0; i <= 46; i++) {
-          const t = i / 46
+        for (let i = 0; i <= 30; i++) {
+          const t = i / 30
           const x = -(EDGE + 1.6) + t * (EDGE + 1.6) * 2
           flowers.push({ x, z: z + dz, y: top - Math.sin(t * Math.PI) * 0.75, s: 1 })
         }
       }
     }
-    return { rows, autos, carts, trees, flowers }
-  }, [len, race, gz, pz])
+    const flags: Spot[] = []
+    for (let z = 14.5; z < len + 30; z += 13) if (Math.abs(z - gz) > 5) flags.push({ x: 0, z })
+    // Shoppers along both arcades, clear of whatever stands at the kerb.
+    const shop: Spot[][] = [[], [], []]
+    for (const side of [-1, 1] as const) {
+      for (let z = -6; z < len + 30; z += 2.8 + r() * 1.8) {
+        if (Math.abs(z - gz) < 4 || (side < 0 && Math.abs(z - pz) < 7) || (side > 0 && Math.abs(z - tz) < 3)) continue
+        if (kerb.some((o) => o.side === side && Math.abs(o.z - z) < o.r + 1)) continue
+        shop[Math.floor(r() * 3)].push({ x: side * (EDGE + 1.12), z, ry: side > 0 ? -Math.PI / 2 : Math.PI / 2 })
+      }
+    }
+    // Cows resting in front of the city wall on each side of the gate.
+    for (const side of [-1, 1]) for (const dz of [-3, 2.6]) cowsDown.push({ x: side * (EDGE + 4.5 + (dz > 0 ? 1 : 0)), z: gz + dz, ry: r() * 6 })
+    // The city crowding up behind both street fronts, and behind the gate and temple gaps.
+    const back: Spot[][] = [[], [], []]
+    for (const side of [-1, 1] as const) {
+      for (let z = -14 + (side > 0 ? 1.7 : 0); z < len + 40; z += 3.4) back[Math.floor(r() * 3)].push({ x: side * (EDGE + 5.9), z, ry: side > 0 ? -Math.PI / 2 : Math.PI / 2 })
+    }
+    return { back, rows, autos, autos2, carts, trees, cows, cowsDown, lorries, flowers, flags, shop }
+  }, [len, race, gz, pz, tz])
 
   return (
     <>
@@ -503,6 +816,11 @@ export default function Jaipur({ len, race }: WorldProps) {
           </mesh>
         ))}
         <group position={[0, 0, gz]}><PropMesh parts={gateP} /></group>
+        <group position={[5.4, 0, gz]}><PropMesh parts={wallP} /></group>
+        <group position={[-5.4, 0, gz]} rotation-y={Math.PI}><PropMesh parts={wallP} /></group>
+        <group position={[EDGE + 3.85, 0, tz]} rotation-y={-Math.PI / 2}><PropMesh parts={templeP} /></group>
+        <group position={[EDGE + 0.95, 0, race * 0.42]}><PropMesh parts={eleP} /></group>
+        <group position={[-(EDGE + 1.7), 0, pz - 5.5]} rotation-y={Math.PI / 2 + 0.5}><PropMesh parts={eleP} /></group>
         {SHRINES.map(([side, f]) => (
           <group key={f} position={[side * (EDGE + 0.75), 0, f * race]} rotation-y={side > 0 ? -Math.PI / 2 : Math.PI / 2}><PropMesh parts={shrineP} /></group>
         ))}
@@ -514,11 +832,18 @@ export default function Jaipur({ len, race }: WorldProps) {
         </mesh>
       </Batch>
       {homes.map((h, i) => <Many key={i} parts={h} at={geo.rows[i]} />)}
-      <Many parts={autoP} at={geo.autos} />
-      <Many parts={cartP} at={geo.carts} />
+      {blocks.map((b, i) => <Many key={i} parts={b} at={geo.back[i]} near={90} />)}
+      <Many parts={autoG} at={geo.autos} near={80} />
+      <Many parts={autoB} at={geo.autos2} near={80} />
+      <Many parts={cowUp} at={geo.cows} near={80} />
+      <Many parts={cowDown} at={geo.cowsDown} near={80} />
+      <Many parts={lorryP} at={geo.lorries} near={80} />
+      <Many parts={flagsP} at={geo.flags} />
+      {crowds.map((c, i) => <Many key={i} parts={c} at={geo.shop[i]} near={70} />)}
+      <Many parts={cartP} at={geo.carts} near={80} />
       <Many parts={treeP} at={geo.trees} />
       <Scatter spots={geo.flowers} colors={['#ff8f00', '#ffb300', '#ff6f00', '#ffca28']}>
-        <icosahedronGeometry args={[0.085, 0]} />
+        <icosahedronGeometry args={[0.1, 0]} />
       </Scatter>
       <Kites />
       <FarJaipur />
@@ -557,29 +882,38 @@ function Kites() {
   )
 }
 
-// The marble tomb far ahead, and the hill fort along the ridge.
+// The hill fort along the ridge to the left, and the marble tomb standing over the rooftops on the
+// right, close enough that the haze doesn't swallow it and big enough to clear the havelis.
+
+// The white marble tomb: platform, the great dome on its drum, four kiosks and four minarets.
+function tomb(k: PropKit) {
+  const marble: Look = { c: '#f1ebe0', r: 0.6 }
+  const shade: Look = { c: '#c9bfae', r: 0.7 }
+  const tx = 0
+  const tz = 0
+  k.box({ c: '#e8dccd', r: 0.8 }, [26, 1.4, 26], [tx, 0.7, tz])
+  k.cyl(marble, 6.4, 6.4, 9, [tx, 5.9, tz], [0, Math.PI / 8, 0], 8)
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2
+    k.box(shade, [3.4, 5.6, 0.2], [tx + Math.sin(a) * 6.0, 5.4, tz + Math.cos(a) * 6.0], [0, a, 0])
+    // The great arched recess in each face, dark inside.
+    k.box({ c: '#6f6559', r: 0.9 }, [2.4, 4.2, 0.1], [tx + Math.sin(a) * 6.12, 5.1, tz + Math.cos(a) * 6.12], [0, a, 0])
+    kioskFar(k, tx + Math.sin(a + Math.PI / 4) * 5.2, 10.4, tz + Math.cos(a + Math.PI / 4) * 5.2, marble)
+    // Minarets at the platform's corners.
+    const mx = tx + Math.sin(a + Math.PI / 4) * 16
+    const mz = tz + Math.cos(a + Math.PI / 4) * 16
+    k.cyl(marble, 0.7, 0.95, 14, [mx, 8.4, mz], undefined, 10)
+    for (const y of [6, 10, 14]) k.cyl(shade, 1.15, 1.0, 0.35, [mx, y + 1.4, mz], undefined, 10)
+    kioskFar(k, mx, 15.4, mz, marble)
+  }
+  k.cyl(marble, 4.0, 4.0, 2.4, [tx, 11.6, tz], undefined, 16)
+  k.sphere(marble, 4.6, [tx, 14.4, tz], [1, 1.25, 1], 18, 10)
+  k.cone(GOLD, 0.3, 2.4, [tx, 21.4, tz], undefined, 8)
+}
+
 function FarJaipur() {
+  const tombP = useProp('jaipur-tomb', tomb)
   const parts = useProp('jaipur-far', (k) => {
-    const marble: Look = { c: '#f4f0ea', r: 0.6 }
-    const shade: Look = { c: '#d9d2c8', r: 0.7 }
-    const tx = -26
-    const tz = 92
-    k.box({ c: '#e8dccd', r: 0.8 }, [26, 1.4, 26], [tx, 0.7, tz])
-    k.cyl(marble, 6.4, 6.4, 9, [tx, 5.9, tz], [0, Math.PI / 8, 0], 8)
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2
-      k.box(shade, [3.4, 5.6, 0.2], [tx + Math.sin(a) * 6.0, 5.4, tz + Math.cos(a) * 6.0], [0, a, 0])
-      kioskFar(k, tx + Math.sin(a + Math.PI / 4) * 5.2, 10.4, tz + Math.cos(a + Math.PI / 4) * 5.2, marble)
-      // Minarets at the platform's corners.
-      const mx = tx + Math.sin(a + Math.PI / 4) * 16
-      const mz = tz + Math.cos(a + Math.PI / 4) * 16
-      k.cyl(marble, 0.7, 0.95, 14, [mx, 8.4, mz], undefined, 10)
-      for (const y of [6, 10, 14]) k.cyl(shade, 1.15, 1.0, 0.35, [mx, y + 1.4, mz], undefined, 10)
-      kioskFar(k, mx, 15.4, mz, marble)
-    }
-    k.cyl(marble, 4.0, 4.0, 2.4, [tx, 11.6, tz], undefined, 16)
-    k.sphere(marble, 4.6, [tx, 14.4, tz], [1, 1.25, 1], 18, 10)
-    k.cone(GOLD, 0.3, 2.4, [tx, 21.4, tz], undefined, 8)
     // The fort: walls and round bastions climbing a ridge, the palace on top.
     const hill: Look = { c: '#a58b5f', r: 1 }
     const wall: Look = { c: '#d7b27a', r: 0.95 }
@@ -603,6 +937,7 @@ function FarJaipur() {
   return (
     <Horizon>
       <PropMesh parts={parts} />
+      <group position={[-22, 0, 82]} scale={1.5}><PropMesh parts={tombP} /></group>
     </Horizon>
   )
 }
