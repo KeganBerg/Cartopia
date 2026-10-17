@@ -382,3 +382,7 @@ body:has(.edit-bar) .tutorial { bottom: calc(150px + var(--sab)); }
   :root .panel-head .close { width: 42px; height: 42px; }
   :root .sheet-tabs button { font-size: 15px; }
 }
+
+/* Placing Rusty's in the tutorial: Done steps back so the glowing lot is the one thing to tap. */
+:root .tool.done.tut-quiet { background: none; border-color: transparent; box-shadow: none; color: inherit; text-shadow: none; }
+:root .tool.done.tut-quiet .gi { color: inherit; filter: none; }

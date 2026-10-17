@@ -26,6 +26,7 @@ import { openPlayerCard } from '../lib/playerCard'
 import { sfx } from '../lib/sound'
 import { hasCrewHouse } from '../game/unlocks'
 import { BuildingThumb } from '../scene/BuildingPreview'
+import { clearCrewInvite, crewInvite, crewLink, shareLink } from '../lib/invite'
 
 // The crew battle strip brings the battle screen's code; it loads when a battle shows.
 const CrewBattleCard = onDemand(() => import('./CrewBattle'), (m) => m.CrewBattleCard)
@@ -389,6 +390,7 @@ function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: st
       <CrewMembers data={data} uid={uid} onChange={onChange} demo={demo} requests={{ asks, setAsks, reload: () => setReloadAsks((k) => k + 1) }} />
 
       <div className="clan-actions">
+        {!demo && <button className="buy small" title="Invite: a link that opens your crew" onClick={() => void shareLink(`Join my crew ${clan.name} [${clan.tag}] in Cartopia 🛡️`, crewLink(clan.tag))}>🔗 Invite</button>}
         {isOfficer(role) && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>⚙️ Crew settings</button>}
         {!confirmLeave ? (
           <button className="sell" onClick={() => setConfirmLeave(true)}>Leave crew</button>
@@ -474,7 +476,8 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   const showNeed = useGame((s) => s.showNeed)
   const [clans, setClans] = useState<Clan[] | null>(null)
   const [asked, setAsked] = useState<Set<string>>(new Set())
-  const [search, setSearch] = useState('')
+  // A crew link (?join=TAG) opens the list on that crew.
+  const [search, setSearch] = useState(() => crewInvite() ?? '')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ name: '', tag: '', emblem: CLAN_EMBLEMS[0], color: CLAN_COLORS[0], description: '', minLevel: 1 })
@@ -501,6 +504,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
       }
       sfx.unlock()
       toast(`Welcome to ${c.name}!`)
+      clearCrewInvite()
       onJoined()
     } catch (e) {
       toast((e as Error).message)

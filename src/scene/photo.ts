@@ -53,8 +53,8 @@ export function compose(shot: HTMLCanvasElement, bd: Backdrop, filter: PhotoFilt
   ctx.fillStyle = 'rgba(255,255,255,.85)'
   ctx.strokeStyle = 'rgba(0,0,0,.35)'
   ctx.lineWidth = px / 6
-  ctx.strokeText('📸 Cartopia', out.width - px, out.height - px * 0.8)
-  ctx.fillText('📸 Cartopia', out.width - px, out.height - px * 0.8)
+  ctx.strokeText('📸 cartopia.lol', out.width - px, out.height - px * 0.8)
+  ctx.fillText('📸 cartopia.lol', out.width - px, out.height - px * 0.8)
   return out
 }
 
