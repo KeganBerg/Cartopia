@@ -80,6 +80,18 @@ export function weatherMix(m: Mix, sky: Sky): Mix {
 const rand = (a: number, b: number) => a + Math.random() * (b - a)
 const chance = (perSecond: number, dt: number) => Math.random() < perSecond * dt
 
+// Noise and echo buffers, made once per audio context: they're read-only once playing, and
+// building them (a few hundred thousand random samples) froze the page for a moment every time
+// the town's sounds started again, as on leaving the Crate Depot.
+const made = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>()
+export function keptBuffer(ctx: BaseAudioContext, key: string, make: () => AudioBuffer) {
+  let m = made.get(ctx)
+  if (!m) made.set(ctx, (m = new Map()))
+  let b = m.get(key)
+  if (!b) m.set(key, (b = make()))
+  return b
+}
+
 export function noiseBuffer(ctx: BaseAudioContext, seconds: number, brown: boolean) {
   const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate)
   const d = buf.getChannelData(0)
@@ -197,10 +209,10 @@ export class Soundscape {
     this.out = ctx.createGain()
     this.out.gain.value = 0
     this.out.connect(dest)
-    this.white = noiseBuffer(ctx, 2, false)
-    this.brown = noiseBuffer(ctx, 4, true)
+    this.white = keptBuffer(ctx, 'white', () => noiseBuffer(ctx, 2, false))
+    this.brown = keptBuffer(ctx, 'brown', () => noiseBuffer(ctx, 4, true))
     this.room = ctx.createConvolver()
-    this.room.buffer = echoTail(ctx, 1.6)
+    this.room.buffer = keptBuffer(ctx, 'room', () => echoTail(ctx, 1.6))
     this.room.connect(this.out)
 
     // Beds: looping noise shaped into a steady layer, faded in and out by step().
@@ -250,7 +262,7 @@ export class Soundscape {
     const hall = ctx.createConvolver()
     // Its own fixed noise, so building it doesn't disturb the town's random sounds.
     let seed = 7
-    hall.buffer = echoTail(ctx, 2.6, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646)
+    hall.buffer = keptBuffer(ctx, 'hall', () => echoTail(ctx, 2.6, () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646))
     this.verb.connect(this.filter('highpass', 250, hall))
     hall.connect(this.keys)
     this.hats = ctx.createGain()

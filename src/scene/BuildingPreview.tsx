@@ -27,6 +27,8 @@ const SPIN_MS = 8000
 // thumbCopy.ts) draws at up to SPIN_FPS: at 24 a big car's turn looked choppy.
 const FPS = 24
 const SPIN_FPS = 60
+// The turn a held floating model shows.
+const REST = 0.12
 // With reduced motion they stand still, so they're redrawn only when something changes.
 let dirty = true
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
@@ -163,8 +165,7 @@ const aim = new Vector3()
 const back = new Vector3()
 const LO = 0.19
 const HI = 0.31
-// The turn a held floating model shows, and its bob height at a given turn (middle at REST).
-const REST = 0.12
+// Its bob height at a given turn (middle at REST).
 const liftAt = (angle: number) => (LO + HI) / 2 + Math.sin((angle - REST) * Math.PI * 4) * ((HI - LO) / 2)
 // A standing model is seen lower down, so it fills a wide box without bobbing.
 const STAND = new Vector3(1, 0.42, 1)
