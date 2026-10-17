@@ -7,12 +7,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useGame } from './store'
 import { sfx } from '../lib/sound'
+import { canBuyPacks } from './payGate'
 
 type Game = ReturnType<typeof useGame.getState>
 
 // Tutorial steps (src/ui/Tutorial.tsx): 1 first job, 3 build Rusty's, 4 find cars,
 // 5 restore, 6 paint, 8 race; 99 is done.
 const DONE = 99
+
+// The one Crew House check, shared by crews and real-money buys (src/game/payGate.ts): built or packed
+// away, and the admin always counts. Use it as useGame(hasCrewHouse).
+export const hasCrewHouse = (s: Pick<Game, 'buildings' | 'stored' | 'admin'>) => canBuyPacks(s)
+
 export const UNLOCKS = {
   fuel: (s: Game) => s.tutorial >= 1,
   shop: (s: Game) => s.tutorial >= 3,
@@ -24,10 +30,12 @@ export const UNLOCKS = {
   trophies: (s: Game) => s.tutorial >= DONE || (s.stats.races ?? 0) > 0,
   social: (s: Game) => s.tutorial >= DONE && s.level >= 2,
   season: (s: Game) => s.tutorial >= DONE && s.level >= 3,
+  // The Bank and Car Packs (real money) wait for the town's own Crew House, even while visiting.
+  bank: (s: Game) => s.tutorial >= DONE && hasCrewHouse(s),
 } satisfies Record<string, (s: Game) => boolean>
 export type Unlock = keyof typeof UNLOCKS
 
-export const unlocked = (s: Game, id: Unlock) => !!s.visiting || UNLOCKS[id](s)
+export const unlocked = (s: Game, id: Unlock) => (id !== 'bank' && !!s.visiting) || UNLOCKS[id](s)
 
 // True once `id` is unlocked. `fresh` is true for a few seconds when it unlocks while the
 // player watches, so the button can pop in with a NEW tag; on load it's just there.

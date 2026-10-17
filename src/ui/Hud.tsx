@@ -84,6 +84,9 @@ export function Hud() {
   // New players start with coins and their level; the rest arrives as it's needed (src/game/unlocks.ts).
   const fuel = useUnlock('fuel')
   const gems = useUnlock('gems')
+  const bank = useUnlock('bank')
+  // Before the Crew House the gem counter shows how to earn gems instead of the Bank.
+  const openGems = () => (bank.on ? s.openPanel('bank') : s.showNeed('bucks', 0))
   const parts = useUnlock('parts')
   const cars = useUnlock('cars')
   const trophies = useUnlock('trophies')
@@ -95,7 +98,7 @@ export function Hud() {
         <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
         <div className="pills">
           <button className="pill" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>
-          {gems.on && <button className={`pill${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>}
+          {gems.on && <button className={`pill${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={openGems}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}<span className="plus"><Icon name="plus" size={12} /></span></button>}
           {parts.on && <button className={`pill${freshClass(parts.fresh)}`} onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /><span className="plus"><Icon name="plus" size={12} /></span></button>}
         </div>
       </div>
@@ -117,7 +120,7 @@ export function Hud() {
         <div className="fuel-sub" title="Fuel refill rate: faster at levels 15, 30, 50 and 75">{nextIn === null ? 'Fuel full' : `+1 fuel in ${nextIn}s`} · {fuelPerMin(s.level)}/min</div></>}
         <div className="hud-right-row">
           {trophies.on && <button className={`pill trophies${freshClass(trophies.fresh)}`} title="Leaderboards" onClick={() => s.openPanel('leaders')}><Icon name="trophy" size={16} /> {compact(s.trophies)}</button>}
-          {gems.on && <button className={`goals-btn bank-btn${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')} title="Bank" aria-label="Bank"><Icon name="bank" /></button>}
+          {bank.on && <button className={`goals-btn bank-btn${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(bank.fresh)}`} onClick={() => s.openPanel('bank')} title="Bank" aria-label="Bank"><Icon name="bank" /></button>}
           {season.on && <SeasonButton />}
           {season.on && <DealsButton />}
           <MuteButton />
@@ -133,7 +136,7 @@ export function Hud() {
           <Speedometer level={s.level} xp={s.xp} onClick={() => s.openPanel('account')} />
           <div className="hud-chips">
             <button className="chip-stat" onClick={() => s.showNeed('coins', 0)}><span className="ico cur-ico" data-fly="coins"><CoinIcon /></span><Roll value={s.coins} format={compact} /></button>
-            {gems.on && <button className={`chip-stat${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}</button>}
+            {gems.on && <button className={`chip-stat${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={openGems}><span className="ico cur-ico" data-fly="bucks"><BuckIcon /></span>{compact(s.bucks)}</button>}
             {parts.on && <button className={`chip-stat${freshClass(parts.fresh)}`} onClick={() => s.showNeed('parts', 0)}><span className="ico cur-ico" data-fly="parts"><PartsIcon /></span><Roll value={s.parts} format={compact} /></button>}
             {fuel.on && <button className={`chip-stat chip-fuel${tip === 'fuel' ? ' tut-pulse' : ''}${freshClass(fuel.fresh)}`} onClick={() => s.showNeed('fuel', 0)}>
               <span className="ico cur-ico"><FuelIcon /></span>
@@ -141,7 +144,7 @@ export function Hud() {
             </button>}
           </div>
           <div className="hud-actions">
-            {gems.on && <button className={`goals-btn bank-btn${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(gems.fresh)}`} onClick={() => s.openPanel('bank')} title="Bank" aria-label="Bank"><Icon name="bank" /></button>}
+            {bank.on && <button className={`goals-btn bank-btn${tip === 'gems' ? ' tut-pulse' : ''}${freshClass(bank.fresh)}`} onClick={() => s.openPanel('bank')} title="Bank" aria-label="Bank"><Icon name="bank" /></button>}
             {season.on && <SeasonButton />}
             {season.on && <DealsButton />}
             {social.on && <ChallengeBell />}

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { UNLOCKS, hasCrewHouse, unlocked, type Unlock } from './unlocks'
 
 type S = Parameters<typeof unlocked>[0]
-const at = (tutorial: number, level = 1, races = 0) => ({ tutorial, level, stats: { races }, visiting: null }) as unknown as S
+const at = (tutorial: number, level = 1, races = 0, buildings: { def: string }[] = []) => ({ tutorial, level, stats: { races }, visiting: null, buildings }) as unknown as S
+const CREW = [{ def: 'crew' }]
 const shown = (s: S) => (Object.keys(UNLOCKS) as Unlock[]).filter((id) => unlocked(s, id))
 
 describe('buttons arrive one at a time for new players', () => {
@@ -19,10 +20,22 @@ describe('buttons arrive one at a time for new players', () => {
     expect(shown(at(99, 1))).not.toContain('social')
     expect(shown(at(99, 2))).toContain('social')
     expect(shown(at(99, 2))).not.toContain('season')
-    expect(shown(at(99, 3))).toEqual(Object.keys(UNLOCKS))
+    expect(shown(at(99, 3, 0, CREW))).toEqual(Object.keys(UNLOCKS))
   })
-  it("shows everything in a friend's town", () => {
-    expect(shown({ ...at(0), visiting: { townName: 'x' } } as unknown as S)).toEqual(Object.keys(UNLOCKS))
+  it("shows everything in a friend's town but the Bank, which needs your own Crew House", () => {
+    expect(shown({ ...at(0), visiting: { townName: 'x' } } as unknown as S)).toEqual(Object.keys(UNLOCKS).filter((id) => id !== 'bank'))
+  })
+})
+
+describe('real-money buys wait for the Crew House (Kegan, 2026-10-17)', () => {
+  it('hides the Bank and Car Packs until a Crew House is built or packed away', () => {
+    expect(unlocked(at(99, 30), 'bank')).toBe(false)
+    expect(unlocked(at(99, 30, 0, [{ def: 'garage' }]), 'bank')).toBe(false)
+    expect(unlocked(at(99, 2, 0, CREW), 'bank')).toBe(true)
+    expect(unlocked({ ...at(99, 30), stored: CREW } as unknown as S, 'bank')).toBe(true)
+  })
+  it('lets the admin through without one', () => {
+    expect(unlocked({ ...at(99, 1), admin: true } as unknown as S, 'bank')).toBe(true)
   })
 })
 
