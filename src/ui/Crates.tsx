@@ -335,6 +335,17 @@ function SumTile({ open, sel, paintCar, onPick, onDone }: { open: CrateOpen; sel
   )
 }
 
+// A Call Card prize, full size over the lift, with your race car on it: the reveal, and a card
+// picked in a ×10 summary. Pops in once (transform and opacity only, like the card's own layers).
+function CardOnLift({ card, inSum }: { card: string; inSum: boolean }) {
+  const tier = callCardDef(card)?.tier
+  return (
+    <div className={`crate-cc-lift${tier ? ` ${tier}` : ''}${inSum ? ' in-sum' : ''}`}>
+      <CallCardShowcase id={card} className="crate-cc-big" />
+    </div>
+  )
+}
+
 // embedded: drawn inside the Cars page (under its header and tabs) instead of over the whole screen.
 // There the page walks in from its Showroom while the depot gets ready (no loading screen), and
 // `onReady` says when the depot can be shown.
@@ -528,6 +539,7 @@ export function CratesPanel({ embedded = false, onReady }: { embedded?: boolean;
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>
         {!embedded && <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>}
       </div>
+      {phase === 'open' && open?.drop.kind === 'callcard' && (shown || summary != null) && <CardOnLift key={`${run}-${open.drop.card}`} card={open.drop.card} inSum={summary != null} />}
       {phase === 'open' && !shown && !ten && <div className="crate-skip">Tap to skip</div>}
       {phase === 'open' && shown && open && !ten && (
         <Prize open={open} paintCar={paintCar} onDone={queue.length > 1 ? next : () => { next() }} onAgain={() => again()}

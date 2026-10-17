@@ -106,6 +106,19 @@
 .crate-sum-tile .cs-act .buy { font-size: 11px; padding: 2px 6px; border-radius: 9px; border-width: 1.5px; box-shadow: 0 2px 0 rgba(0,0,0,.3); white-space: nowrap; }
 .crate-sum > .cp-actions { display: flex; gap: 6px; justify-content: flex-end; }
 
+/* A Call Card prize stands over the lift, full size (Crates.tsx CardOnLift). Its own layers are
+   the card's; this only moves it in (transform and opacity). */
+.crate-cc-lift { position: absolute; left: 50%; top: 37%; transform: translate(-50%, -50%); pointer-events: none; }
+.crate-cc-big { height: min(40vh, 340px); aspect-ratio: 5 / 6; border-width: 4px; border-radius: 20px; box-shadow: 0 0 34px var(--cc-glow, #5aa9ff); animation: cc-lift-in .5s cubic-bezier(.2,1.35,.4,1) both; }
+.crate-cc-big::after { border-radius: 16px; }
+.crate-cc-lift.epic { --cc-glow: #b388ff; }
+.crate-cc-lift.legendary { --cc-glow: #ffb300; }
+/* Picked in a ×10 summary on a phone: a little smaller and higher, clear of the prize grid. */
+.crate-cc-lift.in-sum { top: 32%; }
+.crate-cc-lift.in-sum .crate-cc-big { height: min(32vh, 280px); }
+@keyframes cc-lift-in { from { transform: translateY(40px) scale(.55); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .crate-cc-big { animation: none; } }
+
 /* Wide screens: the picker stands on the right and the crate on the left. */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .crate-dock { left: auto; right: calc(16px + var(--sar)); bottom: 50%; transform: translateY(50%); width: 384px; }
@@ -116,6 +129,9 @@
   .crate-sum-tile .cs-art, .crate-sum-tile .thumb3d { height: 56px; --th: 56px; }
   .crate-ten-strip { left: 37%; }
   .crate-ten-flash { left: 37%; }
+  .crate-cc-lift { left: 37%; top: 50%; }
+  .crate-cc-lift.in-sum { top: 50%; }
+  .crate-cc-big, .crate-cc-lift.in-sum .crate-cc-big { height: min(52vh, 420px); }
   @keyframes prize-in-side { from { transform: translate(30px, 50%) scale(.92); opacity: 0; } }
 }
 
