@@ -1,19 +1,11 @@
-import { CARS, SKINNED_SLOTS, carDef, modSkinDef, performance, skinDef, type Body, type ModSkins } from '../game/data'
+import { CARS, carDef, performance, type Body, type ModSkins } from '../game/data'
+import { cleanSkins } from './cleanSkins'
 import { callCardDef } from '../game/callCards'
 
 // The car another player races with, as their server save has it. game_saves.best_car is the
 // guard's own pick (their highest PI); their picked race car comes from the guard-checked cars
 // in the save, and its PI is never shown above best_car's.
 export type ServerCar = { uid: string | null; name: string; color: string; body: Body; pi: number; mods?: string[]; skin?: string; modSkin?: ModSkins }
-
-// A car's skins as another browser or the server sent them, kept to ones this game knows,
-// so everyone sees a player's car in the animated skin it wears.
-export function cleanSkins(c: { skin?: unknown; modSkin?: unknown }): { skin?: string; modSkin?: ModSkins } {
-  const skin = typeof c.skin === 'string' && skinDef(c.skin) ? c.skin : undefined
-  const m = c.modSkin && typeof c.modSkin === 'object' ? (c.modSkin as Record<string, unknown>) : {}
-  const modSkin = Object.fromEntries(SKINNED_SLOTS.flatMap((sl) => (typeof m[sl] === 'string' && modSkinDef(m[sl] as string) ? [[sl, m[sl]]] : [])))
-  return { ...(skin ? { skin } : {}), ...(Object.keys(modSkin).length ? { modSkin: modSkin as ModSkins } : {}) }
-}
 
 // The game_saves columns serverCar() reads.
 export const SERVER_CAR_COLUMNS = 'best_car, race_car:state->raceCar, cars:state->cars, call_card:state->callCard, call_cards:state->callCards'
