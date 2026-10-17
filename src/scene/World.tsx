@@ -44,7 +44,7 @@ import { WorldFx, PopGroup, usePops } from './WorldFx'
 import { helpable } from '../game/help'
 import { helpBuilding } from '../lib/help'
 import { hoursOf, seedOf } from '../game/hours'
-import { VIEW, isFree, useFreeCam } from './freeCam'
+import { VIEW, freeFingers, isFree, useFreeCam } from './freeCam'
 import { TownControls } from './TownControls'
 import { FreeCam } from './FreeCam'
 import { TutorialCamera } from './TutorialCamera'
@@ -182,7 +182,7 @@ function holdToMove(b: PlacedBuilding, e: ThreeEvent<PointerEvent>) {
     watch.stop()
     const s = useGame.getState()
     // A finger resting on a building while another pinches is zooming, not picking it up.
-    if (s.mode !== 'play' || s.panel || s.visiting || townFingers() > 1) return
+    if (s.mode !== 'play' || s.panel || s.visiting || townFingers() + freeFingers() > 1) return
     held = true
     navigator.vibrate?.(15)
     sfx.click()

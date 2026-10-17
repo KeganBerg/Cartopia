@@ -1,14 +1,14 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { PerspectiveCamera, Spherical, Vector3, type OrthographicCamera } from 'three'
+import { PerspectiveCamera, Raycaster, Spherical, Vector3, type Mesh, type Object3D, type OrthographicCamera, type Scene } from 'three'
 import type { RefObject } from 'react'
 import { useGame } from '../game/store'
-import { FREE, VIEW, setFreeCam, useFreeCam } from './freeCam'
+import { START_LAND } from '../game/data'
+import { FREE, VIEW, nearFor, setFreeCam, setFreeFingers, useFreeCam } from './freeCam'
+import { RAMP, cameraSpot, distToLot, lotsOf, roamBox, type Carry, type Lot } from './freeCamBounds'
 import { Horizon } from './Horizon'
 import { heightAt } from './horizonLand'
 
-// How far from the middle of town the free view may wander.
-const ROAM = 150
 // The opening move: the camera swoops down from the bird's-eye angle to a lower
 // one that shows the skyline, swinging half way round so the building fronts the
 // bird's-eye view hides come into sight, over this many seconds.
@@ -68,11 +68,16 @@ type Rig = {
   // Flick momentum, in units (or radians) a second.
   vel: { x: number; z: number; yaw: number }
   held: boolean
+  // How much of the way out to the pose the camera is, shortened in front of a
+  // building, and how far it's lifted over one (see cameraSpot).
+  carry: Carry
   swoop: { t: number; from: Pose; to: Pose } | null
 }
+// The spot in view stays over the town and the fields just past it (see roamBox).
+let roam = roamBox(START_LAND)
 const keepIn = (p: Pose) => {
-  p.x = clamp(p.x, -ROAM, ROAM)
-  p.z = clamp(p.z, -ROAM, ROAM)
+  p.x = clamp(p.x, roam.x0, roam.x1)
+  p.z = clamp(p.z, roam.z0, roam.z1)
   p.pitch = clamp(p.pitch, FREE.minPolar, FREE.maxPolar)
   p.dist = clamp(p.dist, FREE.minDist, FREE.maxDist)
 }
@@ -98,7 +103,7 @@ function Rig() {
     const from = { x: VIEW.x, z: VIEW.z, yaw: sph.theta, pitch: sph.phi, dist }
     const to = { ...from, yaw: from.yaw + Math.PI, pitch: SWOOP_TILT, dist: dist * SWOOP_IN }
     keepIn(to)
-    rig.current = { cur: { ...from }, goal: { ...from }, vel: { x: 0, z: 0, yaw: 0 }, held: false, swoop: { t: 0, from, to } }
+    rig.current = { cur: { ...from }, goal: { ...from }, vel: { x: 0, z: 0, yaw: 0 }, held: false, carry: { arm: 1, lift: 0 }, swoop: { t: 0, from, to } }
     cam.current = c
     // Dev builds only: lets headless screenshot scripts set a pose.
     if (import.meta.env.DEV) (window as unknown as { __freeRig?: unknown }).__freeRig = rig
@@ -131,6 +136,7 @@ function Rig() {
 
   useGestures(rig, cam)
   const keys = useKeys()
+  const lots = useLots()
 
   useFrame((_, delta) => {
     const c = cam.current
@@ -198,19 +204,103 @@ function Rig() {
     cur.yaw += (goal.yaw - cur.yaw) * f
     cur.pitch += (goal.pitch - cur.pitch) * f
     cur.dist *= (goal.dist / cur.dist) ** f
-    place(c, cur)
+    place(c, cur, lots(c), r, dt)
   })
   return null
 }
 
-// Puts the camera at a pose, never under the ground or the hills past town.
-function place(c: PerspectiveCamera, p: Pose) {
+// Puts the camera at a pose, never under the ground or the hills past town, nor
+// inside a building (see cameraSpot). `r` carries the arm length from frame to frame.
+const groundAt = (x: number, z: number) => Math.max(0, heightAt(x, z)) + 1.2
+function place(c: PerspectiveCamera, p: Pose, lots: Lot[] = [], r?: Rig, dt = 1) {
   VIEW.set(p.x, 0, p.z)
   sph.set(p.dist, p.pitch, p.yaw)
-  c.position.copy(VIEW).add(off.setFromSpherical(sph))
-  const floor = Math.max(0, heightAt(c.position.x, c.position.z)) + 1.2
-  if (c.position.y < floor) c.position.y = floor
+  off.setFromSpherical(sph)
+  const at = cameraSpot(VIEW, off, lots, groundAt, r?.carry ?? { arm: 1, lift: 0 }, dt)
+  if (r) r.carry = at
+  c.position.set(at.x, at.y, at.z)
   c.lookAt(VIEW)
+  // Up close the near plane comes in, so a lamp post or wall a step away isn't cut open.
+  const near = nearFor(c.position.distanceTo(VIEW))
+  if (Math.abs(near - c.near) > c.near * 0.02) {
+    c.near = near
+    c.updateProjectionMatrix()
+  }
+}
+
+// The town's buildings as lots, each measured for height the first time the
+// camera comes near it (a few downward rays against what's drawn), and again now
+// and then in case it has grown. Also keeps the roaming box on the town's land.
+const ray = new Raycaster()
+const down = new Vector3(0, -1, 0)
+const from = new Vector3()
+const MEASURE_NEAR = RAMP + 3
+const REMEASURE = 5000
+const shown = (o: Object3D) => {
+  for (let p: Object3D | null = o; p; p = p.parent) if (!p.visible) return false
+  return true
+}
+function measure(scene: Scene, l: Lot) {
+  let top = -1
+  const ix = Math.min(0.3, (l.x1 - l.x0) / 4)
+  const iz = Math.min(0.3, (l.z1 - l.z0) / 4)
+  const mx = (l.x0 + l.x1) / 2
+  const mz = (l.z0 + l.z1) / 2
+  for (const [x, z] of [[mx, mz], [l.x0 + ix, l.z0 + iz], [l.x1 - ix, l.z0 + iz], [l.x0 + ix, l.z1 - iz], [l.x1 - ix, l.z1 - iz]]) {
+    ray.set(from.set(x, 60, z), down)
+    for (const h of ray.intersectObjects(scene.children, true)) {
+      const m = h.object as Mesh
+      // Only solid things that are drawn, not the sky dome or rain. Merged parts are drawn
+      // by their merged copy (see Batch), which doesn't take rays, so their hidden originals count.
+      if (!m.isMesh || h.point.y < 0.3 || h.point.y > 55 || !(m.userData.batched || shown(m))) continue
+      const r = m.geometry.boundingSphere?.radius ?? 0
+      if (r * m.matrixWorld.getMaxScaleOnAxis() > 80) continue
+      top = Math.max(top, h.point.y)
+      break
+    }
+  }
+  return top
+}
+function useLots() {
+  const scene = useThree((s) => s.scene)
+  const get = useThree((s) => s.get)
+  const list = useRef<Lot[]>([])
+  useEffect(() => {
+    const sync = (g: ReturnType<typeof useGame.getState>) => {
+      const town = g.visiting ?? g
+      roam = roamBox(g.visiting ? (g.visiting.land ?? START_LAND) : g.land)
+      const old = new Map(list.current.map((l) => [l.key, l]))
+      list.current = lotsOf(town.buildings).map((l) => old.get(l.key) ?? l)
+    }
+    sync(useGame.getState())
+    // Dev builds only: lets headless checks see the lots and whether the camera is in one.
+    if (import.meta.env.DEV) {
+      const w = window as unknown as { __freeLots?: unknown; __freeCamState?: () => unknown }
+      w.__freeLots = list
+      w.__freeCamState = () => {
+        const c = get().camera
+        const { x, y, z } = c.position
+        return { x, y, z, inLot: list.current.some((l) => l.top !== undefined && l.top > 0 && x > l.x0 && x < l.x1 && z > l.z0 && z < l.z1 && y < l.top) }
+      }
+    }
+    return useGame.subscribe((g, was) => {
+      if (g.buildings !== was.buildings || g.visiting !== was.visiting || g.land !== was.land) sync(g)
+    })
+  }, [get])
+  return (c: PerspectiveCamera) => {
+    const now = performance.now()
+    // At most one building measured a frame, and only near the camera when it's low.
+    if (c.position.y < 40) {
+      for (const l of list.current) {
+        if (l.at !== undefined && now - l.at < REMEASURE) continue
+        if (distToLot(l, c.position.x, c.position.z) > MEASURE_NEAR) continue
+        l.top = measure(scene, l)
+        l.at = now
+        break
+      }
+    }
+    return list.current
+  }
 }
 
 // Touch and mouse, all feeding the goal pose:
@@ -276,6 +366,7 @@ function useGestures(rig: RefObject<Rig | null>, cam: RefObject<PerspectiveCamer
       const r = rig.current
       if (!r || pts.size >= 2) return
       pts.set(e.pointerId, { x: e.clientX, y: e.clientY, button: e.button })
+      setFreeFingers(pts.size)
       el.setPointerCapture?.(e.pointerId)
       grab(r)
       reset(e.timeStamp)
@@ -331,6 +422,7 @@ function useGestures(rig: RefObject<Rig | null>, cam: RefObject<PerspectiveCamer
     }
     const up = (e: PointerEvent) => {
       if (!pts.delete(e.pointerId)) return
+      setFreeFingers(pts.size)
       const r = rig.current
       if (!r) return
       // Lifting one of two fingers carries on as a one-finger drag from where it is, without a jump.
@@ -369,6 +461,7 @@ function useGestures(rig: RefObject<Rig | null>, cam: RefObject<PerspectiveCamer
       el.removeEventListener('wheel', wheel)
       el.removeEventListener('contextmenu', menu)
       el.style.touchAction = touch
+      setFreeFingers(0)
     }
   }, [gl, rig, cam])
 }

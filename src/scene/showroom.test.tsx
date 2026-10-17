@@ -3,7 +3,7 @@ import './testCanvas'
 import { describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { Box3, type Mesh, type Object3D } from 'three'
-import { CAM_REACH, CAM_TOP, Room, TT_R } from './Showroom'
+import { CAM_REACH, CAM_TOP, LIFT_AT, Room, TT_R } from './Showroom'
 import { describe as tell, floating } from './floating'
 
 // The Showroom every car preview stands in (scene/Showroom.tsx), built in metres.
@@ -41,6 +41,26 @@ describe('showroom', () => {
     })
     await r.unmount()
     expect(bad).toEqual([])
+  })
+
+  // Kegan's close-up (10-16): the car up on the lift was a dust-covered box with a
+  // half-cylinder hump and four wheels, which looks like a placeholder when the
+  // camera orbits round to it. It's a real CarModel now: lights, glass, trim.
+  it('puts a real car on the lift, not a stand-in block', async () => {
+    const r = await ReactThreeTestRenderer.create(<Room />)
+    ;(r.scene.instance as Object3D).updateMatrixWorld(true)
+    const box = new Box3()
+    let parts = 0
+    ;(r.scene.instance as Object3D).traverse((o) => {
+      if (!(o as Mesh).isMesh) return
+      box.setFromObject(o)
+      const c = box.getCenter(box.min.clone())
+      // Up on the lift's arms (1.67 m) by the right wall, in metres (the room is drawn at S).
+      if (c.y > 1.6 && c.y < 3.4 && box.max.y - box.min.y < 2 && Math.hypot(c.x - LIFT_AT[0], c.z - LIFT_AT[1]) < 2.6) parts++
+    })
+    await r.unmount()
+    // The arms and carriages alone are 6, the old stand-in 6 more; a CarModel is over 20.
+    expect(parts).toBeGreaterThan(20)
   })
 
   it('leaves the turntable its pit', () => {
