@@ -32,6 +32,8 @@ for (let i = 0; i < 160; i++) {
   if (key !== last) { last = key; await p.waitForTimeout(800); await shot(`t${s.t}-${s.panel ?? s.mode}${s.search ? '-search' : ''}`) }
   if (!tip) {
     idle++
+    // The hand waits behind the flashing-lights warning; a player taps Got it first.
+    await p.getByText('Got it').click({ timeout: 2000 }).catch(() => {})
     if (idle % 10 === 0) console.log('no hand', key)
     await p.waitForTimeout(1500)
     continue
