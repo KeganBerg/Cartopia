@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { UNLOCKS, unlocked, type Unlock } from './unlocks'
 
@@ -35,5 +36,19 @@ describe('real-money buys wait for the Crew House (Kegan, 2026-10-17)', () => {
   })
   it('lets the admin through without one', () => {
     expect(unlocked({ ...at(99, 1), admin: true } as unknown as S, 'bank')).toBe(true)
+  })
+})
+
+describe('crews wait for the Crew House (Kegan, 2026-10-17)', () => {
+  it('locks the Crew window until it is built, unless already in a crew', () => {
+    const src = readFileSync('src/ui/Social.tsx', 'utf8')
+    const panel = src.slice(src.indexOf('export function ClanPanel'), src.indexOf('function CrewLocked'))
+    expect(panel).toMatch(/const built = useGame\(hasCrewHouse\)/)
+    // The lock comes before sign-in, the crew list and the crew home.
+    const lock = panel.indexOf('<CrewLocked />')
+    expect(lock).toBeGreaterThan(0)
+    expect(lock).toBeLessThan(panel.indexOf('<ClanBrowser'))
+    expect(lock).toBeLessThan(panel.indexOf('Sign in to join'))
+    expect(panel).toMatch(/!built && \(uid === null \|\| mine === null\)/)
   })
 })
