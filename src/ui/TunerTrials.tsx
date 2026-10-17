@@ -1,5 +1,5 @@
 import { useGame, type OwnedCar } from '../game/store'
-import { raceCarOf } from '../game/raceCar'
+import { carPi, raceCarOf } from '../game/raceCar'
 import { CARS, MAX_UPGRADE, MODS, MOD_SLOTS, carDef, patternDef, type UpgradeSlot } from '../game/data'
 import { DIST } from '../game/distance'
 import { TUNER_TRIALS, buildChecks, hostMods, tunerPrize, tunerTrial, type BuildCheck, type TunerTrial } from '../game/tuner'
@@ -9,6 +9,7 @@ import { openGarageTab } from './Menus'
 import { openRaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { TileClip } from './TileClip'
+import { SkillIcon } from './TapTip'
 
 // Tuner Trials screen (game/tuner.ts): each trial's host car built for it, the parts and
 // tuning it asks for checked against your race car, and the prize. The race bar's button
@@ -65,6 +66,9 @@ function CheckRow({ c, onFix }: { c: BuildCheck; onFix: () => void }) {
   )
 }
 
+// How far the race car outclasses a host before the screen calls the race an easy win.
+const EASY = 1.5
+
 export function TunerTrials({ sel, setSel, car }: { sel: string; setSel: (id: string) => void; car: OwnedCar | undefined }) {
   const tuner = useGame((s) => s.tuner)
   const t = tunerTrial(sel) ?? TUNER_TRIALS[0]
@@ -74,18 +78,23 @@ export function TunerTrials({ sel, setSel, car }: { sel: string; setSel: (id: st
   const d = car ? carDef(car.model) : CARS[0]
   const checks = car ? buildChecks(t, car) : []
   const pat = t.pattern ? patternDef(t.pattern) : undefined
+  const mine = car ? carPi(car) : 0
+  const easy = mine >= t.pi * EASY
+  const top = Math.max(mine, t.pi, 1)
+  const prize = trialPrizeOf(t, tuner)
+  const skill = t.tier >= 2 ? hc.skill : undefined
   return (
     <div className="rm-split rm-prow rm-tuner" style={{ '--pr': t.color } as React.CSSProperties}>
       <div className="rm-left">
         <div className={`rm-banner rm-photo${t.night ? ' rm-night' : ''}`} style={artStyle('tour', t.venue, t.night)}>
           <TileClip mode="tour" venue={t.venue} night={t.night} />
+          <span className="tt-twist" title={`${t.name}: ${t.twist}`}>{t.icon}</span>
           <span className="rm-eyebrow">{v.icon} {v.name}{t.night && ' · 🌙'} · {DIST[t.dist].label}</span>
-          <b className="rm-ttl">{t.icon} {t.name}</b>
-          <span className="tt-host"><CarThumb size="sm" color={t.color} body={hc.body} model={hc.id} mods={hostMods(t)} /></span>
+          <b className="rm-ttl">{t.name}</b>
           <span className="rm-chips">
-            <span>{flames(t)}</span>
-            <span>PI {t.pi}</span>
-            <span className={beaten ? 'got' : ''}>{beaten ? `✔ ×${tuner![t.id]}` : `🏁 ${money(trialPrizeOf(t, tuner))}`}</span>
+            <span title={`Difficulty ${t.tier}/3`}>{flames(t)}</span>
+            {skill && <SkillIcon sk={skill} className="tt-skill" />}
+            {beaten && <span className="got" title={`Won ×${tuner![t.id]}`}>✔ ×{tuner![t.id]}</span>}
           </span>
         </div>
         <div className="tt-build" role="list" aria-label="Build">
@@ -102,7 +111,7 @@ export function TunerTrials({ sel, setSel, car }: { sel: string; setSel: (id: st
                 className={`pr-tile t${x.tier}${x.id === t.id ? ' sel' : ''}${won(tuner, x) ? ' done' : ''}`} style={{ '--pr': x.color } as React.CSSProperties}
                 onClick={() => setSel(x.id)}>
                 <CarThumb size="xs" color={x.color} body={xc.body} model={xc.id} mods={hostMods(x)} />
-                <span className="pr-face" aria-hidden>{x.icon}</span>
+                <span className="pr-face" data-tap-tip title={`${x.name}: ${x.twist}`}>{x.icon}</span>
                 {won(tuner, x) ? <span className="pr-tick" aria-hidden>✔</span> : !ready && <span className="pr-tick tt-wrench" aria-hidden>🔧</span>}
                 <small>{flames(x)}{x.pattern && ' 🎨'}</small>
                 <b>PI {x.pi}</b>
@@ -110,18 +119,22 @@ export function TunerTrials({ sel, setSel, car }: { sel: string; setSel: (id: st
             )
           })}
         </div>
-        {pat && (
-          <div className={`ev-reward pr-reward tt-reward${beaten ? ' got' : ''}`}>
-            <div className="ev-reward-car">
-              <CarThumb size="lg" color={car?.color ?? t.color} finish={car?.finish} body={d.body} model={d.id} mods={car?.mods} panels={{ body: { pattern: pat.id } }} />
-              <span className="ev-reward-state">{beaten ? '✔' : '🔒'}</span>
-            </div>
-            <div className="ev-reward-info">
-              <b>{pat.name}</b>
-              <span className="ev-reward-chips"><em>🖌️ Pattern</em></span>
-            </div>
+        <div className={`tt-vs${beaten ? ' got' : ''}`}>
+          <div className="tt-side me">
+            <CarThumb size="lg" color={car?.color ?? t.color} finish={car?.finish} body={d.body} model={d.id} mods={car?.mods} panels={pat && { body: { pattern: pat.id } }} />
+            <span className="tt-pi" title={`Your car: PI ${mine}`}><i style={{ width: `${(mine / top) * 100}%` }} />PI {mine}</span>
           </div>
-        )}
+          <b className="tt-vs-mark">VS</b>
+          <div className="tt-side host">
+            <CarThumb size="lg" color={t.color} body={hc.body} model={hc.id} mods={hostMods(t)} />
+            <span className="tt-pi" title={`${t.host}: PI ${t.pi}`}><i style={{ width: `${(t.pi / top) * 100}%` }} />PI {t.pi}</span>
+          </div>
+          {easy && <span className="tt-easy" title={`Easy win: PI ${mine} vs ${t.pi}`}>😴 Too easy</span>}
+          <div className="tt-prize">
+            <span className="tt-coins" title={beaten ? `Each win pays ${money(prize)}` : 'First win: double pay'}>🏆 {money(prize)}</span>
+            {pat && <span className="tt-pat" title={`First win unlocks the ${pat.name} pattern`}>{beaten ? '✔' : '🎨'} {pat.name}</span>}
+          </div>
+        </div>
       </div>
     </div>
   )

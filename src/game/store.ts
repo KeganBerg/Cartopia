@@ -283,6 +283,8 @@ type Actions = {
   openPanel: (p: Panel) => void
   // Close the open menu: back to the one it was opened from, or the town.
   closePanel: () => void
+  // The X: close every open menu straight to the town, skipping the way back.
+  closeMenus: () => void
   // Switch to a sibling menu from a tab row (Garage / Showroom / Crates, Friends / Crew): same place in the trail.
   swapPanel: (p: Exclude<Panel, null>) => void
   openShop: (focus?: string) => void
@@ -1008,6 +1010,11 @@ export const useGame = create<GameState>()(
           const prev = s.panel ? s.panelBack[s.panelBack.length - 1] ?? null : null
           if (s.panel) sfx.menuClose()
           return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+        }),
+      closeMenus: () =>
+        set((s) => {
+          if (s.panel) sfx.menuClose()
+          return { panel: null, panelBack: [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
         }),
       swapPanel: (panel) => set((s) => {
         if (s.panel !== panel) sfx.tab()
