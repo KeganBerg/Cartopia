@@ -1,7 +1,7 @@
 // Race shots for the launch trailer: real races on the race's own physics in the real race
 // scene (every venue, World Tour countries included), filmed by trailer cameras.
 // Dev only: `npm run dev`, then `node scripts/trailer/shoot.mjs` captures the frames.
-// ?shot=launch|chase|drone|low|side|wide|pass|orbit|gp&venue=<id>&night=1&sky=<kind>&cars=gtr,lambo&colors=%23eceff1,%23fdd835
+// ?shot=launch|chase|drone|low|side|wide|pass|orbit|duel|track|flyover|gp&venue=<id>&night=1&sky=<kind>&cars=gtr,lambo&colors=%23eceff1,%23fdd835
 // Any viewport works: in portrait the cameras widen so the cars still fit across the frame.
 // The capture script drives the page's clock; window.__clip says how many frames to keep.
 import { createRoot } from 'react-dom/client'
@@ -126,6 +126,31 @@ const PLANS: Record<string, Plan> = {
     cam: (t, mz, tz) => {
       const c = mid(mz, tz)
       return { pos: [0.9, 2.4 + t * 0.25, c - 5.5], at: [0, 1.6, c + 30], fov: 55 }
+    },
+  },
+  // Low on the road just ahead of the pair, both cars charging the lens at full chat.
+  duel: {
+    warm: 0.4, start: -0.3,
+    cam: (t, mz, tz) => {
+      const lead = Math.max(mz, tz, 0)
+      return { pos: [0.15, 0.42, lead + 3.4], at: [0, 0.38, lead - 0.4], fov: 52 }
+    },
+  },
+  // Riding low beside the pair inside the kerb, the roadside streaking past behind them.
+  track: {
+    warm: 0.4, start: -2.2,
+    cam: (t, mz, tz) => {
+      const c = mid(mz, tz)
+      return { pos: [1.55, 0.36, c + 2.4 - t * 0.4], at: [-0.3, 0.42, c - 0.4], fov: 46 }
+    },
+  },
+  // Straight down from above, turning slowly as the pair tears up the strip.
+  flyover: {
+    warm: 0.4, start: -1.8,
+    cam: (t, mz, tz) => {
+      const c = mid(mz, tz)
+      const a = 0.3 + t * 0.25
+      return { pos: [Math.sin(a) * 1.2, 7.5 - t * 0.8, c + 0.4 + Math.cos(a) * 1.2], at: [0, 0, c + 0.5], fov: 50 }
     },
   },
   // Parked on the start line, the camera circling the car on the road side from

@@ -274,5 +274,113 @@
   "q": "shot=orbit&venue=main&night=0&cars=stomper&colors=%23ff7043&a=-0.8&dur=1.1",
   "w": 720,
   "h": 1280
+ },
+ {
+  "name": "L-duel-main",
+  "q": "shot=duel&venue=main&night=0&cars=vette,charger&colors=%23e53935,%23263238&dur=2.4",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-duel-vegas",
+  "q": "shot=duel&venue=vegas&night=1&cars=hellcat,thunderjet&colors=%237e57c2,%23ff7043&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-duel-rio",
+  "q": "shot=duel&venue=rio&night=0&cars=kitsune,hotshot&colors=%2343a047,%23fdd835&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-duel-moscow",
+  "q": "shot=duel&venue=moscow&night=0&cars=raiden,kreis&colors=%23e53935,%23eceff1&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-track-main",
+  "q": "shot=track&venue=main&night=0&cars=vette,charger&colors=%23e53935,%23263238&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-track-vegas",
+  "q": "shot=track&venue=vegas&night=1&cars=hellcat,thunderjet&colors=%237e57c2,%23ff7043&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-track-giza",
+  "q": "shot=track&venue=giza&night=0&cars=hyper,zenith&colors=%23ffb300,%2300acc1&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-flyover-giza",
+  "q": "shot=flyover&venue=giza&night=0&cars=hyper,zenith&colors=%23ffb300,%2300acc1&dur=2.0",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "L-flyover-sydney",
+  "q": "shot=flyover&venue=sydney&night=0&cars=current,ridgeback&colors=%234dd0e1,%23ff7043&dur=2.4",
+  "w": 1440,
+  "h": 810
+ },
+ {
+  "name": "P-duel-main",
+  "q": "shot=duel&venue=main&night=0&cars=vette,charger&colors=%23e53935,%23263238&dur=2.4",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-duel-vegas",
+  "q": "shot=duel&venue=vegas&night=1&cars=hellcat,thunderjet&colors=%237e57c2,%23ff7043&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-duel-rio",
+  "q": "shot=duel&venue=rio&night=0&cars=kitsune,hotshot&colors=%2343a047,%23fdd835&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-duel-moscow",
+  "q": "shot=duel&venue=moscow&night=0&cars=raiden,kreis&colors=%23e53935,%23eceff1&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-track-main",
+  "q": "shot=track&venue=main&night=0&cars=vette,charger&colors=%23e53935,%23263238&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-track-vegas",
+  "q": "shot=track&venue=vegas&night=1&cars=hellcat,thunderjet&colors=%237e57c2,%23ff7043&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-track-giza",
+  "q": "shot=track&venue=giza&night=0&cars=hyper,zenith&colors=%23ffb300,%2300acc1&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-flyover-giza",
+  "q": "shot=flyover&venue=giza&night=0&cars=hyper,zenith&colors=%23ffb300,%2300acc1&dur=2.0",
+  "w": 720,
+  "h": 1280
+ },
+ {
+  "name": "P-flyover-sydney",
+  "q": "shot=flyover&venue=sydney&night=0&cars=current,ridgeback&colors=%234dd0e1,%23ff7043&dur=2.4",
+  "w": 720,
+  "h": 1280
  }
 ]
