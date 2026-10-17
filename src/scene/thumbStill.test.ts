@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { chooseFocus, pickThumbs, spinsFor, STILL_PER_FRAME, type Slot as S } from './thumbCopy'
 
@@ -96,6 +96,18 @@ describe('thumbnails: every one on screen turns', () => {
   // Shop > Upgrades in a late-game town redrew every card's detailed building 24 times a second.
   it('shows Shop > Upgrades cards as held pictures', () => {
     expect(readFileSync('src/ui/Upgrade.tsx', 'utf8')).toMatch(/<BuildingThumb [^>]*\bstill\b/)
+  })
+})
+
+// Kegan, a row of three cars: "Only 1/3 are spinning". Every screen with car tiles goes through
+// the one scheduler above; none may hold its cars still.
+describe('every screen with car tiles', () => {
+  const screens = readdirSync('src/ui').filter((f) => f.endsWith('.tsx') && /<(CarThumb|HatThumb)\b/.test(readFileSync(`src/ui/${f}`, 'utf8')))
+  it('finds the car screens', () => {
+    for (const f of ['CarPacks.tsx', 'Collection.tsx', 'RaceHub.tsx', 'WorldTour.tsx', 'TimeTrial.tsx']) expect(screens).toContain(f)
+  })
+  it.each(screens)('%s turns its car tiles', (f) => {
+    expect(readFileSync(`src/ui/${f}`, 'utf8')).not.toMatch(/<(CarThumb|HatThumb)\b[^>]*\bstill\b/)
   })
 })
 
