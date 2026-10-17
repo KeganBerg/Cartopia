@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { stageSnapshot } from '../scene/Stage'
 import { useGame } from '../game/store'
+import { gameLink } from '../lib/invite'
 
 // The snapshot button on a won race: a picture of the race as it stands, with a
 // winner's strip along the bottom, shared from a phone or saved on a computer.
@@ -23,7 +24,7 @@ async function postcard(shot: Blob, caption: string): Promise<Blob | null> {
   g.fillStyle = '#ffffff'
   g.textAlign = 'right'
   g.font = `700 ${Math.round(strip * 0.32)}px system-ui, sans-serif`
-  g.fillText('Cartopia', c.width - strip * 0.4, img.height + strip / 2)
+  g.fillText('cartopia.lol', c.width - strip * 0.4, img.height + strip / 2)
   return new Promise((done) => c.toBlob(done, 'image/jpeg', 0.9))
 }
 
@@ -38,7 +39,7 @@ export function SnapshotButton({ caption }: { caption: string }) {
       if (!card) return useGame.getState().toast('No picture this time')
       const file = new File([card], `cartopia-${Date.now()}.jpg`, { type: 'image/jpeg' })
       if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] }).catch(() => {})
+        await navigator.share({ files: [file], text: `${caption} ${gameLink('share')}` }).catch(() => {})
         return
       }
       const url = URL.createObjectURL(card)

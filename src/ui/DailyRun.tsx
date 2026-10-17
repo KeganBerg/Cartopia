@@ -4,6 +4,7 @@ import { DAILY_MEDALS, dailyMedal, dailyNumber, dailyRun, dailyShare, type Daily
 import { shortLeft } from '../game/trial'
 import { StageSlot } from '../scene/Stage'
 import { DailyScene } from '../scene/DailyScene'
+import { gameLink } from '../lib/invite'
 
 // Daily Run screen (game/daily.ts): today's start line in 3D with the loaner car, the medal
 // times, your best today and a share button. The result card after a run shows the medal.
@@ -14,7 +15,8 @@ const msToTomorrow = (t = Date.now()) => 86400000 - (t % 86400000)
 export const dailyBest = (d: { day: string; best: number | null } | undefined, day: string) => (d?.day === day ? d.best : null)
 
 // Shares the text with the phone's share sheet, or copies it.
-async function share(text: string) {
+async function share(daily: string) {
+  const text = `${daily}\n${gameLink('daily')}`
   try {
     if (navigator.share) return await navigator.share({ text })
     await navigator.clipboard.writeText(text)

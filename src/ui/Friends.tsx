@@ -18,6 +18,8 @@ import { signedInUser } from '../lib/cloud'
 import { LikeButton } from './Meet'
 import { GhostButton } from './GhostRace'
 import { LoadingBand } from './Loading'
+import { inviteLink, shareLink } from '../lib/invite'
+import { INVITE_TEXT } from './Settings'
 
 export function FriendsPanel() {
   const uid = useUserId()
@@ -75,6 +77,8 @@ export function FriendsPanel() {
           <button className="buy small" disabled={!query.replace(/^@/, '').trim()} onClick={send}>+ Add</button>
         </div>
       )}
+
+      <button className="buy fr-invite" title="Invite: your link sends you a friend request when they sign in" onClick={() => void shareLink(INVITE_TEXT, inviteLink(mine?.username))}>🔗 Invite friends</button>
 
       {incoming.length > 0 && (
         <>
