@@ -180,6 +180,8 @@ html {
 /* Build toolbar: one slim dock of icon tiles; the hint floats above it as a pill. */
 :root .edit-bar { display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: none; box-shadow: none; padding: 0; max-width: calc(100vw - 16px); }
 :root .edit-hint { order: -1; margin: 0; max-width: 100%; padding: 5px 14px; border-radius: 999px; font: 14px var(--display); color: #fff; background: linear-gradient(#34507f, #1f3358); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); text-shadow: 0 1.5px 0 rgba(0,0,0,.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .edit-info { order: -1; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; max-width: 100%; }
+:root .edit-info .traffic-meter { margin: 0; padding: 5px 12px; background: rgba(15,20,29,.78); border: 2.5px solid var(--line); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
 :root .edit-tools { flex-wrap: nowrap; gap: 4px; padding: 5px; background: var(--sheet); border: 3px solid var(--line); border-radius: 20px; box-shadow: 0 5px 0 rgba(0,0,0,.3); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 :root .edit-tools::-webkit-scrollbar { display: none; }
 :root .tool { flex-direction: column; justify-content: center; gap: 2px; min-width: 58px; height: 54px; padding: 4px 6px; font: 11px/1 var(--display); letter-spacing: .2px; border: 2px solid transparent; border-radius: 14px; background: transparent; box-shadow: none; color: #4a6283; white-space: nowrap; }

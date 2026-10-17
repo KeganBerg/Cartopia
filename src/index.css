@@ -938,9 +938,18 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 /* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
 .goals-btn.cam-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(248px + var(--sab)); width: 60px; height: 60px; border-radius: 16px; }
 .goals-btn.cam-dock.on { background: linear-gradient(#6ab4ff 0 50%, #3a86ea 50%); color: #fff; }
+/* Screenshot mode (src/ui/ShotMode.tsx): hide-everything and save-picture, left of the camera toggle in the free view. */
+.shot-dock { position: absolute; z-index: 51; right: calc(96px + var(--sar)); bottom: calc(248px + var(--sab)); display: flex; gap: 10px; }
+.shot-dock .goals-btn { position: static; width: 60px; height: 60px; border-radius: 16px; }
+/* While on, only the town's 3D view is left: every other layer of the page is hidden and lets touches through. */
+html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d):not(.shot-ui) *, html.shot body > :not(#root), html.shot body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+.shot-ui { position: absolute; z-index: 60; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,.45); color: #fff; font: 15px var(--display); pointer-events: none; transition: opacity .6s; }
+.shot-ui.gone { opacity: 0; }
 @media (max-width: 700px) {
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
   .goals-btn.cam-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(202px + var(--sab)); border-radius: 14px; }
+  .shot-dock { right: calc(70px + var(--sar)); bottom: calc(202px + var(--sab)); gap: 8px; }
+  .shot-dock .goals-btn { width: 52px; height: 52px; border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
 }
@@ -948,6 +957,8 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 @media (max-height: 500px) {
   .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
   .goals-btn.cam-dock { width: 44px; height: 44px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(216px + var(--sab)); }
+  .shot-dock { right: calc(86px + var(--sar)); bottom: calc(216px + var(--sab)); gap: 6px; }
+  .shot-dock .goals-btn { width: 44px; height: 44px; border-radius: 12px; }
   .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
   .collect-all::before { inset: 4px; }
   .collect-ico { font-size: 22px; }
@@ -1256,7 +1267,7 @@ html.calm .callout { animation: none !important; }
 .cl-lamps { grid-template-columns: repeat(4, 1fr); }
 .cl-themes { grid-template-columns: repeat(4, 1fr); }
 .cl-card { position: relative; display: flex; flex-direction: column; padding: 0; border: 3px solid rgba(20,33,61,.14); border-radius: 14px; background: #fff; overflow: hidden; cursor: pointer; }
-.cl-card img { display: block; width: 100%; aspect-ratio: 240 / 220; object-fit: cover; background: #141a33; }
+.cl-card img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; background: #141a33; }
 .cl-themes .cl-card img { aspect-ratio: 360 / 220; background: #bfe3f7; }
 .cl-name { font: 800 15px Nunito, sans-serif; color: #14213d; padding: 6px 4px 7px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cl-card.sel { border-color: #ff8f00; box-shadow: 0 0 0 3px rgba(255,143,0,.3); }
@@ -1552,7 +1563,7 @@ html.calm .callout { animation: none !important; }
 .preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 12px; border: 1.5px solid #dfe5ea; background: #fff; min-width: 0; }
 .preset.empty { justify-content: center; min-height: 92px; border-style: dashed; }
 .preset-row { display: flex; gap: 4px; }
-@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { grid-template-columns: repeat(3, 1fr); } .garage-tabs button { font-size: 12px; padding: 6px 1px; } }
+@media (max-width: 520px) { .patterns, .trim-opts { grid-template-columns: repeat(3, 1fr); } .garage-tabs { gap: 2px; padding: 3px; } .garage-tabs button { font-size: 11px; letter-spacing: -.2px; padding: 5px 0; } .garage-tabs button i { font-size: 20px; } }
 
 /* Skins: a wrapping grid of animated chips edged in their tier colour, try-on bar under it. */
 .garage-detail { min-width: 0; }

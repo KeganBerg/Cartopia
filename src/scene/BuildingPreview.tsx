@@ -77,6 +77,9 @@ const changed = () => {
 let watcher: IntersectionObserver | undefined
 let sizer: ResizeObserver | undefined
 const byCanvas = new Map<Element, Slot>()
+const wasSeen = new WeakMap<HTMLCanvasElement, boolean>()
+// For tests: how many thumbnails are mounted, and how many of them are counted as on screen.
+export const thumbsSeen = () => [slots.size, [...slots].filter((s) => s.seen).length]
 
 function fit(slot: Slot, w: number, h: number) {
   const pw = Math.max(1, Math.round(w * DPR))
@@ -90,7 +93,10 @@ function fit(slot: Slot, w: number, h: number) {
 }
 
 function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
-  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined', still, fresh: true }
+  // A thumb that swaps model (the Grand Prix prize box cycles cars) re-attaches the same canvas. The
+  // observer doesn't always report a target that's unobserved and observed again, so it keeps
+  // whether it was on screen; otherwise the new car never draws and the box stays blank.
+  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, fresh: true }
   slots.add(slot)
   byCanvas.set(canvas, slot)
   const m = models.get(item.key)
@@ -122,6 +128,7 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   fit(slot, canvas.clientWidth, canvas.clientHeight)
   changed()
   return () => {
+    wasSeen.set(canvas, slot.seen)
     slots.delete(slot)
     byCanvas.delete(canvas)
     watcher?.unobserve(canvas)

@@ -57,7 +57,7 @@ function Stage({ car, big }: { car: ReturnType<typeof carDef>; big?: boolean }) 
 }
 
 function BuyButton({ p, owned, pending, onBuy }: { p: BucksPack; owned: boolean; pending: boolean; onBuy: () => void }) {
-  return owned ? <button className="buy pk-buy" disabled>✓ In garage</button>
+  return owned ? <button className="buy pk-buy" disabled title="In your garage">✓ Owned</button>
     : <button className="buy pk-buy" disabled={pending} onClick={onBuy}>{pending ? '...' : `$${p.price.toFixed(2)}`}</button>
 }
 

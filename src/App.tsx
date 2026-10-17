@@ -11,6 +11,7 @@ import { Preview, StageCanvas } from './scene/Stage'
 import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
+import { ShotGrabber, ShotMode } from './ui/ShotMode'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
@@ -166,7 +167,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : graphics === 'auto' ? [1, pace.dpr] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
+      <Canvas className="town-3d" shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : graphics === 'auto' ? [1, pace.dpr] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
         onCreated={({ gl }) => {
           quietShaders(gl)
           splashProgress(0.9)
@@ -179,6 +180,7 @@ export default function App() {
         <CountFrames view="town" />
         <World />
         <SplashHandoff />
+        <ShotGrabber />
         <FrameCap fps={townSlowed ? Math.min(30, pace.fps) : townFps(graphics, pace.fps, paceStep === 0, free, isDesktop())} paused={townPaused} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
@@ -248,6 +250,7 @@ export default function App() {
       <FlyLayer />
       <RaveHeadsUp />
       <FlashWarning />
+      <ShotMode />
     </>
   )
 }
