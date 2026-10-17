@@ -1325,9 +1325,10 @@ html.calm .callout { animation: none !important; }
 .garage-tabs button { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; border: 0; background: transparent; border-radius: 9px; padding: 6px 2px; font: 13px/1.1 var(--display); color: #546e7a; cursor: pointer; white-space: nowrap; }
 .garage-tabs button i { font-style: normal; font-size: 16px; line-height: 1.1; }
 .garage-tabs button.sel { background: #fff; color: #263238; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
-.mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
-.mod-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px solid #e0e0e0; background: #fafafa; border-radius: 10px; padding: 6px 2px; font: 800 11px Nunito, sans-serif; color: #455a64; cursor: pointer; }
+.mod-tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; }
+.mod-tab { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 2px solid #e0e0e0; background: #fafafa; border-radius: 10px; padding: 6px 0; font: 800 11px Nunito, sans-serif; color: #455a64; cursor: pointer; }
 .mod-tab-icon { font-size: 20px; line-height: 1; }
+.mod-tab span:not(.mod-tab-icon) { font-size: 9px; letter-spacing: -.3px; white-space: nowrap; max-width: 100%; overflow: hidden; }
 .mod-tab.sel { border-color: var(--accent); background: #fff8e1; color: #263238; }
 .mod-dot { position: absolute; top: 4px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
 .mod-hint { margin: 8px 2px 6px; font-size: 13px; color: #607d8b; }
@@ -1351,9 +1352,6 @@ html.calm .callout { animation: none !important; }
   .mod-card { display: grid; grid-template-columns: 1fr auto; column-gap: 8px; }
   .mod-card .mod-name, .mod-card .mod-stats, .mod-card .mod-pi { grid-column: 1; }
   .mod-card button { grid-column: 2; grid-row: 1 / span 3; align-self: center; width: auto; min-width: 104px; margin: 0; }
-  .mod-tabs { gap: 3px; }
-  .mod-tab { padding: 6px 0; }
-  .mod-tab span:not(.mod-tab-icon) { font-size: 9px; letter-spacing: -.3px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: clip; }
 }
 .buy.owned { background: linear-gradient(#42a5f5, #1565c0); }
 /* Drivers: a car assigned to a business */
