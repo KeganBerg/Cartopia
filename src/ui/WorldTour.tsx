@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useGame } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
-import { CARS, carDef } from '../game/data'
+import { CARS, RACE_FUEL, carDef } from '../game/data'
 import { DIST } from '../game/distance'
 import { REP_TITLES } from '../game/reputation'
 import { TOUR_BLUE, WORLD_TOUR, WORLD_TOUR_REP, worldDone, worldPrize } from '../game/worldTour'
@@ -62,7 +62,7 @@ export function WorldTour({ onRace }: { onRace: (i: number) => void }) {
               {won ? (
                 <button className="buy small alt" disabled={!open} onClick={() => onRace(i)}>↻ ${worldPrize(i, false).toLocaleString()}</button>
               ) : next ? (
-                <button className="buy small" disabled={!open} onClick={() => onRace(i)}>🏁 ${worldPrize(i, true).toLocaleString()}</button>
+                <button className="buy small" disabled={!open} onClick={() => onRace(i)}>🏁 ${worldPrize(i, true).toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
               ) : (
                 <span className="wt-lock" aria-label="Locked">🔒</span>
               )}

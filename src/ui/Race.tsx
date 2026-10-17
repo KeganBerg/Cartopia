@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { CamButton } from './CamButton'
 import { SkillIcon } from './TapTip'
 import { useTouchLock } from './DriveControls'
 import { BoostButton, GAIN_MS, nextGain, type BoostGain } from './BoostButton'
@@ -983,7 +984,7 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               ) : short ? (
                 <button className="buy small alt" onClick={() => openPanel('rescue')}>Need {s.minCars} cars ({carCount})</button>
               ) : (
-                <button className="buy small" onClick={() => onRace(s, rival, prize)}>🏁 ${prize.toLocaleString()}</button>
+                <button className="buy small" onClick={() => onRace(s, rival, prize)}>🏁 ${prize.toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
               )}
             </div>
           </div>
@@ -1952,6 +1953,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
       <LoadingScene ready={stageReady} label={`Heading to ${venue.name}`} onClose={close} />
       <div className="rf-top">
         <h2>{title ?? `Drag Race vs ${rival.town}`}</h2>
+        <CamButton kind="drag" />
         <button className="close" onClick={close} aria-label="Leave race">✕</button>
       </div>
       {countdown <= 0 && t.current > 0.8 && <div className="rf-lanes">

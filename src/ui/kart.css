@@ -101,3 +101,4 @@
 .kp-st { font-size: 20px; text-align: center; }
 .kp-go { min-height: 48px; font-size: 18px; }
 .kp-note { text-align: center; font: 700 18px var(--ui, system-ui); }
+.kt .rf-top .cam-btn { width: 44px; height: 44px; font-size: 21px; }

@@ -32,10 +32,10 @@ describe('legal pages', () => {
 
 describe('settings', () => {
   it('fall back to defaults for missing or bad data', () => {
-    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false })
-    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false })
-    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false })
-    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":true,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'sharp', steerSet: false, kartLine: true, fps: false })
+    expect(parsePrefs(null)).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false, dragView: 'chase', kartView: 'chase' })
+    expect(parsePrefs('{oops')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false, dragView: 'chase', kartView: 'chase' })
+    expect(parsePrefs('{"graphics":"ultra","reduceMotion":"yes"}')).toEqual({ graphics: 'auto', reduceMotion: null, vibration: true, raceWeather: false, muteTaunts: false, askLeave: true, askSell: true, steer: 'smooth', steerSet: false, kartLine: true, fps: false, dragView: 'chase', kartView: 'chase' })
+    expect(parsePrefs('{"graphics":"saver","reduceMotion":true,"vibration":false,"raceWeather":true,"steer":"sharp"}')).toEqual({ graphics: 'saver', reduceMotion: true, vibration: false, raceWeather: true, muteTaunts: false, askLeave: true, askSell: true, steer: 'sharp', steerSet: false, kartLine: true, fps: false, dragView: 'chase', kartView: 'chase' })
     expect(parsePrefs('{"askLeave":false,"askSell":false}')).toMatchObject({ askLeave: false, askSell: false })
     expect(parsePrefs('{"muteTaunts":true}').muteTaunts).toBe(true)
     // Smooth is the default; ◀ ▶ buttons stick only when the player picked them in Settings.
@@ -43,6 +43,9 @@ describe('settings', () => {
     expect(parsePrefs('{"steer":"buttons"}').steer).toBe('smooth')
     expect(parsePrefs('{"steer":"buttons","steerSet":true}').steer).toBe('buttons')
     expect(parsePrefs('{"muteTaunts":"yes"}').muteTaunts).toBe(false)
+    // The picked race cameras are remembered; an unknown one falls back to the chase view.
+    expect(parsePrefs('{"dragView":"bumper","kartView":"top"}')).toMatchObject({ dragView: 'bumper', kartView: 'top' })
+    expect(parsePrefs('{"dragView":"top","kartView":"tv"}')).toMatchObject({ dragView: 'chase', kartView: 'chase' })
   })
   it('Saver draws every 3D view at one pixel per screen pixel', () => {
     expect(dprFor('saver')).toBe(1)
