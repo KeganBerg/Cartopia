@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Batch } from './Batch'
 import { Tint } from './CityTint'
 import type { ColorTheme } from '../game/cityLook'
 import { Grounded } from './ServiceVehicles'
@@ -50,7 +51,9 @@ export type SceneView = { dir: [number, number, number]; at: [number, number, nu
 function buildingItem(def: BuildingDef, level?: number, theme?: ColorTheme | null): Item {
   return {
     key: `b|${def.id}|${level ?? 1}|${SEASON}|${theme?.id ?? ''}`,
-    model: () => <Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider>,
+    // Merged like the town (Batch): a detailed building is dozens of small meshes, and a page of
+    // them turning drew thousands of pieces a second, enough to make the Build grid lag.
+    model: () => <Batch version={1}><Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider></Batch>,
   }
 }
 

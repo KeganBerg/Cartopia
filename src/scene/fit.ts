@@ -19,7 +19,7 @@ export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) =
   // Effects that reach far beyond the model (searchlight beams) opt out with userData.noFit.
   const box = new Box3()
   model.traverse((o) => {
-    if ((o as Mesh).isMesh && !hasNoFit(o, model)) box.expandByObject(o, false)
+    if ((o as Mesh).isMesh && !o.userData.merged && !hasNoFit(o, model)) box.expandByObject(o, false)
   })
   turntable.rotation.y = turn
   turntable.position.copy(at)

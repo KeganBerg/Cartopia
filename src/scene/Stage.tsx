@@ -2,7 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode 
 import { SharedShapes } from './sharedShapes'
 import { createPortal } from 'react-dom'
 import { Canvas, useThree } from '@react-three/fiber'
-import { ACESFilmicToneMapping, NeutralToneMapping, PCFSoftShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLRenderer } from 'three'
+import { ACESFilmicToneMapping, NeutralToneMapping, PCFShadowMap, type PerspectiveCamera, type ToneMapping, type WebGLRenderer } from 'three'
 import { pinPrograms, quietShaders, warmShaders } from './warm'
 import { useCanvasDpr } from '../lib/prefs'
 import { FrameCap } from './frameCap'
@@ -141,7 +141,9 @@ function makeStage(tone: ToneMapping, view: string, cap?: number) {
       c.lookAt(0, 0, 0)
       c.updateProjectionMatrix()
       gl.shadowMap.enabled = !!cam.shadows
-      gl.shadowMap.type = PCFSoftShadowMap
+      // Not PCFSoft: three dropped it and swaps in PCF at the first shadow draw, after the
+      // background compile, so every depot shader built a second time on the first frames.
+      gl.shadowMap.type = PCFShadowMap
     }, [run, camera, gl])
     useEffect(() => {
       if (!run) return
