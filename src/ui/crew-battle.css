@@ -71,33 +71,69 @@
 .cb-duel { flex: none; padding: 0 5px; font-size: 13px; line-height: 20px; border-radius: 6px; border: 1.5px solid #ffd54f; background: rgba(255,213,79,.2); animation: chest-glow 1.4s ease-in-out infinite; }
 .cb-empty { padding: 8px 4px; text-align: center; font: 12px var(--display); color: #90a4ae; }
 
-.cb-legend { display: flex; gap: 4px; justify-content: center; }
-.cb-legend span { flex: 1; text-align: center; padding: 3px 4px; border-radius: 9px; font: 13px var(--display); color: #fff; background: rgba(12,16,32,.82); border: 1.5px solid rgba(255,255,255,.2); white-space: nowrap; }
-.cb-legend .h2h { border-color: #ffd54f; color: #ffd54f; }
-
-.cb-actions { display: flex; align-items: center; gap: 6px; }
-.cb-record, .cb-prize { padding: 4px 9px; border-radius: 10px; font: 13px var(--display); color: #fff; background: rgba(12,16,32,.82); border: 1.5px solid rgba(255,255,255,.2); white-space: nowrap; }
-.cb-prize { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #ffe082; }
-.cb-race { flex: none; font: 20px var(--display); color: #fff; padding: 7px 18px; border: 3px solid #fff; border-radius: 14px; background: linear-gradient(#66bb6a, #2e7d32); box-shadow: 0 4px 0 rgba(0,0,0,.4); }
+.cb-race { flex: none; font: 20px var(--display); color: #fff; padding: 9px 18px; border: 3px solid #fff; border-radius: 14px; background: linear-gradient(#66bb6a, #2e7d32); box-shadow: 0 4px 0 rgba(0,0,0,.4); }
 .cb-race:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.4); }
+
+/* War league next to the title */
+.cb-league { margin-left: 6px; padding: 1px 8px; border-radius: 10px; font-size: 14px; vertical-align: middle; color: #ffe082; background: rgba(12,16,32,.72); border: 1.5px solid rgba(255,224,130,.5); }
+
+/* War chest track: the crew's score toward par, a chest at each tier, the trophy at the end */
+.cb-track { display: flex; align-items: center; gap: 14px; padding: 10px 12px 18px 14px; border-radius: 14px; background: rgba(12,16,32,.86); border: 2px solid rgba(255,255,255,.18); }
+.cb-track-bar { position: relative; flex: 1; height: 12px; margin-right: 14px; border-radius: 6px; background: #263238; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
+.cb-track-bar > i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: linear-gradient(90deg, color-mix(in srgb, var(--us) 60%, #000), var(--us)); transition: width .6s; }
+.cb-node { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; padding: 0; display: grid; place-items: center; font-size: 18px; border-radius: 50%; border: 2px solid #546e7a; background: #1c2540; filter: grayscale(1) brightness(.75); }
+.cb-node small { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 1px; font: 11px var(--display); color: #cfd8dc; white-space: nowrap; }
+.cb-node.on { filter: none; border-color: #ffd54f; }
+.cb-node.ready { background: linear-gradient(#ffca28, #f57f17); border-color: #fff; animation: chest-glow 1.4s ease-in-out infinite; }
+.cb-node.done { filter: none; font-size: 15px; color: #fff; background: #2e7d32; border-color: #a5d6a7; }
+.cb-node:disabled { opacity: 1; cursor: default; }
+.cb-track-end { flex: none; font-size: 24px; filter: drop-shadow(0 0 6px rgba(255,213,79,.6)); }
+
+.cb-tabs { background: rgba(12,16,32,.82); }
+.cb-tabs button { color: #b0bec5; }
+.cb-tabs button.sel { background: #fff; color: var(--ink); }
+
+/* War log */
+.cb-log { display: flex; flex-direction: column; gap: 3px; padding: 5px; border-radius: 12px; background: rgba(12,16,32,.82); border: 2px solid rgba(255,255,255,.18); max-height: 128px; overflow-y: auto; }
+.cb-log-sum { text-align: center; font: 13px var(--display); color: #ffe082; }
+.cb-log-row { display: flex; align-items: center; gap: 6px; padding: 3px 7px; border-radius: 8px; font: 13px var(--display); color: #fff; background: rgba(255,255,255,.06); }
+.cb-log-row > i { font-style: normal; }
+.cb-log-row > em { flex: 1; min-width: 0; font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cfd8dc; }
+.cb-log-row > b { font-weight: normal; color: #ffe082; }
+.cb-log-row.win { box-shadow: inset 3px 0 0 #ffb300; }
+.cb-log-row.loss { box-shadow: inset 3px 0 0 #e53935; }
+.cb-log-row .cb-badge i { width: 22px; height: 22px; font-size: 12px; border-width: 1.5px; }
+
+/* You: points toward the member cap, what each race adds, and Race */
+.cb-you { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 10px; border-radius: 14px; background: rgba(12,16,32,.9); border: 2px solid #ffd54f; }
+.cb-you-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.cb-you-head { display: flex; justify-content: space-between; font: 15px var(--display); color: #fff; }
+.cb-you-head b { font-weight: normal; }
+.cb-you-head small { color: #90a4ae; }
+.cb-you-bar { height: 8px; border-radius: 4px; background: #263238; overflow: hidden; }
+.cb-you-bar > i { display: block; height: 100%; background: linear-gradient(90deg, #ffb300, #ffd54f); transition: width .6s; }
+.cb-you-gain { display: flex; gap: 4px; }
+.cb-you-gain span { flex: 1; text-align: center; padding: 1px 2px; border-radius: 7px; font: 12px var(--display); color: #fff; background: rgba(255,255,255,.08); white-space: nowrap; }
+.cb-you-gain .h2h { color: #ffd54f; }
 
 /* Short phones: a tighter board and shorter rosters */
 @media (max-height: 640px) {
   .cb-board { top: calc(36px + var(--sat)); padding: 5px 8px 4px; }
   .cb-score { font-size: 24px; }
   .cb-badge.big i { width: 34px; height: 34px; font-size: 18px; }
-  .cb-roster { max-height: 92px; }
+  .cb-roster, .cb-log { max-height: 76px; }
+  .cb-track { padding: 10px 10px 8px; }
 }
 
 /* Wide screens: the dock stands on the right, leaving the cars the middle of the screen */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .cb-dock { left: auto; right: calc(16px + var(--sar)); bottom: calc(16px + var(--sab)); transform: none; width: 380px; }
-  .cb-roster { max-height: 200px; }
+  .cb-roster, .cb-log { max-height: 200px; }
   .cb-board { width: 520px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cb-vs, .cb-claim, .cb-duel { animation: none; }
+  .cb-vs, .cb-claim, .cb-duel, .cb-node.ready { animation: none; }
 }
 
 /* No crew yet */
