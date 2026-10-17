@@ -57,7 +57,7 @@ describe('academy learner cars drive clean laps', () => {
       const cars: Object3D[] = []
       scene.traverse((o) => {
         if (!o.userData.whole || o.parent?.userData.upright !== true) return
-        for (let p = o.parent; p; p = p.parent) if (p.userData.noBatch) return void cars.push(o)
+        for (let p: Object3D | null = o.parent; p; p = p.parent) if (p.userData.noBatch) return void cars.push(o)
       })
       expect(cars.length).toBe(level >= 7 ? 3 : 2)
       // Each car's footprint in its own frame, measured once.
