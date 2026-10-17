@@ -325,6 +325,8 @@ export function Batch({ version, off, cell, freeze, prune, release, children }: 
         mesh.receiveShadow = b.receive
         mesh.renderOrder = b.order
         mesh.raycast = () => {}
+        // Sizing a model (fit.ts) measures its own pieces, not these copies of them.
+        mesh.userData.merged = true
         out.add(mesh)
         m = { sig, mesh }
       }

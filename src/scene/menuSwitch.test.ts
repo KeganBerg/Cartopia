@@ -45,3 +45,42 @@ describe('Social tabs', () => {
     expect(readFileSync('src/ui/Social.tsx', 'utf8')).toMatch(/if \(shelled\) return null/)
   })
 })
+
+// Leaving Crates paused the first time: three swaps PCFSoft shadows for PCF at the first shadow
+// draw, so every depot shader compiled in the background was thrown away and built again.
+describe('Crates', () => {
+  it('compiles the depot for the shadows three really draws', () => {
+    expect(readFileSync('src/scene/Stage.tsx', 'utf8')).not.toMatch(/PCFSoftShadowMap/)
+    expect(readFileSync('src/scene/warm.ts', 'utf8')).toMatch(/if \(gl\.shadowMap\.type === PCFSoftShadowMap\) gl\.shadowMap\.type = PCFShadowMap/)
+  })
+  it('finishes every compiled shader while the depot is still getting ready', async () => {
+    const { warmShaders } = await import('./warm')
+    const { Scene, PerspectiveCamera, PCFShadowMap, PCFSoftShadowMap } = await import('three')
+    const used: number[] = []
+    const programs = [0, 1, 2].map((i) => ({ getUniforms: () => used.push(i) }))
+    const gl = { shadowMap: { type: PCFSoftShadowMap }, info: { programs }, getRenderTarget: () => null, setRenderTarget: () => {}, compileAsync: () => Promise.resolve() }
+    await warmShaders(gl as never, new Scene(), new PerspectiveCamera(), false)
+    expect(used).toEqual([0, 1, 2])
+    expect(gl.shadowMap.type).toBe(PCFShadowMap)
+  })
+})
+
+// Kegan, the Build grid: "Lagging". Each building thumbnail was dozens of small meshes.
+describe('Build grid', () => {
+  it('merges each building thumbnail like the town', () => {
+    expect(readFileSync('src/scene/BuildingPreview.tsx', 'utf8')).toMatch(/model: \(\) => <Batch version=\{1\}>.*<BuildingModel /)
+  })
+  it('sizes a merged building by its own pieces', async () => {
+    const { Group, Mesh, BoxGeometry, MeshBasicMaterial } = await import('three')
+    const { seat } = await import('./fit')
+    const turn = new Group()
+    const model = new Group()
+    turn.add(model)
+    model.add(new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial()))
+    const plain = seat(model, turn)
+    const copy = new Mesh(new BoxGeometry(9, 9, 9), new MeshBasicMaterial())
+    copy.userData.merged = true
+    model.add(copy)
+    expect(seat(model, turn)).toEqual(plain)
+  })
+})
