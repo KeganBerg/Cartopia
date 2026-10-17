@@ -9,9 +9,11 @@ import { decal, LAYER } from './layers'
 
 // While the tutorial asks for Rusty's Rescue, the lot the starter town keeps for it
 // glows with a see-through Rusty's on it, so the player knows where it goes before
-// opening the Shop. Placing it starts on the same lot (World's placement ghost).
+// opening the Shop. Placing it starts on the same lot (World's placement ghost), still glowing.
 export function RustyLot() {
-  const show = useGame((s) => s.tutorial === 3 && s.mode === 'play' && !s.visiting && !s.buildings.some((b) => b.def === 'rescue') && canPlace(s, 'rescue', ...RUSTY_LOT))
+  // While placing, the pad keeps glowing under the placement ghost, which World draws.
+  const placing = useGame((s) => s.mode === 'place' && s.placing === 'rescue')
+  const show = useGame((s) => s.tutorial === 3 && (s.mode === 'play' || (s.mode === 'place' && s.placing === 'rescue')) && !s.visiting && !s.buildings.some((b) => b.def === 'rescue') && canPlace(s, 'rescue', ...RUSTY_LOT))
   const pad = useRef<MeshBasicMaterial>(null)
   useFrame(({ clock }) => {
     if (pad.current) pad.current.opacity = 0.35 + 0.25 * Math.sin(clock.elapsedTime * 3)
@@ -25,7 +27,7 @@ export function RustyLot() {
         <planeGeometry args={[w * TILE - 0.2, h * TILE - 0.2]} />
         <meshBasicMaterial ref={pad} color="#ffca28" transparent opacity={0.5} depthWrite={false} {...decal(2)} />
       </mesh>
-      <BuildingModel def={buildingDef('rescue')} ghost valid />
+      {!placing && <BuildingModel def={buildingDef('rescue')} ghost valid />}
     </group>
   )
 }

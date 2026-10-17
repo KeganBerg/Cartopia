@@ -2604,7 +2604,7 @@ export const useGame = create<GameState>()(
           sfx.start()
           set({
             coins: g.coins - spot.cost,
-            search: { ...rollSearch(spotId, res?.cars ?? null, { truck: g.truck, hot: hotSpot(g.level) === spotId }), ...(piece ? { piece } : {}) },
+            search: { ...rollSearch(spotId, res?.cars ?? null, { truck: g.truck, hot: hotSpot(g.level) === spotId, noFlat: g.tutorial < 99 }), ...(piece ? { piece } : {}) },
             stats: bump(g, 'searches'),
             updatedAt: Date.now(),
           })
@@ -2818,7 +2818,8 @@ function rollCar(spotId: string, hot = false): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-export function rollSearch(spotId: string, finds: ServerFind[] | null = null, opts: { truck?: number; hot?: boolean } = {}): Search {
+// noFlat: a new player's tutorial search never gets a flat (fixing one costs gems they don't have yet).
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null, opts: { truck?: number; hot?: boolean; noFlat?: boolean } = {}): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
   const truck = truckOf(opts.truck)
@@ -2835,7 +2836,7 @@ export function rollSearch(spotId: string, finds: ServerFind[] | null = null, op
   })
   for (const f of finds ?? []) if (f.i >= 0 && f.i < n) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
   if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * n)] = rollCar(spotId, !!opts.hot)
-  const flatAt = Math.random() < truck.flat ? pick(Array.from({ length: n }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
+  const flatAt = !opts.noFlat && Math.random() < truck.flat ? pick(Array.from({ length: n }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }
 }
 
