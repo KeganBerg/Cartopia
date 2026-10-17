@@ -292,11 +292,65 @@
 .cc-tier-epic { --cc-edge: #b388ff; }
 .cc-tier-legendary { --cc-edge: #ffd54f; }
 
+/* ---- The stage: the car stands on the card's ground ----
+   Each card says where its ground is (--f, a fraction of its height: where a car's wheels would
+   touch), the colour of its light (--cc-glow) and of its bottom edge (--cc-base). A holder with
+   .cc-stage says where it wants the ground (--g) and how tall the car is (--car-h); the card's
+   scene slides up so its ground meets that line (the bottom edge's colour fills in below), the car's wheels go on it, and .cc-ground (CallCardGround) lights the floor under the
+   car, shades where it touches and glows behind it in the card's colour. All still: nothing here
+   moves, so it costs one picture. A stand thumbnail's ground point is about 60% down it (--wf). */
+.cc-stage { container-type: size; --wf: .6; --H: min(var(--car-h, 60cqh), 69cqw); }
+.cc-stage:is(.cc-show, .rm-qc) { background: var(--cc-base, #0b1430); }
+.cc-stage > .cc { top: calc((var(--g, .7) - var(--f, .7)) * 100%); bottom: auto; height: 100%; }
+.cc-stage .cc-show-car, .cc-stage .rm-qc-top > .thumb3d { position: absolute; z-index: 1; left: 50%; right: auto; bottom: auto; top: calc(var(--g, .7) * 100% - var(--wf) * var(--H)); width: auto; height: var(--H); max-height: none; aspect-ratio: 4 / 3; margin: 0; translate: -50% 0; }
+.cc-show-car .thumb3d { position: absolute; inset: 0; width: auto; height: auto; --th: 100%; background: none; border-radius: 0; }
+.cc-ground { position: absolute; z-index: 1; left: 50%; top: calc(var(--g, .7) * 100% - .62 * var(--H)); width: calc(var(--H) * 2.3); height: var(--H); translate: -50% 0; pointer-events: none;
+  --gl: var(--cc-glow, var(--cc, #8ab4ff));
+  background:
+    radial-gradient(24% 7% at 50% 62%, rgba(0,0,0,.6), rgba(0,0,0,0)),
+    radial-gradient(40% 10% at 50% 63%, rgba(0,0,0,.3), rgba(0,0,0,0)),
+    radial-gradient(50% 17% at 50% 63%, color-mix(in srgb, var(--gl) 55%, transparent), transparent),
+    radial-gradient(30% 40% at 50% 34%, color-mix(in srgb, var(--gl) 30%, transparent), transparent); }
+
+/* Where each card's ground is, and its light. */
+.cc-on-showroom { --f: .72; --cc-base: #0a1026; }
+.cc-on-neonalley { --f: .78; --cc-glow: #ff4fb8; --cc-base: #ff2d95; }
+.cc-on-raincheck { --f: .70; --cc-glow: #ffd27a; --cc-base: #10203a; }
+.cc-on-sunsetstrip { --f: .72; --cc-glow: #ffa25a; --cc-base: #2a1d3d; }
+.cc-on-checkerrush { --f: .66; --cc-glow: #ff5a50; --cc-base: #16181d; }
+.cc-on-tiresmoke { --f: .68; --cc-glow: #ff6a5a; --cc-base: #1c1f25; }
+.cc-on-hazard { --f: .72; --cc-glow: #ffc230; --cc-base: #15130c; }
+.cc-on-oceandrive { --f: .64; --cc-glow: #fff1c4; --cc-base: #01579b; }
+.cc-on-snowday { --f: .70; --cc-glow: #ffffff; --cc-base: #dfe7f5; }
+.cc-on-autumnlane { --f: .70; --cc-glow: #ffb15a; --cc-base: #4e2412; }
+.cc-on-dragtree { --f: .74; --cc-glow: #ffd54f; --cc-base: #0c1020; }
+.cc-on-bubblepop { --f: .72; --cc-glow: #ffffff; --cc-base: #8fd3ff; }
+.cc-on-pixelpark { --f: .74; --cc-glow: #ffe08a; --cc-base: #c84c0c; }
+.cc-on-ravelights { --f: .74; --cc-glow: #ff4fd8; --cc-base: #4a0072; }
+.cc-on-warpspeed { --f: .62; --cc-glow: #8fd8ff; --cc-base: #020b2a; }
+.cc-on-polarglow { --f: .76; --cc-glow: #5effb4; --cc-base: #061826; }
+.cc-on-midnightgrid { --f: .68; --cc-glow: #ff3d82; --cc-base: #0d0221; }
+.cc-on-plasma { --f: .64; --cc-glow: #c08aff; --cc-base: #10002b; }
+.cc-on-lasergrid { --f: .68; --cc-glow: #ff2a4a; --cc-base: #1c0010; }
+.cc-on-circuitry { --f: .68; --cc-glow: #5effa8; --cc-base: #04150f; }
+.cc-on-deepsea { --f: .76; --cc-glow: #7fe3ff; --cc-base: #021428; }
+.cc-on-fireworks { --f: .78; --cc-glow: #ff7ab0; --cc-base: #1e1440; }
+.cc-on-comettrail { --f: .66; --cc-glow: #a8d8ff; --cc-base: #0b0820; }
+.cc-on-discoball { --f: .72; --cc-glow: #ff8ce6; --cc-base: #10041f; }
+.cc-on-sakura { --f: .72; --cc-glow: #ffc1d6; --cc-base: #f3a5c0; }
+.cc-on-thunderroad { --f: .72; --cc-glow: #a9c8ff; --cc-base: #2c3850; }
+.cc-on-inferno { --f: .70; --cc-glow: #ff8a2a; --cc-base: #ff6a00; }
+.cc-on-starwarp { --f: .70; --cc-glow: #b48cff; --cc-base: #0a0820; }
+.cc-on-goldrush { --f: .64; --cc-glow: #ffe27a; --cc-base: #3d2400; }
+.cc-on-blackhole { --f: .72; --cc-glow: #ff9a50; --cc-base: #020108; }
+.cc-on-magmacore { --f: .72; --cc-glow: #ff7a1a; --cc-base: #160704; }
+.cc-on-diamondrain { --f: .68; --cc-glow: #b8ecff; --cc-base: #0a1830; }
+.cc-on-championlap { --f: .70; --cc-glow: #ffe6a0; --cc-base: #090600; }
+
 /* A card with the player's car on it (CallCardShowcase): picker preview, crate prize. */
 .cc-show { position: relative; display: block; overflow: hidden; isolation: isolate; border: 3px solid var(--line, #14213d); border-radius: 16px; background: #0b1430; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
 .cc-show::after { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: 13px; pointer-events: none; box-shadow: inset 0 0 0 2px var(--cc-edge, rgba(255,255,255,.16)); }
-.cc-show-car { position: absolute; z-index: 1; left: 0; right: 0; bottom: 4%; aspect-ratio: 4 / 3; max-height: 92%; margin: 0 auto; }
-.cc-show-car::before { content: ''; position: absolute; left: 14%; right: 14%; bottom: 2%; height: 16%; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0)); }
+.cc-show { --g: .7; --car-h: 74cqh; }
 .cc-show-car .thumb3d { position: absolute; inset: 0; width: auto; height: auto; --th: 100%; background: none; border-radius: 0; }
 
 /* ---- Call Card picker (CallCardPicker.tsx) ---- */

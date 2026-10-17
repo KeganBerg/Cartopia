@@ -8,7 +8,7 @@
 // races (RACE_FUEL each, winning 75%). On top: the day's 3 tasks, a seventh of the weekly ones,
 // 4 endless goals, 2 building upgrades and a story goal while they last.
 import { BUILDINGS, GOALS, QUEST_PAY, RACE_FUEL, baseFuelCap, buildingUpgradeXp, fuelPerMin, levelXpBoost, payAt, raceXp, townXpMult, xpToNext } from '../src/game/data'
-import { endlessPay } from '../src/game/endless'
+import { endlessXp } from '../src/game/endless'
 
 const WIN = 0.75
 const boost618 = (l: number) => (l <= 3 ? 1 : Math.min(3, 1 + 0.5 * (l - 3)))
@@ -25,7 +25,7 @@ export function hourXp(l: number) {
   const fuel = baseFuelCap(l) + 30 + 60 * fuelPerMin(l)
   const play = (fuel / 2) * jobXpPerFuel(l) + (fuel / 2) * raceXpPerFuel(l)
   const tasks = 3 * payAt(QUEST_PAY.daily.task, l).xp + (3 * payAt(QUEST_PAY.weekly.task, l).xp) / 7
-  const extra = 4 * endlessPay(1, l).xp + 2 * buildingUpgradeXp(3) + (l < 40 ? storyAvg : 0)
+  const extra = 4 * endlessXp(l) / levelXpBoost(l) + 2 * buildingUpgradeXp(3) + (l < 40 ? storyAvg : 0)
   return { play, extra: tasks + extra }
 }
 

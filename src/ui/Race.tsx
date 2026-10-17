@@ -11,7 +11,7 @@ import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpOpen, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, campaignOpen, campaignStarTotal, campaignStarsNeed, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
 import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
-import { CallCardArt, callCardTier, callCardTip } from './CallCard'
+import { CallCardArt, CallCardGround, callCardTier, callCardTip } from './CallCard'
 import { CallCardPopup } from './CallCardPicker'
 import { callCardDef } from '../game/callCards'
 import { serverCallCard } from '../lib/serverCar'
@@ -162,6 +162,7 @@ function CardArt({ id, color }: { id?: string; color: string }) {
   return (
     <>
       <CallCardArt id={id} tint={color} />
+      <CallCardGround tint={color} />
       {d?.tier && <span className="rm-cc-gem" title={callCardTip(id)}>{d.icon}</span>}
     </>
   )
@@ -840,7 +841,7 @@ export function RacePanel() {
                 const on = pick.includes(p.id)
                 const full = !on && pick.length >= PARTY_MAX - 1
                 return (
-                  <button key={p.id} className={`rm-qc rm-qc-live rm-qc-pick${callCardTier(p.callCard)}${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
+                  <button key={p.id} className={`rm-qc cc-stage rm-qc-live rm-qc-pick${callCardTier(p.callCard)}${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
                     onClick={() => setPick(on ? pick.filter((x) => x !== p.id) : [...pick, p.id])} aria-pressed={on}>
                     <CardArt id={p.callCard} color={p.color} />
                     <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
@@ -853,7 +854,7 @@ export function RacePanel() {
               }
               const stakes = wagersOn() ? stakesFor(level, p.level, coins) : []
               if (betFor === p.id) return (
-                <div key={p.id} className={`rm-qc rm-qc-live rm-qc-bet${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                <div key={p.id} className={`rm-qc cc-stage rm-qc-live rm-qc-bet${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
                   <CardArt id={p.callCard} color={p.color} />
                   <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
                   <span className="rm-qc-body">
@@ -868,7 +869,7 @@ export function RacePanel() {
                 </div>
               )
               return (
-                <div key={p.id} className={`rm-qc rm-qc-live${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
+                <div key={p.id} className={`rm-qc cc-stage rm-qc-live${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
                   <CardArt id={p.callCard} color={p.color} />
                   <span className="rm-qc-top">
                     <CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag live">LIVE</span>
@@ -897,7 +898,7 @@ export function RacePanel() {
               )
             })}
             {[...online, ...rivals.map(fair)].map((r) => (
-              <div key={r.id} className={`rm-qc${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
+              <div key={r.id} className={`rm-qc cc-stage${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
                 <CardArt id={r.callCard} color={r.color} />
                 <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">

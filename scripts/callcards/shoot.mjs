@@ -31,6 +31,8 @@ for (const [form, size] of [['desktop', { width: 1280, height: 800 }], ['phone',
       if (!cc) return
       cc.className = `cc cc-${id}`
       card.classList.remove('cc-tier-rare', 'cc-tier-epic', 'cc-tier-legendary')
+      card.classList.remove(...[...card.classList].filter((c) => c.startsWith('cc-on-')))
+      card.classList.add(`cc-on-${id}`)
       if (tiers[id]) card.classList.add(`cc-tier-${tiers[id]}`)
     })
   }, CARDS)
