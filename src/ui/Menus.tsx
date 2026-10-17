@@ -283,8 +283,10 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
     if (!el || !sel) return
     const r = el.getBoundingClientRect()
     const t = sel.getBoundingClientRect()
+    // Keep it clear of the › strip too, which covers the row's right edge.
+    const edge = r.right - (el.querySelector('.sheet-more-bar')?.getBoundingClientRect().width ?? 0)
     if (t.left < r.left) el.scrollLeft -= r.left - t.left
-    else if (t.right > r.right) el.scrollLeft += t.right - r.right
+    else if (t.right > edge) el.scrollLeft += t.right - edge
   }, [value])
   return (
     <div ref={row} className="sheet-tabs" role="tablist">
