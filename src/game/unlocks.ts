@@ -26,9 +26,13 @@ export const UNLOCKS = {
   social: (s: Game) => s.tutorial >= DONE && s.level >= 2,
   season: (s: Game) => s.tutorial >= DONE && s.level >= 3,
   // The Bank and Car Packs (real money) wait for the town's own Crew House, even while visiting.
-  bank: (s: Game) => s.tutorial >= DONE && canBuyPacks(s),
+  bank: (s: Game) => s.tutorial >= DONE && hasCrewHouse(s),
 } satisfies Record<string, (s: Game) => boolean>
 export type Unlock = keyof typeof UNLOCKS
+
+// The one Crew House check, shared by crews and real-money buys (src/game/payGate.ts): built or packed
+// away, and the admin always counts. Use it as useGame(hasCrewHouse).
+export const hasCrewHouse = (s: Pick<Game, 'buildings' | 'stored' | 'admin'>) => canBuyPacks(s)
 
 export const unlocked = (s: Game, id: Unlock) => (id !== 'bank' && !!s.visiting) || UNLOCKS[id](s)
 
