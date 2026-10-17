@@ -51,6 +51,9 @@ type LiveState = {
   signedIn: boolean
 }
 
+// The server caps bets per day (0059_economy_followups.sql), so a bet can fail on a yes.
+export const BET_LIMIT = 'Bet limit for today. Race without a bet!'
+
 // How long a challenge stays open, and the breather after one ends.
 export const INVITE_MS = 45000
 const COOLDOWN_MS = 60000
@@ -303,8 +306,10 @@ async function openLobby(uid: string) {
         return
       }
       if (!payload.accept) {
-        startCooldown(out.to)
         sfx.error()
+        // The bet couldn't be held (daily cap): they said yes, so a plain race can follow straight away.
+        if (out.stake && payload.why === 'limit') return useGame.getState().toast(BET_LIMIT)
+        startCooldown(out.to)
         return useGame.getState().toast('Challenge declined')
       }
       useLive.setState({ race: { raceId: out.raceId, opponent: from, host: true, mode: out.mode, stake: out.stake } })
@@ -395,15 +400,20 @@ export async function answer(raceId: string, accept: boolean) {
     useGame.getState().toast('That race is off')
     accept = false
   }
-  if (accept && inv0.stake && !(await acceptWager(raceId, inv0.stake))) {
-    useGame.getState().toast('That bet is off')
-    accept = false
+  let why: 'limit' | undefined
+  if (accept && inv0.stake) {
+    const held = await acceptWager(raceId, inv0.stake)
+    if (held !== true) {
+      why = held === 'limit' ? 'limit' : undefined
+      useGame.getState().toast(why ? BET_LIMIT : 'That bet is off')
+      accept = false
+    }
   }
   const l = useLive.getState()
   // Stakes already held still race, even if the invite timed out meanwhile.
   const inv = l.invites.find((i) => i.raceId === raceId) ?? (accept && inv0.stake ? inv0 : undefined)
   if (!inv) return
-  lobby?.send({ type: 'broadcast', event: 'answer', payload: { raceId, accept, from: myCard() } })
+  lobby?.send({ type: 'broadcast', event: 'answer', payload: { raceId, accept, from: myCard(), ...(why ? { why } : {}) } })
   useLive.setState({
     invites: l.invites.filter((i) => i.raceId !== raceId),
     cooldownFrom: accept ? l.cooldownFrom : { ...l.cooldownFrom, [inv.from.id]: Date.now() + COOLDOWN_MS },
@@ -470,6 +480,15 @@ export function setClosed(closed: boolean) {
   if (closed) for (const i of l.invites) lobby?.send({ type: 'broadcast', event: 'answer', payload: { raceId: i.raceId, accept: false, from: myCard() } })
   useLive.setState({ closed, invites: closed ? [] : l.invites })
   refreshPresence()
+}
+
+// A live race screen going away before GO calls its bet off, but only once the race itself has
+// ended: React mounts a screen twice in development (and a remount is not the player leaving), and
+// calling it off there refunded every bet while both players raced on with the pot showing.
+export function voidUnlessRacing(raceId: string) {
+  setTimeout(() => {
+    if (useLive.getState().race?.raceId !== raceId) void voidWager(raceId)
+  }, 0)
 }
 
 export function endLiveRace() {

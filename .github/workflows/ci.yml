@@ -26,6 +26,8 @@ jobs:
         run: npm run build
       - name: Tests
         run: npx vitest run
+      - name: Server rules (every migration on a fresh database, then live races, wagers and crew races)
+        run: npm run check:server
       - name: Startup smoke test (built game opens in Chromium)
         run: |
           npx playwright install --with-deps chromium-headless-shell

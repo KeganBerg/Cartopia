@@ -8,6 +8,8 @@
     "build": "oxlint && tsc -b && vite build && node scripts/check-dist.mjs",
     "smoke": "node scripts/smoke.mjs",
     "check:packs": "node scripts/packs/check.mjs",
+    "check:server": "scripts/twoplayer/server-check.sh",
+    "twoplayer": "scripts/twoplayer/stack.sh up && node scripts/twoplayer/play.mjs",
     "lint": "oxlint",
     "preview": "vite preview",
     "test": "vitest run"
@@ -37,6 +39,7 @@
     "playwright": "^1.64.1",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "ws": "^8.22.0"
   }
 }
