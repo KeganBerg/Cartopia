@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type ReactNode } from 'react'
-import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Object3D, Texture, Vector3, type Material } from 'three'
+import { BufferAttribute, BufferGeometry, Color, Group, Matrix4, Mesh, Object3D, Texture, Vector3, type Material, type Scene } from 'three'
 import { prunedSet } from './pruned'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { glowMats } from './dayNight'
@@ -100,6 +100,8 @@ type Merged = { sig: string; mesh: Mesh }
 type Bucket = { sig: string[]; build: () => BufferGeometry | null; mat: Material; cast: boolean; receive: boolean; order: number; members: Mesh[] }
 
 // Enough of a part's place to notice it moved, turned or grew, as one number.
+// How often a put-away batch looks to see whether it's gone from the scene for good (see Batch).
+const KEEP_PUT_AWAY_MS = 2000
 const PLACE = [0, 1, 2, 5, 8, 10, 12, 13, 14]
 const placeOf = (m: Matrix4) => {
   const e = m.elements
@@ -313,6 +315,8 @@ export function Batch({ version, off, cell, freeze, prune, release, children }: 
       const sig = b.sig.join(';')
       const old = made.current.get(key)
       let m: Merged | null = old && old.sig === sig ? old : null
+      // Kept from before the batch was last put away (see below): back in the scene as it was.
+      if (m && m.mesh.parent !== out) out.add(m.mesh)
       if (!m) {
         const geo = b.build()
         if (!geo) {
@@ -356,23 +360,43 @@ export function Batch({ version, off, cell, freeze, prune, release, children }: 
     if (f) f.on = true
   }, [version, off, cell, prune, release])
 
-  // Gone from the scene: put the originals back and free the merged meshes.
-  useLayoutEffect(
-    () => () => {
-      for (const m of made.current.values()) {
-        merged.current?.remove(m.mesh)
-        m.mesh.geometry.dispose()
-      }
+  // Gone from the scene: put the originals back and free the merged meshes. A menu kept out of
+  // sight (React Activity, see KeepTabs) comes through here too and shows again later, so the merged
+  // meshes are kept a while: showing it again then reuses them instead of merging everything
+  // again (the Showroom's room took a moment on each visit to the Cars page). They're freed once
+  // nothing has brought them back and the batch is gone from the scene.
+  const freeing = useRef(0)
+  useLayoutEffect(() => {
+    window.clearTimeout(freeing.current)
+    const out = merged.current
+    return () => {
+      for (const m of made.current.values()) out?.remove(m.mesh)
       for (const mesh of hidden.current) {
         mesh.visible = true
         delete mesh.userData.batched
       }
-      made.current = new Map()
       hidden.current = new Set()
       unprune()
-    },
-    [],
-  )
+      const kept = made.current
+      const free = () => {
+        if (made.current !== kept) return
+        for (const m of kept.values()) m.mesh.geometry.dispose()
+        made.current = new Map()
+      }
+      const inScene = () => {
+        let o: Object3D | null = out
+        while (o?.parent) o = o.parent
+        return !!(o as Scene | null)?.isScene
+      }
+      const later = () => {
+        if (made.current !== kept) return
+        if (inScene()) freeing.current = window.setTimeout(later, KEEP_PUT_AWAY_MS)
+        else free()
+      }
+      if (typeof window === 'undefined') free()
+      else freeing.current = window.setTimeout(later, 0)
+    }
+  }, [])
 
   return (
     <>

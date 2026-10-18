@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import './testCanvas'
+import { Activity } from 'react'
 import { describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
 import { BoxGeometry, type BufferAttribute, type Mesh, type Object3D } from 'three'
@@ -215,5 +216,28 @@ describe('Batch release', () => {
     // The hidden original keeps its own, so taps still find it.
     const box = r.scene.instance.getObjectByName('box') as Mesh
     expect(box.geometry.getAttribute('position').array).not.toBeNull()
+  })
+})
+
+describe('Batch kept out of sight', () => {
+  it('reuses its merged meshes when a kept menu shows again, instead of merging again', async () => {
+    const page = (mode: 'visible' | 'hidden') => (
+      <Activity mode={mode}>
+        <Town picked="" />
+      </Activity>
+    )
+    const r = await ReactThreeTestRenderer.create(page('visible'))
+    const scene = r.scene.instance as Object3D
+    const mergedGeos = () => {
+      const out: string[] = []
+      scene.traverse((o) => void (o.userData.merged && out.push((o as Mesh).geometry.uuid)))
+      return out
+    }
+    const before = mergedGeos()
+    expect(before.length).toBeGreaterThan(0)
+    await r.update(page('hidden'))
+    await r.update(page('visible'))
+    expect(mergedGeos()).toEqual(before)
+    expect(live(scene)).toEqual([])
   })
 })
