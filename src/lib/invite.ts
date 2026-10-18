@@ -66,7 +66,7 @@ export function captureArrival(url: URL = new URL(location.href)) {
 // The invite reward each side gets once the new player reaches INVITE_LEVEL (claim_invite_rewards()
 // in supabase/migrations/0112_invite_rewards.sql pays it; the numbers here are only for the screen).
 export const INVITE_GEMS = 100
-export const INVITE_LEVEL = 5
+export const INVITE_LEVEL = 10
 
 // Tells the server where this account came from, once (record_arrival()). Kept until the server
 // has it, so an old server just means trying again next time.
