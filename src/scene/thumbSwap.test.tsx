@@ -22,6 +22,13 @@ globalThis.IntersectionObserver = class {
   disconnect() {}
 } as never
 
+// The browser's first size report comes later; these tests set the size themselves.
+globalThis.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as never
+
 const { CarThumb, thumbsSeen } = await import('./BuildingPreview')
 
 describe('a thumbnail that swaps car', () => {
@@ -34,5 +41,21 @@ describe('a thumbnail that swaps car', () => {
     await act(async () => root.render(<CarThumb body="truck" color="#00ff00" />))
     expect(thumbsSeen()).toEqual([1, 1])
     await act(async () => root.unmount())
+  })
+})
+
+describe('a thumbnail that swaps car, picture kept', () => {
+  // Clearing the canvas on every swap made the Grand Prix prize box blink blank each time it cycled.
+  it('keeps the old picture until the new car draws, and clears it once gone', async () => {
+    const el = document.createElement('div')
+    const root = createRoot(el)
+    await act(async () => root.render(<CarThumb body="sedan" color="#ff0000" />))
+    const canvas = el.querySelector('canvas')!
+    canvas.width = 120
+    canvas.height = 90
+    await act(async () => root.render(<CarThumb body="truck" color="#0000ff" />))
+    expect(canvas.width).toBe(120)
+    await act(async () => root.unmount())
+    expect(canvas.width).toBe(0)
   })
 })
