@@ -19,7 +19,8 @@ class Bin {
   spin = new Map<string, { look: Look; geos: BufferGeometry[] }>()
   add(look: Look, geo: BufferGeometry, p: V3 = [0, 0, 0], r: V3 = [0, 0, 0], s: V3 = [1, 1, 1], o: { order?: EulerOrder; spin?: boolean } = {}) {
     const m = new Matrix4().compose(new Vector3(...p), new Quaternion().setFromEuler(new Euler(r[0], r[1], r[2], o.order ?? 'XYZ')), new Vector3(...s))
-    const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m)
+    // A plain copy: clone() builds a fresh default shape first.
+    const g = (geo.index ? geo.toNonIndexed() : new BufferGeometry().copy(geo)).applyMatrix4(m)
     geo.dispose()
     for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n)
     g.clearGroups()

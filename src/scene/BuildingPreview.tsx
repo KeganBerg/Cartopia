@@ -71,8 +71,9 @@ function carItem(c: CarLook, stand?: boolean): Item {
 const slots = new Set<Slot>()
 const models = new Map<string, { item: Item; uses: number }>()
 // Models stay mounted after their thumbnail goes, so reopening the Shop reuses
-// compiled shaders and geometry; past this many unused ones, the oldest go.
-const KEEP_IDLE = 80
+// compiled shaders and geometry; past this many unused ones, the oldest go. Enough for every
+// Shop tab: with fewer, going back to a tab rebuilt its pictures (a stall per picture).
+const KEEP_IDLE = 300
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete(fn))
 let version = 0

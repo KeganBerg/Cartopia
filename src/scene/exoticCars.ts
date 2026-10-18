@@ -1,5 +1,5 @@
 import { BoxGeometry, BufferGeometry, CircleGeometry, CylinderGeometry, ExtrudeGeometry, Matrix4, PlaneGeometry, Shape, ShapeGeometry, TorusGeometry, Vector2, Vector3 } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { TessellateModifier } from 'three/examples/jsm/modifiers/TessellateModifier.js'
 import { Loft, type Pt, type Section } from './loft'
@@ -21,7 +21,7 @@ export type ExoticHelpers = {
 export type ExoticFit = { spoiler?: string; hood?: string; exhaust?: string; kit?: string }
 
 export const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-export const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+export const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 export const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 export const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 // A flat polygon in its own x/y plane, facing +z.
