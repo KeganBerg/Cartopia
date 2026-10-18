@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
 import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt, performance } from '../game/data'
@@ -320,21 +320,33 @@ function WarMap({ b, myPi, left, me, ready }: { b: Battle; myPi: number; left: n
   const last = recent[recent.length - 1]
   const lastTarget = last ? map[last.side === 'us' ? 'them' : 'us'].find((s) => s.id === last.target) : undefined
   const lead = ours - theirs
+  // The streaks are drawn in the field's own pixels, so their dashes and draw-in keep their length.
+  const field = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(360)
+  useLayoutEffect(() => {
+    const el = field.current
+    if (!el) return
+    setW(el.clientWidth || 360)
+    const ro = new ResizeObserver(() => setW(el.clientWidth || 360))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const px = (x: number) => (x * w) / 100
   return (
     <div className={`wm${lay.small ? ' small' : ''}${ready ? ' go' : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
-      <div className="wm-field" style={{ height: lay.height, '--front': `${lay.frontY}px` } as React.CSSProperties}>
+      <div className="wm-field" ref={field} style={{ height: lay.height, '--front': `${lay.frontY}px` } as React.CSSProperties}>
         <i className="wm-turf them" title={`${b.them.name}: race them for stars`} />
         <i className="wm-turf us" title={`${b.us.name}: stars ${b.them.tag} took off your crew`} />
-        <svg className="wm-lines" viewBox={`0 0 100 ${lay.height}`} preserveAspectRatio="none" aria-hidden>
+        <svg className="wm-lines" viewBox={`0 0 ${w} ${lay.height}`} aria-hidden>
           {target && (() => {
             const t = where('them', target.id)!
             const mine = map.us.find((s) => s.me)
             const f = mine ? where('us', mine.id)! : { x: 50, y: lay.height - 8 }
-            return <line className="wm-aimline" x1={f.x} y1={f.y} x2={t.x} y2={t.y} />
+            return <line className="wm-aimline" x1={px(f.x)} y1={f.y} x2={px(t.x)} y2={t.y} />
           })()}
           {streaks.map(({ a, from, to, fresh }, i) => (
             <line key={`${a.at}${a.by}${i}`} className={`wm-streak ${a.side}${a.won ? ' won' : ' lost'}${fresh >= 0 ? ' fresh' : ''}${i === streaks.length - 1 ? ' newest' : ''}`}
-              style={{ '--d': `${Math.max(0, fresh) * 0.45}s` } as React.CSSProperties} x1={from.x} y1={from.y} x2={to.x} y2={to.y} pathLength={1} />
+              style={{ '--d': `${Math.max(0, fresh) * 0.45}s` } as React.CSSProperties} x1={px(from.x)} y1={from.y} x2={px(to.x)} y2={to.y} pathLength={1} />
           ))}
         </svg>
         <div className="wm-front" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>

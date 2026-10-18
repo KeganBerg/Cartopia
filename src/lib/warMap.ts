@@ -116,7 +116,8 @@ export async function submitWarRun(t: number): Promise<WarResult | null> {
 // Where each racer stands on the battlefield: their crew across the top, ours across the bottom, the front
 // (the star tug) between. x is a percent of the width, y is pixels from the top. Rows zigzag so the field
 // reads as a map rather than a table; bigger crews get more, smaller spots.
-export const FIELD = { row: 66, front: 46, pad: 8 }
+// y is the centre of the racer's car; their name and stars hang below it.
+export const FIELD = { row: 70, car: 28, front: 46, pad: 8 }
 export function fieldLayout(them: number, us: number) {
   const cols = (n: number) => (n <= 4 ? Math.max(1, n) : n <= 10 ? 5 : 6)
   const place = (n: number, top: number, down: boolean) => {
@@ -129,7 +130,7 @@ export function fieldLayout(them: number, us: number) {
       const k = i % c
       const row = down ? r : rows - 1 - r
       const x = ((k + 0.5) / inRow) * 100
-      const y = top + row * FIELD.row + FIELD.row / 2 + ((k % 2 ? 1 : -1) * (inRow > 1 ? 7 : 0))
+      const y = top + row * FIELD.row + FIELD.car + ((k % 2 ? 1 : -1) * (inRow > 1 ? 7 : 0))
       return { x, y }
     })
   }
