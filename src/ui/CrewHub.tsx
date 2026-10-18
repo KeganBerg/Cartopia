@@ -63,9 +63,12 @@ export function CrewBattleTile() {
   if (failed || !b) return null
   const v = venueOf(b.venue)
   const share = battleShare(b.us.score, b.them.score)
+  const warLeft = !b.result ? battle!.attacksLeft ?? 0 : 0
   return (
     <div className="rm-tile rm-photo cr-battle" style={artStyle('tour', b.venue, true)} role="button" tabIndex={0} onClick={() => openPanel('battle')}>
-      <span className="rm-tag">CREW WAR · ⏳ {shortLeft(msToNextWeek(now))}{ready > 0 && ' · 🧰!'}</span>
+      <span className="rm-tag">CREW WAR · ⏳ {shortLeft(msToNextWeek(now))}</span>
+      {ready > 0 ? <span className="cr-act chest" title="A war chest is waiting">🧰 Claim!</span>
+        : warLeft > 0 && <span className="cr-act" title={`War races left today: ${warLeft}`}>⚔️ {warLeft} races</span>}
       <div className="cr-bscore">
         <Side s={b.us} score={b.us.score} lead={b.us.score >= b.them.score} />
         <span className="cr-vs">VS</span>

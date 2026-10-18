@@ -58,7 +58,14 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   // Same count as the Crew tab's dot, and the button opens that tab while a chest waits.
-  const crewChests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const goalChest = useCrewGoal((g) => g.ready)
+  const warChest = useCrewBattle((b) => b.ready)
+  const crewChests = goalChest + warChest
+  // War races left today: the button shows them and goes straight to the war map.
+  const warLeft = useCrewBattle((b) => (b.battle?.current && !b.battle.current.result ? b.battle.attacksLeft ?? 0 : 0))
+  // The button goes where its badge points: a war chest or war races to the war, the goal chest to the Crew tab.
+  const toWar = warChest > 0 || (crewChests === 0 && warLeft > 0)
+  const socialTo = toWar ? 'battle' : goalChest > 0 ? 'clan' : 'friends'
   const crewChat = useChat((c) => c.unread.crew)
   const globalChat = useChat((c) => c.unread.global > 0)
   const chatPing = useChat((c) => c.pinged.global + c.pinged.crew > 0)
@@ -80,7 +87,7 @@ export function BottomBar() {
       <div className="bottom-bar">
         {shop.on && <button className={`icon-btn${pulse('shop')}${freshClass(shop.fresh)}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>}
         {cars.on && <button className={`icon-btn${pulse('cars')}${freshClass(cars.fresh)}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>}
-        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>SOCIAL</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel(socialTo)}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 ? <span className="btn-dot">{crewChests}</span> : toWar && <span className="btn-dot war" title={`War races left today: ${warLeft}`}>⚔️{warLeft}</span>}</span>SOCIAL</button>}
         {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{chatPing ? <span className="btn-dot" title="You were mentioned">@</span> : crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
         {edit.on && <button className={`icon-btn${freshClass(edit.fresh)}`} onClick={() => setMode(useGame.getState().tutorial >= 99 ? 'road' : 'move')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>}
         {race.on && <button className={`big-btn race-btn${pulse('race')}${freshClass(race.fresh)}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>}

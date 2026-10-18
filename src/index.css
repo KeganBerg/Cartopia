@@ -1635,6 +1635,7 @@ button.book-car { font: inherit; color: inherit; }
 .tab-dot, .btn-dot { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin-left: 5px; border-radius: 9px; background: #e53935; color: #fff; font: 12px/1 var(--display); vertical-align: middle; }
 .icon-btn .i { position: relative; }
 .btn-dot { position: absolute; top: -4px; right: -6px; margin: 0; border: 2px solid #fff; }
+.btn-dot.war, .tab-dot.war { background: #ff6d00; font-size: 11px; white-space: nowrap; }
 @media (max-width: 600px) {
   .book-cars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .book-car .thumb3d.sm { --tw: 72px; --th: 56px; }

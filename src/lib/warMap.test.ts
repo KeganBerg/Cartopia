@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { raceFloor } from '../game/race'
 import type { Battle, BattleSide, WarAttack } from './battles'
-import { streetTime, warMap, warStars } from './warMap'
+import { msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
 
 const sql = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
 
@@ -45,5 +45,29 @@ describe('crew war map', () => {
     expect(sql).toContain("'id', 'bot' || i")
     expect(sql).toMatch(/with ordinality as e\(m, i\)/)
     expect(sql).toContain("i := substr(p_target, 4)::int")
+  })
+
+  it('picks revenge first, then the fewest stars, then the slowest time', () => {
+    const spot = (id: string, stars: number, t: number, revenge = false): MapSpot => ({ id, name: id, car: 'c', body: 'sedan', color: '#fff', pi: 100, t, stars, hits: 0, revenge })
+    expect(nextTarget([spot('a', 1, 8), spot('b', 0, 7), spot('c', 0, 9)], 100)?.id).toBe('c')
+    expect(nextTarget([spot('a', 1, 8, true), spot('b', 0, 7), spot('c', 0, 9)], 100)?.id).toBe('a')
+    // All beaten: a rematch, the slowest first.
+    expect(nextTarget([spot('a', 3, 8), spot('b', 3, 7)], 100)?.id).toBe('a')
+    expect(nextTarget([], 100)).toBeNull()
+    // The rival just raced waits while anyone else is left.
+    expect(nextTarget([spot('a', 0, 9), spot('b', 1, 7)], 100, 'a')?.id).toBe('b')
+    expect(nextTarget([spot('a', 1, 9)], 100, 'a')?.id).toBe('a')
+  })
+
+  it('marks rivals who took stars off you', () => {
+    const r = (id: string) => ({ id, name: id, car: 'Hellhound', body: 'muscle', color: '#f00', pi: 100, t: 8 })
+    const side = (ids: string[]): BattleSide => ({ bot: false, name: 'X', tag: 'X', emblem: '🏁', color: '#fff', score: 0, members: [], roster: ids.map(r) })
+    const attacks: WarAttack[] = [{ side: 'them', by: 'r2', byName: 'R2', target: 'me', won: true, stars: 2, points: 10, at: '' }, { side: 'them', by: 'r3', byName: 'R3', target: 'm2', won: true, stars: 1, points: 5, at: '' }]
+    const map = warMap({ week: '2026-10-12', venue: 'main', result: null, mine: 0, mvp: false, claimed: [], us: side(['me', 'm2']), them: side(['r1', 'r2', 'r3']), attacks }, 'me')
+    expect(map.them.map((s) => !!s.revenge)).toEqual([false, true, false])
+  })
+
+  it('counts down to UTC midnight', () => {
+    expect(msToWarRaces(Date.UTC(2026, 9, 18, 21, 0))).toBe(3 * 3600_000)
   })
 })

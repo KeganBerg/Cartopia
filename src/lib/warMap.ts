@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { flushSave, signedInUser } from './cloud'
-import { CARS, type Body } from '../game/data'
+import { CARS, carDef, performance, type Body } from '../game/data'
+import { raceCarOf } from '../game/raceCar'
 import { raceFloor } from '../game/race'
 import { useGame, spendFuel } from '../game/store'
 import { GHOST_FUEL, isBody, runWarGhost, type Ghost } from './ghosts'
@@ -27,6 +28,8 @@ export type MapSpot = {
   stars: number
   hits: number
   me?: boolean
+  // This rival took stars off you: race them back first.
+  revenge?: boolean
 }
 
 // Cars for street crew drivers: picked from the crew's tag so they stay put.
@@ -47,9 +50,11 @@ function spots(side: BattleSide, b: Battle, by: 'us' | 'them', me: string | null
     })
   }
   const roster = side.roster?.length ? side.roster : side.members.map((m) => ({ id: m.id, name: m.name, car: null, body: null, color: null, pi: null, t: null }))
+  // Rivals who took stars off you (only on their row).
+  const hitMe = (id: string) => by === 'us' && !!me && (b.attacks ?? []).some((a) => a.side === 'them' && a.target === me && a.by === id && a.stars > 0)
   return roster.map((m) => ({
     id: m.id, name: m.name, car: m.car ?? '?', model: CARS.find((c) => c.name === m.car)?.id, body: isBody(m.body) ? m.body : 'sedan', color: m.color ?? side.color,
-    pi: m.pi ?? 0, t: m.t, me: m.id === me, ...tally(m.id),
+    pi: m.pi ?? 0, t: m.t, me: m.id === me, revenge: hitMe(m.id), ...tally(m.id),
   }))
 }
 
@@ -58,14 +63,51 @@ export function warMap(b: Battle, me: string | null) {
   return { them: spots(b.them, b, 'us', me), us: spots(b.us, b, 'them', me) }
 }
 
+// The time a street crew driver runs against this car (0114: tighter for stronger drivers).
+export const streetTime = (myPi: number, w: number) => Math.round(raceFloor(myPi) * (1.34 - 0.05 * Math.min(1.6, Math.max(0.4, w))) * 100) / 100
+
+// The next rival worth racing: one who took stars off you first, then the fewest stars taken, then the
+// slowest time; once all are beaten, a rematch. skip: a rival just raced, passed over while there's anyone else.
+export function nextTarget(spots: MapSpot[], myPi: number, skip?: string) {
+  // Everyone beaten: a rematch still scores war points (0114 scores every race the same way).
+  const open = spots.some((s) => s.stars < 3) ? spots.filter((s) => s.stars < 3) : spots
+  const pool = open.some((s) => s.id !== skip) ? open.filter((s) => s.id !== skip) : open
+  const time = (s: MapSpot) => s.t ?? streetTime(myPi, s.w ?? 1)
+  return [...pool].sort((x, y) => Number(!!y.revenge) - Number(!!x.revenge) || x.stars - y.stars || time(y) - time(x))[0] ?? null
+}
+
+// War races left today while this week's war is on (0 with no war, or none left).
+export function warRacesLeft() {
+  const b = useCrewBattle.getState().battle
+  return b?.current && !b.current.result ? Math.max(0, b.attacksLeft ?? WAR_RULES.attacksPerDay) : 0
+}
+
+// When the day's war races come back (UTC midnight).
+export function msToWarRaces(now: number) {
+  const d = new Date(now)
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1) - now
+}
+
+// The player's race car's performance, as the war map uses it.
+export function myWarPi() {
+  const s = useGame.getState()
+  const car = raceCarOf(s.cars, s.raceCar)
+  return car ? performance(carDef(car.model), car.upgrades, car.mods) : 0
+}
+
+// Races the next rival straight from a war race's result card.
+export function nextWarRival(skip?: string) {
+  const b = useCrewBattle.getState().battle?.current
+  if (!b || warRacesLeft() <= 0) return null
+  return nextTarget(warMap(b, demoBattle() ? 'me' : signedInUser()).them, myWarPi(), skip)
+}
+
 // Stars a time earns against a ghost: 1 for a win, 2 by 1%, 3 by 3% (0114's war_attack_submit).
 export function warStars(t: number, their: number) {
   if (!(t < their)) return 0
   return 1 + (t <= their * (1 - WAR_RULES.star2) ? 1 : 0) + (t <= their * (1 - WAR_RULES.star3) ? 1 : 0)
 }
 
-// The time a street crew driver runs against this car (0114: tighter for stronger drivers).
-export const streetTime = (myPi: number, w: number) => Math.round(raceFloor(myPi) * (1.34 - 0.05 * Math.min(1.6, Math.max(0.4, w))) * 100) / 100
 
 // Races a rival on the map. The server picks the time to beat and counts the day's war races.
 export async function attackSpot(spot: MapSpot, myPi: number, tag: string) {
@@ -79,6 +121,7 @@ export async function attackSpot(spot: MapSpot, myPi: number, tag: string) {
   })
   if (demoBattle() || !supabase || !signedInUser()) {
     if (!spendFuel(GHOST_FUEL)) return
+    useCrewBattle.setState((c) => (c.battle ? { battle: { ...c.battle, attacksLeft: Math.max(0, (c.battle.attacksLeft ?? WAR_RULES.attacksPerDay) - 1) } } : c))
     return runWarGhost(ghost(spot.t ?? streetTime(myPi, spot.w ?? 1), false), Promise.resolve(false))
   }
   try {
