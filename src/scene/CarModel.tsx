@@ -6,7 +6,7 @@ import {
   InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
   type Group,
 } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
@@ -268,7 +268,8 @@ export class Kit {
   parts = new Map<Part, BufferGeometry[]>()
   add(part: Part, geo: BufferGeometry, p: V3 = [0, 0, 0], r: V3 = [0, 0, 0], s: V3 = [1, 1, 1]) {
     const m = new Matrix4().compose(new Vector3(...p), new Quaternion().setFromEuler(new Euler(...r)), new Vector3(...s))
-    const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m)
+    // Copied into a plain geometry: clone() builds a default shape of the same kind first.
+    const g = (geo.index ? geo.toNonIndexed() : new BufferGeometry().copy(geo)).applyMatrix4(m)
     geo.dispose()
     for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal' && n !== 'uv') g.deleteAttribute(n)
     g.clearGroups()
@@ -287,9 +288,9 @@ export class Kit {
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 // One bevel segment: for small parts seen through glass.
-const rbox1 = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 1, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox1 = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 1, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 const cyl = (rt: number, rb: number, h: number, seg = 10) => new CylinderGeometry(rt, rb, h, seg)
