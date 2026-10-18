@@ -25,6 +25,7 @@ cars, mods, skins, hats and Call Cards with published odds.
 | `Data/ServerCatalog.luau` | The tables the web server checks every save against (prices, rewards, unlock levels, upgrade costs per level) plus `crateTables` (what a crate rolls from). Treat these as the source of truth for the economy. |
 | `Data/Curves.luau` | Formulas sampled at levels 1-100: `xpToNext`, `levelXpBoost`, `playXpMult`, `townXpMult`, `fuelPerMin`, `baseFuelCap`, `gemCoins`, plot prices, crate odds and cost by level. Use them as **expected values** for tests of your Luau versions of the formulas. |
 | `Data/CarShapes.luau` | Every car body's proportions (length, width, cabin, hood, wheel size, spoiler, fins...). The web cars are procedural boxes and tapers, so these build the same cars from Parts/Wedges/MeshParts. Per-car tweaks are in `CarLooks.luau`. |
+| `Data/UIMotion.luau` | Menu and button motion, ported from the web game: panels rise in and drop away (a bottom sheet on phones), instant swaps between menus, button press and hover, reward pops, number bumps, error shakes, each with its sound. See Menu motion below. |
 | `Audio/` + `Data/Audio.luau` | All the game's music, club tracks, ambience, sound effects and tutorial voice as MP3s, with a map of where each plays (see Audio below). |
 | `json/` | The same data as JSON, if you prefer `HttpService:JSONDecode`. |
 | `index.json` | Which module holds which exports, and the web source file of each. |
@@ -94,6 +95,20 @@ Roblox audio rules to plan around (check the Creator Hub, they change):
 - New audio is checked by moderation before it plays.
 - To stay inside the cap, upload `sfx-sprite.mp3` once instead of the 77 effect files and play each effect as a region of it: `Sound.PlaybackRegionsEnabled = true`, `Sound.PlaybackRegion = NumberRange.new(start, stop)` from `Sfx[name].sprite`. That makes the whole set **79 uploads**: 24 songs, 18 club tracks, 2 rave, 20 ambience loops, 2 thunder claps, 1 sprite and 12 voice lines.
 - Car engines are not in the kit: the web game synthesises them per car as you drive. On Roblox, use a short engine loop per body type with `PlaybackSpeed` following RPM.
+
+## Menu motion
+
+The web game never lets a menu or button sit still: menus rise in and drop away, presses push
+down and spring back, rewards pop, and each has a sound. `Data/UIMotion.luau` does the same
+with TweenService, with the web game's own timings and easing. Use it on **every** screen:
+
+1. In one LocalScript: `UIMotion.init(require(CartopiaData.Audio))`, then `UIMotion.bindAll(playerGui)`. Every button, now and later, gets press, hover (mouse only) and a tap sound. A button with its own sound sets the attribute `Sfx` (e.g. `"buy"`, `"equip"`, `"reward"`); `NoMotion = true` opts one out.
+2. Build each menu as a **CanvasGroup** (so it fades as a whole) with a dim Frame named `Overlay` beside it. Never set `Visible` by hand: open with `UIMotion.open(panel)` and close with `UIMotion.close(panel)`. They play the menu sounds.
+3. Going from one menu straight to another (a tab row, a button that jumps to Cars) uses `UIMotion.swap(from, to)`: instant, with the tab tick, like the web game.
+4. Rewards, unlocks and new badges appear with `UIMotion.pop(gui, "reward")`. A coin, gem or fuel number that changes calls `UIMotion.bump(label)`. A refused action calls `UIMotion.shake(button)`.
+5. Keep the timings in `UIMotion.Timing`. They are the web game's (panel in 0.26 s, out 0.17 s, sheet 0.3 s), and anything slower feels sluggish.
+
+Buttons inside a UIListLayout or UIGridLayout can't move (the layout owns their position), so they only scale on press. That's fine. The module respects Roblox's Reduced Motion setting.
 
 ## House rules that carry over
 
