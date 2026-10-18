@@ -61,6 +61,7 @@
 button.cl-name { padding: 0; border: 0; background: none; cursor: pointer; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
 .cl-spot.me .cl-name, .cl-row.me .cl-name { color: #c2185b; }
 .cl-time { font: 15px var(--display); font-variant-numeric: tabular-nums; }
+.cl-tie { display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: #14213d; color: #fff; font: 900 11px Nunito, sans-serif; vertical-align: 2px; white-space: nowrap; }
 .cl-podium::after { content: ''; grid-column: 1 / -1; height: 10px; margin-top: -6px; border: 3px solid var(--line, #14213d); border-radius: 4px;
   background: repeating-conic-gradient(#fff 0 25%, #14213d 0 50%) 0 0 / 10px 10px; }
 
