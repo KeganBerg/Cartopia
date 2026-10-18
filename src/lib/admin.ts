@@ -13,6 +13,12 @@ export type AdminPlayer = {
   cars: AdminCar[]; muted: string | true | null; admin: boolean; joined: string; seen: string | null; chat?: AdminChat[]
 }
 export type AdminLogRow = { id: number; at: string; action: string; target: string | null; name: string | null; detail: Record<string, unknown> }
+// One reported chat message (0117_chat_reports.sql): every open report on it rolled up.
+export type AdminReport = {
+  message: number; at: string; room: string; body: string; reported: string | null; reportedName: string
+  reasons: string[]; count: number; reporter: string; live: boolean
+}
+export type ReportOutcome = 'dismissed' | 'deleted' | 'muted'
 export type LiveKind = 'night' | 'day' | 'rave' | 'weather' | 'banner'
 
 // Asks the server once per sign-in and keeps the answer in the store (game.admin), where the
@@ -76,4 +82,18 @@ export const admin = {
   unmute: (id: string) => call<AdminPlayer>('admin_unmute', { p_uid: id }),
   chatDelete: (id: string, msg: number | null) => call<number>('admin_chat_delete', { p_uid: id, p_id: msg }),
   log: () => call<AdminLogRow[]>('admin_log_recent'),
+  reports: () => call<AdminReport[]>('admin_reports'),
+  closeReport: (msg: number, outcome: ReportOutcome) => call<number>('admin_report_close', { p_message: msg, p_outcome: outcome }),
+}
+
+// Open chat reports for the 🛡 button's badge; 0 for players and until the SQL is live.
+export function useOpenReports(isAdmin: boolean) {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    if (!isAdmin || !supabase) return setN(0)
+    let live = true
+    supabase.rpc('admin_reports').then(({ data, error }) => live && setN(!error && Array.isArray(data) ? data.length : 0), () => {})
+    return () => { live = false }
+  }, [isAdmin])
+  return n
 }
