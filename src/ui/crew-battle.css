@@ -117,30 +117,44 @@
 .cb-you-gain .h2h { color: #ffd54f; }
 
 /* War map: their crew across the top, yours along the bottom, the front line between */
-.wm { display: flex; flex-direction: column; gap: 4px; padding: 6px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--them) 28%, #0c1020) 0%, #0c1020 50%, color-mix(in srgb, var(--us) 28%, #0c1020) 100%); border: 2px solid rgba(255,255,255,.18); }
+.wm { display: flex; flex-direction: column; gap: 5px; padding: 6px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--them) 30%, #0c1020) 0%, #0c1020 55%, color-mix(in srgb, var(--us) 24%, #0c1020) 100%); border: 2px solid rgba(255,255,255,.18); }
+/* The goal: stars each crew has taken, the line saying how */
+.wm-goal { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 10px; background: rgba(0,0,0,.35); }
+.wm-goal > b { flex: 1; text-align: center; font: 15px var(--display); font-weight: normal; color: #ffe082; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wm-goal > span { display: flex; align-items: center; gap: 4px; font: 20px var(--display); color: #fff; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.wm-goal > span small { padding: 1px 6px; border-radius: 8px; font-size: 12px; background: var(--us); }
+.wm-goal > span.them small { background: var(--them); }
 .wm-row { display: flex; gap: 4px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
 .wm-row::-webkit-scrollbar { display: none; }
-.wm-spot { flex: 1 0 58px; max-width: 76px; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 3px 2px 4px; border-radius: 12px; color: #fff; background: rgba(255,255,255,.06); border: 2px solid transparent; }
+.wm-side { flex: none; display: grid; place-items: center; width: 22px; border-radius: 8px; font-style: normal; font-size: 14px; background: color-mix(in srgb, var(--them) 55%, transparent); }
+.wm-row.us .wm-side { background: color-mix(in srgb, var(--us) 55%, transparent); }
+.wm-spot { position: relative; flex: 1 0 58px; max-width: 76px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px; border-radius: 12px; color: #fff; background: rgba(255,255,255,.07); border: 2px solid transparent; }
 .wm-spot:disabled { opacity: 1; cursor: default; }
 .wm-spot.them:not(:disabled):active { transform: translateY(1px); }
-.wm-spot.sel { border-color: #ffd54f; background: rgba(255,213,79,.18); box-shadow: 0 0 12px rgba(255,213,79,.45); }
+.wm-spot.sel { border-color: #ffd54f; background: rgba(255,213,79,.2); box-shadow: 0 0 12px rgba(255,213,79,.5); }
+.wm-spot.sel::after { content: '▼'; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #ffd54f; }
 .wm-spot.me { border-color: rgba(255,213,79,.6); }
-.wm-spot.down .wm-car { filter: grayscale(.85) brightness(.7); }
+.wm-spot.down .wm-car > :not(.wm-done) { filter: grayscale(.9) brightness(.55); }
 .wm-spot > em { max-width: 100%; font: 11px var(--display); font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wm-stars { display: flex; gap: 1px; font-size: 11px; line-height: 1; }
+.wm-row.us .wm-spot { flex-basis: 50px; padding: 2px; background: rgba(255,255,255,.04); }
+.wm-row.us .wm-car { width: 34px; height: 34px; }
+.wm-stars { display: flex; gap: 1px; font-size: 12px; line-height: 1; }
 .wm-stars i { font-style: normal; color: rgba(255,255,255,.22); }
 .wm-stars i.on { color: #ffd54f; text-shadow: 0 0 4px rgba(255,213,79,.7); }
-.wm-car { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, #2b3556, #141b33); border: 2px solid var(--c); }
-.wm-car > * { width: 100%; height: 100%; }
-.wm-front { position: relative; display: flex; align-items: center; justify-content: center; min-height: 46px; padding: 4px 64px 4px 6px; border-block: 2px dashed rgba(255,213,79,.45); }
-.wm-attack { display: flex; align-items: center; gap: 8px; width: 100%; }
+.wm-car { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, #2b3556, #141b33); border: 2px solid var(--c); }
+.wm-car > :not(.wm-done) { width: 100%; height: 100%; }
+.wm-car.big { flex: none; width: 58px; height: 58px; border-width: 3px; }
+.wm-done { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-size: 24px; color: #69f0ae; text-shadow: 0 0 6px #000, 0 2px 0 #000; }
+/* The rival to race next and the one button */
+.wm-target { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 6px 8px; border-radius: 12px; background: rgba(255,213,79,.12); border: 2px solid rgba(255,213,79,.55); }
+.wm-target.all { justify-content: center; font: 16px var(--display); color: #69f0ae; }
 .wm-vs { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.wm-vs b { font: 16px var(--display); font-weight: normal; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wm-vs small { font: 12px var(--display); color: #b0bec5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wm-go { padding: 6px 14px; font-size: 18px; background: linear-gradient(#ef5350, #b71c1c); }
+.wm-vs b { font: 18px var(--display); font-weight: normal; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-vs small { font: 13px var(--display); color: #cfd8dc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-vs .wm-gain { color: #ffe082; }
+.wm-go { display: flex; flex-direction: column; align-items: center; line-height: 1.1; padding: 6px 16px; font-size: 20px; background: linear-gradient(#ef5350, #b71c1c); }
+.wm-go small { font-size: 12px; color: #ffe082; }
 .wm-go:disabled { filter: grayscale(1); opacity: .7; }
-.wm-feed { font: 13px var(--display); color: #e0e0e0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wm-left { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); padding: 2px 7px; border-radius: 9px; font: 13px var(--display); color: #ffe082; background: rgba(0,0,0,.4); }
 
 /* Short phones: a tighter board and shorter rosters */
 @media (max-height: 640px) {
@@ -149,7 +163,7 @@
   .cb-badge.big i { width: 34px; height: 34px; font-size: 18px; }
   .cb-roster, .cb-log { max-height: 76px; }
   .wm-car { width: 36px; height: 36px; }
-  .wm-front { min-height: 40px; }
+  .wm-car.big { width: 46px; height: 46px; }
   .cb-track { padding: 10px 10px 8px; }
 }
 
