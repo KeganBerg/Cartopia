@@ -243,27 +243,35 @@ function YourPart({ b, rules }: { b: Battle; rules: BattleRules }) {
   )
 }
 
-// One crew member on the war map: their car, name, and the stars rivals have taken off them.
+// One crew member on the war map: their car, name, and the stars the other crew has taken off them (✔ when all 3).
 function Spot({ s, side, sel, onPick }: { s: MapSpot; side: 'us' | 'them'; sel: boolean; onPick?: () => void }) {
   return (
     <button className={`wm-spot ${side}${sel ? ' sel' : ''}${s.stars === 3 ? ' down' : ''}${s.me ? ' me' : ''}`} disabled={!onPick} onClick={onPick}
-      title={`${s.name} · ${s.car}${s.t ? ` · ${s.t.toFixed(2)}s` : ''}${s.hits ? ` · raced ${s.hits}×` : ''}`}>
+      title={`${s.name} · ${s.car}${s.t ? ` · ${s.t.toFixed(2)}s` : ''} · ${s.stars}★ taken`}>
+      <span className="wm-car" style={{ '--c': s.color } as React.CSSProperties}>
+        <CarThumb size="xs" body={s.body} model={s.model} color={s.color} />
+        {s.stars === 3 && <i className="wm-done">✔</i>}
+      </span>
       <span className="wm-stars">{[1, 2, 3].map((i) => <i key={i} className={i <= s.stars ? 'on' : ''}>★</i>)}</span>
-      <span className="wm-car" style={{ '--c': s.color } as React.CSSProperties}><CarThumb size="xs" body={s.body} model={s.model} color={s.color} /></span>
       <em>{s.me ? 'You' : s.name}</em>
     </button>
   )
 }
 
-// The war map: their crew across the top, yours along the bottom, the front line between. Tap a rival to race
-// them; every race either crew runs shows here as stars on the driver it was against.
+// The next rival worth racing: fewest stars taken so far, then the slowest time.
+const nextTarget = (spots: MapSpot[], myPi: number) => [...spots].filter((s) => s.stars < 3)
+  .sort((x, y) => x.stars - y.stars || (y.t ?? streetTime(myPi, y.w ?? 1)) - (x.t ?? streetTime(myPi, x.w ?? 1)))[0] ?? null
+
+// The war map. Goal: take stars off their racers (each star is war points). The star score sits on top, their
+// racers below it, the one to race next in the middle with the only button, and your crew (defending) at the bottom.
 function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; me: string | null }) {
   const map = useMemo(() => warMap(b, me), [b, me])
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const target = map.them.find((s) => s.id === pick) ?? null
-  const latest = (b.attacks ?? [])[0]
-  const nameOf = (id: string) => [...map.them, ...map.us].find((s) => s.id === id)?.name ?? '?'
+  const target = map.them.find((s) => s.id === pick) ?? nextTarget(map.them, myPi)
+  const ours = map.them.reduce((t, s) => t + s.stars, 0)
+  const theirs = map.us.reduce((t, s) => t + s.stars, 0)
+  const max = map.them.length * 3
   const go = async () => {
     if (!target) return
     setBusy(true)
@@ -271,25 +279,29 @@ function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; 
     setBusy(false)
   }
   const time = target ? target.t ?? streetTime(myPi, target.w ?? 1) : 0
+  const gain = `+${WAR_RULES.starPoints}–${WAR_RULES.starPoints * 3}`
   return (
     <div className="wm" style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
-      <div className="wm-row them">{map.them.map((s) => <Spot key={s.id} s={s} side="them" sel={s.id === pick} onPick={() => { sfx.click(); setPick(s.id === pick ? null : s.id) }} />)}</div>
-      <div className="wm-front">
-        {target ? (
-          <div className="wm-attack">
-            <span className="wm-vs"><b>{target.name}</b><small>{target.car} · ⏱ {target.t === null ? '~' : ''}{time.toFixed(2)}s</small></span>
-            <button className="cb-race wm-go" disabled={busy || left <= 0} onClick={go} title={`Win for ★, by 1% for ★★, by 3% for ★★★ · ${WAR_RULES.starPoints} war points a star`}>⚔️ Race</button>
-          </div>
-        ) : (
-          <span className="wm-feed">
-            {latest
-              ? <>{latest.side === 'us' ? '🟢' : '🔴'} {latest.byName} {latest.won ? [1, 2, 3].map((i) => (i <= latest.stars ? '★' : '☆')).join('') : '✖'} {nameOf(latest.target)}</>
-              : <>👆 Tap a rival to race them</>}
-          </span>
-        )}
-        <span className="wm-left" title="War races left today">🎟 {left}/{WAR_RULES.attacksPerDay}</span>
+      <div className="wm-goal" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
+        <span className="us"><small>{b.us.tag}</small>⭐ {ours}</span>
+        <b>Beat their racers for ⭐</b>
+        <span className="them">⭐ {theirs}<small>{b.them.tag}</small></span>
       </div>
-      <div className="wm-row us">{map.us.map((s) => <Spot key={s.id} s={s} side="us" sel={false} />)}</div>
+      <div className="wm-row them"><i className="wm-side" title={`${b.them.name}: race them`}>🎯</i>{map.them.map((s) => <Spot key={s.id} s={s} side="them" sel={s.id === target?.id} onPick={() => { sfx.click(); setPick(s.id) }} />)}</div>
+      {target ? (
+        <div className="wm-target">
+          <span className="wm-car big" style={{ '--c': target.color } as React.CSSProperties}><CarThumb size="xs" body={target.body} model={target.model} color={target.color} /></span>
+          <span className="wm-vs">
+            <b>{target.name}</b>
+            <small title="Their time: beat it to win a star">⏱ {target.t === null ? '~' : ''}{time.toFixed(2)}s</small>
+            <small className="wm-gain" title={`★ win · ★★ by 1% · ★★★ by 3% · ${WAR_RULES.starPoints} war points a star`}>⚔️ {gain}</small>
+          </span>
+          <button className="cb-race wm-go" disabled={busy || left <= 0} onClick={go} title={left > 0 ? 'Race them' : 'New war races at midnight UTC'}>
+            ⚔️ Race<small>🎟 {left}/{WAR_RULES.attacksPerDay}</small>
+          </button>
+        </div>
+      ) : <div className="wm-target all">✔ All {map.them.length} beaten · ⭐ {ours}/{max}</div>}
+      <div className="wm-row us"><i className="wm-side" title={`${b.us.name}: stars ${b.them.tag} took off your crew`}>🛡️</i>{map.us.map((s) => <Spot key={s.id} s={s} side="us" sel={false} />)}</div>
     </div>
   )
 }
@@ -394,7 +406,7 @@ export function BattlePanel() {
             <Roster s={b.them} side="them" me={me} online={online} />
           </div>
         ) : <WarLogList log={battle!.log ?? []} record={rec} />}
-        <YourPart b={b} rules={rules} />
+        {tab !== 'map' && <YourPart b={b} rules={rules} />}
       </div>
     </div>
   )
