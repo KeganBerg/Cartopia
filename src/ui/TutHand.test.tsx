@@ -6,6 +6,7 @@ HTMLCanvasElement.prototype.getContext = (() => ctx) as never
 vi.mock('../scene/BuildingPreview', () => ({ BuildingThumb: () => null, CarThumb: () => null }))
 
 const { handTarget, TUTORIAL_STEPS } = await import('./Tutorial')
+const { handBelow } = await import('./TutHand')
 const { useGame } = await import('../game/store')
 type Game = ReturnType<typeof useGame.getState>
 const at = (over: Partial<Game>) => ({ ...useGame.getState(), panel: null, visiting: null, levelUp: null, mode: 'play', search: null, ...over }) as Game
@@ -33,5 +34,13 @@ describe('the tutorial hand', () => {
   it('shows the way out of a menu that isn’t part of the step', () => {
     expect(handTarget(at({ tutorial: 1, panel: 'goals' }))).toContain('.close')
     expect(handTarget(at({ tutorial: 6, panel: 'rescue' }))).toContain('.close')
+  })
+})
+
+describe('the hand on the tutorial card', () => {
+  it('points down at Next from above, so it never covers Skip under it', () => {
+    const next = { x: 300, y: 700, w: 70, h: 40 }
+    expect(handBelow(next, true, 844)).toBe(false)
+    expect(handBelow(next, false, 844)).toBe(true)
   })
 })

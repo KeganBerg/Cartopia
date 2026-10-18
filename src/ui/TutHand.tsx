@@ -27,6 +27,12 @@ function find(sels: string[]): Element | null {
   return null
 }
 
+// Point up from below, or down from above when the target sits low on the screen. On the
+// tutorial card's own Next the hand comes from above: from below it sat right on Skip.
+export function handBelow(box: Box, onCard: boolean, screenH: number) {
+  return !onCard && box.y + box.h + 80 < screenH
+}
+
 // Something else on top (the flashing-lights warning, a toast): the hand waits rather than point at what can't be tapped.
 function covered(el: Element, x: number, y: number) {
   const hit = document.elementFromPoint(x, y)
@@ -75,8 +81,7 @@ export function TutHand() {
       const h = hand.current
       const g = ring.current
       if (!box || !h || !g) return hide()
-      // Point up from below, or down from above when the target sits low on the screen.
-      const below = box.y + box.h + 80 < innerHeight
+      const below = handBelow(box, !!el?.closest('.tutorial'), innerHeight)
       const cx = box.x + box.w / 2
       const tipY = below ? box.y + box.h * 0.6 : box.y + box.h * 0.4
       h.classList.toggle('down', !below)

@@ -146,9 +146,13 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
     watcher?.unobserve(canvas)
     sizer?.unobserve(canvas)
     // A page kept for later (a menu tab out of sight) holds no pictures meanwhile; it's redrawn
-    // when it shows again.
-    canvas.width = 0
-    canvas.height = 0
+    // when it shows again. A thumb that only swapped model has its canvas back by then: it keeps
+    // the last car until the next one draws, instead of blinking blank on every swap.
+    queueMicrotask(() => {
+      if (byCanvas.has(canvas)) return
+      canvas.width = 0
+      canvas.height = 0
+    })
     const n = models.get(item.key)
     if (n) n.uses--
     // Scenes animate every frame while mounted, so they go as soon as nothing shows them.
