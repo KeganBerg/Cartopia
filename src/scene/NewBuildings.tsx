@@ -313,12 +313,22 @@ export function BlockCar({ m, at, c, rot = 0 }: { m: Mat; at: V3; c: string; rot
       {/* A car is car-sized however big the block it's parked in. */}
       <Upright size={1}>
         <group rotation-y={rot}>
-          {/* Body on four wheels, so it sits on the deck or lot it's parked on. */}
-          <Box m={m} at={[0, 0.115, 0]} s={[0.36, 0.13, 0.66]} c={c} />
-          <Box m={m} at={[0, 0.225, -0.04]} s={[0.3, 0.1, 0.34]} c="#b3e5fc" />
+          {/* Body on four wheels, so it sits on the deck or lot it's parked on: a
+              lower body with bumpers, a glass cabin under a roof in the body colour,
+              headlights at the front (+z) and tail lights at the back. */}
+          <Box m={m} at={[0, 0.105, 0]} s={[0.36, 0.11, 0.66]} c={c} />
+          <Box m={m} at={[0, 0.2, -0.04]} s={[0.3, 0.09, 0.34]} c="#b3e5fc" />
+          <Box m={m} at={[0, 0.258, -0.05]} s={[0.31, 0.03, 0.3]} c={c} />
+          {[0.335, -0.335].map((z) => <Box key={z} m={m} at={[0, 0.075, z]} s={[0.37, 0.05, 0.03]} c="#9e9e9e" shadow={false} />)}
+          {[-0.12, 0.12].map((x) => (
+            <group key={x}>
+              <Box m={m} at={[x, 0.13, 0.331]} s={[0.07, 0.035, 0.006]} c="#fff8e1" shadow={false} />
+              <Box m={m} at={[x, 0.13, -0.331]} s={[0.07, 0.035, 0.006]} c="#e53935" shadow={false} />
+            </group>
+          ))}
           {[[-0.17, 0.2], [0.17, 0.2], [-0.17, -0.2], [0.17, -0.2]].map(([x, z]) => (
             <mesh key={`${x}${z}`} position={[x, 0.05, z]} rotation-z={Math.PI / 2}>
-              <cylinderGeometry args={[0.05, 0.05, 0.05, 10]} />
+              <cylinderGeometry args={[0.055, 0.055, 0.05, 12]} />
               {m('#212121')}
             </mesh>
           ))}

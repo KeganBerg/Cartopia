@@ -43,8 +43,10 @@ function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: num
   const size = useThree((t) => t.size)
   useLayoutEffect(() => {
     if (!inner.current || !ref.current) return
-    const b = seat(inner.current, ref.current)
-    const floor = Math.max(b.r * 1.2, 0.8)
+    // Measured by its vertices: a turned pyramid roof's loose box is 1.4x too wide.
+    const b = seat(inner.current, ref.current, undefined, true)
+    // The disc hugs the model's swept footprint so a small shop fills the card too.
+    const floor = Math.max(b.r * 1.08, 0.3)
     disc.current?.scale.setScalar(floor)
     camera.aspect = size.width / Math.max(1, size.height)
     frame(camera, b, VIEW, { floor, pad: 0.06 })
@@ -219,7 +221,10 @@ export function UpgradePanel() {
   // A merged block of houses reaching level 10 becomes a landmark (a Vanguard or Globe Tower).
   const becomes = block && isLandmark({ ...block, anchor: { ...block.anchor, level: next } }) ? landmarkName(block) : null
   if (d.kind === 'house') {
-    rows.push({ label: 'Building', now: landmark ?? levelName(d, lvl), next: becomes ?? levelName(d, next) })
+    const now = landmark ?? levelName(d, lvl)
+    const then = becomes ?? levelName(d, next)
+    // Only when the house actually turns into something else.
+    if (now !== then) rows.push({ label: 'Building', now, next: then })
     rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
     rows.push({ label: 'Upgrade XP', now: '', next: `+${xpGain(s.level, buildingUpgradeXp(lvl) * k)}` })
   }
