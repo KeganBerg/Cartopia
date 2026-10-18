@@ -291,8 +291,9 @@ function StartLights() {
 }
 
 // Tyre smoke off the line, and a flag waving at the finish.
-const smokeGeo = new IcosahedronGeometry(0.5, 1)
-const smokeMat = new MeshStandardMaterial({ color: '#eceff1', roughness: 1, flatShading: true, emissive: '#555555' })
+// Soft, see-through and smooth-shaded: faceted opaque puffs read as rocks on the road.
+const smokeGeo = new IcosahedronGeometry(0.5, 2)
+const smokeMat = new MeshStandardMaterial({ color: '#eceff1', roughness: 1, emissive: '#666666', transparent: true, opacity: 0.55, depthWrite: false })
 type Puff = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number }
 const SMOKE_MAX = 90
 const pt = new Object3D()
@@ -334,10 +335,10 @@ function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObj
     }
     list.length = n
     m.count = n
-    m.visible = n > 0
     m.instanceMatrix.needsUpdate = true
   })
-  return <instancedMesh ref={mesh} args={[smokeGeo, smokeMat, SMOKE_MAX]} frustumCulled={false} visible={false} />
+  // Kept visible with no puffs, so the race warm-up compiles its shader before the lights go green.
+  return <instancedMesh ref={mesh} args={[smokeGeo, smokeMat, SMOKE_MAX]} count={0} frustumCulled={false} />
 }
 
 function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; them: RefObject<RacerView> }) {

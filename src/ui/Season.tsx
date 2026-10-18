@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Icon } from './Icon'
+import { Icon, CoinIcon, BuckIcon, PartsIcon } from './Icon'
 import { useGame, currentSeason, tierReady, seasonClaimable } from '../game/store'
 import { seasonNumber, SEASON_TIERS, STARS_PER_TIER, SEASON_CAR_BUCKS, seasonOf, seasonEndsAt, carDef, seasonSkin, seasonModSkin } from '../game/data'
 import { raceCarOf } from '../game/raceCar'
@@ -102,7 +102,9 @@ export function SeasonPanel() {
       <div ref={chips} className="sp-chips" role="list" aria-label="Star Pass tiers">
         {tiers.map((t, i) => (
           <button key={t.n} role="listitem" className={`sp-tier ${t.state}${t.car ? ' final' : ''}${i === near ? ' on' : ''}`} onClick={() => look(zOf(i))} aria-label={`Tier ${t.n}`}>
-            {t.car ? '🚗' : <b>{t.n}</b>}
+            {/* The prize as a picture, its tier number in the corner. */}
+            {t.car ? '🚗' : t.skin ? <i className="sp-swatch" style={{ background: t.skin }} /> : t.gems ? <BuckIcon size={24} /> : t.parts ? <PartsIcon size={24} /> : <CoinIcon size={24} />}
+            <b>{t.n}</b>
           </button>
         ))}
       </div>
