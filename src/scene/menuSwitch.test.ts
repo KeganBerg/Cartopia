@@ -36,7 +36,7 @@ describe('switching menus', () => {
 describe('Social tabs', () => {
   it('keeps one window for all four tabs', () => {
     const app = readFileSync('src/App.tsx', 'utf8')
-    expect(app).toMatch(/isSocialTab\(panel\) && <SocialPanel tab=\{panel\} \/>/)
+    expect(app).toMatch(/<Kept on=\{isSocialTab\(panel\)\} open=\{!!panel\}><SocialPanel tab=\{socialTab\} \/><\/Kept>/)
     for (const p of ['FriendsPanel', 'ClanPanel', 'MeetPanel', 'LeadersPanel']) expect(app).not.toMatch(new RegExp(`<${p}\\b`))
   })
   it("has each tab's own window step aside inside it", () => {
@@ -82,5 +82,25 @@ describe('Build grid', () => {
     copy.userData.merged = true
     model.add(copy)
     expect(seat(model, turn)).toEqual(plain)
+  })
+})
+
+// Kegan: "why does the game still freeze each transition to a new tab". Every tap rebuilt the
+// whole page: its cards, its 3D thumbnails, and a page layout per thumbnail as each went in.
+describe('every tab switch', () => {
+  it('keeps the main menus and their tabs built while switching', () => {
+    const app = readFileSync('src/App.tsx', 'utf8')
+    for (const m of ['ShopPanel', 'InventoryPanel', 'CarsPage', 'SocialPanel', 'BankPanel', 'CarPacksPanel', 'GoalsPanel']) expect(app).toMatch(new RegExp(`<Kept on=\\{[^}]+\\} open=\\{!!panel\\}><${m}\\b`))
+    const menus = readFileSync('src/ui/Menus.tsx', 'utf8')
+    expect(menus).toMatch(/<KeepTabs tab=\{tab\} render=\{\(t\) => \(t === 'upgrades'/)
+    expect(menus).toMatch(/<KeepTabs tab=\{room\} render=/)
+    expect(readFileSync('src/ui/SocialPanel.tsx', 'utf8')).toMatch(/<KeepTabs tab=\{tab\}/)
+    expect(readFileSync('src/ui/Goals.tsx', 'utf8')).toMatch(/<KeepTabs tab=\{tab\}/)
+  })
+  it("doesn't lay the page out again for each thumbnail as a grid goes in", () => {
+    const src = readFileSync('src/scene/BuildingPreview.tsx', 'utf8')
+    const attach = src.slice(src.indexOf('function attach('), src.indexOf('// Unused models past KEEP_IDLE'))
+    expect(attach).toMatch(/sizer\.observe\(canvas\)\n  \} else fit\(slot, canvas\.clientWidth, canvas\.clientHeight\)/)
+    expect(attach).not.toMatch(/\[\.\.\.models\]/)
   })
 })

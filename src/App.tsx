@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CountFrames, FpsMeter } from './ui/FpsMeter'
 import { SharedShapes } from './scene/sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -22,7 +22,8 @@ import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
 import { ChatPanel } from './ui/Chat'
 import { VisitBanner } from './ui/Friends'
-import { SocialPanel, isSocialTab } from './ui/SocialPanel'
+import { SocialPanel, isSocialTab, type SocialTab } from './ui/SocialPanel'
+import { Kept } from './ui/KeepTabs'
 import { Tutorial } from './ui/Tutorial'
 import { TutHand } from './ui/TutHand'
 import { Tips } from './ui/Tips'
@@ -108,6 +109,9 @@ const prefetchPanels = () => {
 export default function App() {
   useAdminCheck()
   const panel = useGame((s) => s.panel)
+  // The Social window kept out of sight shows the tab it was left on.
+  const [socialTab, setSocialTab] = useState<SocialTab>('friends')
+  if (isSocialTab(panel) && panel !== socialTab) setSocialTab(panel)
   // Real-money menus need the Crew House (src/game/payGate.ts).
   const bankOn = useGame((s) => unlocked(s, 'bank'))
   const paceStep = useTownPace((p) => p.step)
@@ -208,21 +212,22 @@ export default function App() {
       <Hud />
       <LiveBanner />
       <BottomBar />
-      {panel === 'shop' && <ShopPanel />}
-      {panel === 'inventory' && <InventoryPanel />}
+      {/* The main menus stay built while switching between them (Kept), and go back in town. */}
+      <Kept on={panel === 'shop'} open={!!panel}><ShopPanel /></Kept>
+      <Kept on={panel === 'inventory'} open={!!panel}><InventoryPanel /></Kept>
       {/* My Cars, For Sale, Collection and Crates are one page that stays up while its tabs switch. */}
-      {(panel === 'garage' || panel === 'showroom' || panel === 'crates') && <CarsPage crates={(onReady) => <CratesPanel embedded onReady={onReady} />} />}
+      <Kept on={panel === 'garage' || panel === 'showroom' || panel === 'crates'} open={!!panel}><CarsPage crates={(onReady) => <CratesPanel embedded onReady={onReady} />} /></Kept>
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
       {/* Friends, Crew, Meet and Leaderboards: one window that stays up while its tabs switch. */}
-      {isSocialTab(panel) && <SocialPanel tab={panel} />}
+      <Kept on={isSocialTab(panel)} open={!!panel}><SocialPanel tab={socialTab} /></Kept>
       {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
-      {panel === 'bank' && bankOn && <BankPanel />}
-      {panel === 'carpacks' && bankOn && <CarPacksPanel />}
+      <Kept on={panel === 'bank' && bankOn} open={!!panel}><BankPanel /></Kept>
+      <Kept on={panel === 'carpacks' && bankOn} open={!!panel}><CarPacksPanel /></Kept>
       {panel === 'deals' && <DealsPanel />}
       {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
@@ -232,7 +237,7 @@ export default function App() {
       <GoalSplash />
       <AlertsCard />
       {panel === 'account' && <AccountPanel />}
-      {panel === 'goals' && <GoalsPanel />}
+      <Kept on={panel === 'goals'} open={!!panel}><GoalsPanel /></Kept>
       {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <WheelPanel />}
       {panel === 'flat' && <FlatPanel />}

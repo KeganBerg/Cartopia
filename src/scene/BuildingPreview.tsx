@@ -132,9 +132,11 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
         if (s) fit(s, e.contentRect.width, e.contentRect.height)
       }
     })
+    // Its size comes with the observer's first report, after the page lays out. Reading it here
+    // made the browser lay the page out again for every thumbnail as a grid of them went in
+    // (Shop > Upgrades froze for over a second on a slow phone).
     sizer.observe(canvas)
-  }
-  fit(slot, canvas.clientWidth, canvas.clientHeight)
+  } else fit(slot, canvas.clientWidth, canvas.clientHeight)
   changed()
   return () => {
     wasSeen.set(canvas, slot.seen)
@@ -142,14 +144,40 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
     byCanvas.delete(canvas)
     watcher?.unobserve(canvas)
     sizer?.unobserve(canvas)
+    // A page kept for later (a menu tab out of sight) holds no pictures meanwhile; it's redrawn
+    // when it shows again.
+    canvas.width = 0
+    canvas.height = 0
     const n = models.get(item.key)
     if (n) n.uses--
     // Scenes animate every frame while mounted, so they go as soon as nothing shows them.
     if (n && n.uses <= 0 && n.item.view) models.delete(item.key)
-    const idle = [...models].filter(([, v]) => v.uses <= 0)
-    for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
+    trimSoon()
     changed()
   }
+}
+
+// Unused models past KEEP_IDLE go, the oldest first, a few a frame: looked at once after a page's
+// thumbnails have all gone, not once per thumbnail (a big page closing went through the whole
+// list hundreds of times), and taken down over a few frames, not all in the frame the page closes.
+const TRIM_PER_FRAME = 4
+let trimming = false
+function trimSoon() {
+  if (trimming) return
+  trimming = true
+  const go = () => {
+    const idle = [...models].filter(([, v]) => v.uses <= 0)
+    const over = idle.slice(0, Math.min(TRIM_PER_FRAME, Math.max(0, idle.length - KEEP_IDLE)))
+    for (const [k] of over) models.delete(k)
+    if (over.length) changed()
+    trimming = idle.length - over.length > KEEP_IDLE
+    if (trimming) requestAnimationFrame(go)
+  }
+  if (typeof requestAnimationFrame === 'undefined') {
+    trimming = false
+    const idle = [...models].filter(([, v]) => v.uses <= 0)
+    for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
+  } else requestAnimationFrame(go)
 }
 
 // A held thumbnail (Shop > Upgrades) turns while the mouse is over it, and holds where it got to.
@@ -203,6 +231,7 @@ const Model = memo(function Model({ item }: { item: Item }) {
 function Renderer() {
   const { gl, scene } = useThree()
   const groups = useRef(new Map<string, Group>())
+  const building = useRef<string | null>(null)
   const [, mounted] = useState(0)
   // A rebuilt canvas (the phone dropped the old one) starts with an empty scene.
   useEffect(() => () => inScene.clear(), [])
@@ -217,13 +246,21 @@ function Renderer() {
   const focus = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: -Infinity })
   // What one turning thumbnail has been costing to draw (ms), to size the next frame's share.
   const cost = useRef(2)
+  const rank = (n: { spin: boolean; slots: Slot[] }) => (n.slots.includes(focus.current.slot!) ? 0 : n.spin ? 1 : 2)
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
     for (const k of inScene) if (!models.has(k)) inScene.delete(k)
-    const add = nextMounts(slots, (k) => models.has(k), inScene)
-    if (add.length) {
-      for (const k of add) inScene.add(k)
-      mounted((v) => v + 1)
+    // The next model goes in only once the last one is built: on a slow phone the frames can
+    // come faster than the builds, and the ones piled up were all built in one go (a page of
+    // new cars froze for a second).
+    const w = building.current
+    if (!w || !models.has(w) || !inScene.has(w) || groups.current.has(w)) {
+      const add = nextMounts(slots, (k) => models.has(k), inScene)
+      building.current = add.at(-1) ?? null
+      if (add.length) {
+        for (const k of add) inScene.add(k)
+        mounted((v) => v + 1)
+      }
     }
     const now = performance.now()
     const still = reduceMotionOn()
@@ -248,15 +285,7 @@ function Renderer() {
     const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k), { focus: f.slot, hover: over, scenes, still, now, gap: 1000 / SPIN_FPS - 4, spins: spinsFor(BUDGET_MS, cost.current) })
     if (waiting) dirty = true
     if (!need.size) return
-    // Each turning one goes round with the clock, however long since it last drew (a long wait, a
-    // page that has only just shown it, moves it no more than a quarter second's worth).
     let spun = 0
-    for (const n of need.values()) {
-      if (!n.spin || models.get(n.key)?.item.view) continue
-      spun++
-      for (const s of n.slots) s.angle = (s.angle + (Number.isFinite(s.at) ? Math.min(now - s.at, 250) : 0) / SPIN_MS) % 1
-      n.angle = n.slots[0].angle
-    }
     const t0 = performance.now()
 
     // Lay the models out in rows across the atlas.
@@ -285,8 +314,25 @@ function Renderer() {
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
     gl.setClearColor(0x000000, 0)
-    for (const n of need.values()) {
+    // The hero first, then the turning ones, then the held ones, for as long as the frame's
+    // BUDGET_MS lasts (one at least): the rest wait for the next frame. A page of new thumbnails
+    // drew them all in one frame and held the menu up while it opened.
+    const order = [...need.values()].sort((a, b) => rank(a) - rank(b))
+    const drawn: typeof order = []
+    for (const n of order) {
+      if (drawn.length && performance.now() - t0 > BUDGET_MS) {
+        dirty = true
+        break
+      }
+      drawn.push(n)
       const { key } = n
+      // Each turning one goes round with the clock, however long since it last drew (a long wait, a
+      // page that has only just shown it, moves it no more than a quarter second's worth).
+      if (n.spin && !models.get(key)?.item.view) {
+        spun++
+        for (const s of n.slots) s.angle = (s.angle + (Number.isFinite(s.at) ? Math.min(now - s.at, 250) : 0) / SPIN_MS) % 1
+        n.angle = n.slots[0].angle
+      }
       const g = groups.current.get(key)!
       const c = cam.current
       c.aspect = n.w / n.h
@@ -324,9 +370,9 @@ function Renderer() {
     gl.setScissorTest(false)
 
     // Copy in the same frame, before the browser discards the drawing buffer.
-    copyThumbs(src, width, height, need.values())
-    if (spun) cost.current = cost.current * 0.8 + ((performance.now() - t0) / need.size) * 0.2
-    for (const n of need.values()) for (const s of n.slots) {
+    copyThumbs(src, width, height, drawn)
+    if (spun) cost.current = cost.current * 0.8 + ((performance.now() - t0) / drawn.length) * 0.2
+    for (const n of drawn) for (const s of n.slots) {
       s.fresh = false
       s.at = now
     }
