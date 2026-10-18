@@ -6,7 +6,7 @@ import type { HatFit } from '../game/hats'
 import { CarModel, carSize, wheelRig } from './CarModel'
 import { wheelPool } from './carBatch'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
+import { checkerTex, skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
@@ -343,7 +343,8 @@ function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObj
 
 function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; them: RefObject<RacerView> }) {
   const flag = useRef<Group>(null)
-  const tex = useMemo(() => signTexture('▚▚▚', '#ffffff', '#111111'), [])
+  // Real chequers: the ▚ glyph rendered as a scribble on some fonts.
+  const tex = useMemo(() => checkerTex(1.5), [])
   useFrame(() => {
     const g = flag.current
     if (!g) return
@@ -823,7 +824,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, len]}>
           <planeGeometry args={[ROAD * 2, 0.5]} />
-          <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
+          <meshBasicMaterial map={checkerTex((ROAD * 2) / 0.5)} {...decal(2)} />
         </mesh>
         <Banner z={-0.8} text="START" bg="#2e7d32" />
         <Banner z={len} text="FINISH" bg="#c62828" />
