@@ -1419,7 +1419,7 @@ export default function Shanghai({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`shanghai:${len}`} cell={24}>
+      <Batch version={`shanghai:${len}`} cell={24} freeze prune>
         <mesh rotation-x={-Math.PI / 2} position={[EDGE + 0.8, 0.012, len / 2 + 5]}>
           <planeGeometry args={[1.6, len + 60]} />
           <meshStandardMaterial color="#9a958d" />
