@@ -720,6 +720,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .reset-type input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font-size: 18px; font-weight: 800; letter-spacing: .04em; text-align: center; border: 2px solid #c62828; border-radius: 10px; padding: 8px; background: #fff; }
 .danger-btn:disabled { opacity: .45; filter: grayscale(.6); box-shadow: none; }
 .agree { font-size: 12.5px; margin: 6px 0 12px; }
+.forgot { display: block; font-size: 13px; margin: 8px 0 2px; }
 .legal { font-size: 14px; line-height: 1.55; }
 .legal h3 { color: #1e5fbf; }
 .legal ul { padding-left: 20px; }

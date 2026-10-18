@@ -7,7 +7,7 @@ import { localBackup, restoreLocalBackup } from '../lib/cloud'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { UsernameRow } from './Username'
 import { AccountData, Group, GuestData, HelpTab, LegalView, SettingsTab } from './Settings'
-import { LEGAL, type LegalDoc } from '../legal/legal'
+import { CONTACT, LEGAL, type LegalDoc } from '../legal/legal'
 import { CityLook } from './CityLook'
 import { TwoStepGate } from './TwoStep'
 
@@ -16,6 +16,20 @@ const MENU_TABS = [{ id: 'town', label: '🏠 Town' }, { id: 'settings', label: 
 let lastTab: MenuTab = 'town'
 // A Terms or Privacy page to open with the Menu (from /terms, /privacy or a sign-up link).
 let pendingLegal: LegalDoc['id'] | null = null
+
+// Set when the player arrives from a "reset your password" email: the Menu asks for a new one.
+let recovering = false
+
+export function watchPasswordRecovery() {
+  const open = () => {
+    if (recovering) return
+    recovering = true
+    lastTab = 'account'
+    setTimeout(() => useGame.getState().openPanel('account'), 1500)
+  }
+  if (location.hash.includes('type=recovery')) open()
+  supabase?.auth.onAuthStateChange((e) => { if (e === 'PASSWORD_RECOVERY') open() })
+}
 
 export function openLegal(id: LegalDoc['id']) {
   pendingLegal = id
@@ -31,6 +45,7 @@ export function AccountPanel() {
   const [password, setPassword] = useState('')
   const [msg, setMsg] = useState('')
   const [tab, setTab] = useState<MenuTab>(lastTab)
+  const [newPassword, setNewPassword] = useState(recovering ? '' : null as string | null)
   const isAdmin = useGame((s) => s.admin)
   const [legal, setLegal] = useState<LegalDoc['id'] | null>(() => {
     const id = pendingLegal
@@ -61,6 +76,25 @@ export function AccountPanel() {
     setMsg(signUp && !data.session ? 'Check your email to confirm your account, then sign in.' : 'Signed in. Your town now saves to the cloud.')
   }
 
+  const sendReset = async () => {
+    if (!supabase) return
+    if (!email.includes('@')) return setMsg('Type your email above, then tap Forgot password.')
+    setMsg('...')
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    setMsg(error ? `Could not send the email. Write to ${CONTACT} and we will help.` : 'Check your email for a link to set a new password.')
+  }
+
+  const saveNewPassword = async () => {
+    if (!supabase || newPassword == null) return
+    if (newPassword.length < 6) return setMsg('Passwords need at least 6 characters.')
+    setMsg('...')
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    if (error) return setMsg(friendlyAuthError(error.message, false))
+    recovering = false
+    setNewPassword(null)
+    setMsg('Password changed. You are signed in.')
+  }
+
   if (legal) return (
     <Panel title={LEGAL[legal].title} onBack={() => setLegal(null)}>
       <LegalView id={legal} />
@@ -88,6 +122,12 @@ export function AccountPanel() {
         </>
       ) : user ? (
         <TwoStepGate uid={user.id}>{(twoStep) => <>
+          {newPassword != null && (
+            <Group icon="🔑" title="New password">
+              <input placeholder="New password" type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <button className="buy" onClick={saveNewPassword}>Save password</button>
+            </Group>
+          )}
           <Group icon="☁️" title="Cloud save">
             <div className="set-row">
               <span className="set-label">{user.email}<small>Your town saves to the cloud</small></span>
@@ -113,6 +153,7 @@ export function AccountPanel() {
             <button className="buy" onClick={() => signIn(false)}>Sign in</button>
             <button className="buy alt" onClick={() => signIn(true)}>Create account</button>
           </div>
+          <button className="link forgot" onClick={sendReset}>Forgot password?</button>
           <p className="hint agree">By creating an account you agree to the <button className="link" onClick={() => setLegal('terms')}>Terms</button> and <button className="link" onClick={() => setLegal('privacy')}>Privacy Policy</button>.</p>
           <GuestData />
         </>
