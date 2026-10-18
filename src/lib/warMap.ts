@@ -112,3 +112,44 @@ export async function submitWarRun(t: number): Promise<WarResult | null> {
   }
   return null
 }
+
+// Where each racer stands on the battlefield: their crew across the top, ours across the bottom, the front
+// (the star tug) between. x is a percent of the width, y is pixels from the top. Rows zigzag so the field
+// reads as a map rather than a table; bigger crews get more, smaller spots.
+export const FIELD = { row: 66, front: 46, pad: 8 }
+export function fieldLayout(them: number, us: number) {
+  const cols = (n: number) => (n <= 4 ? Math.max(1, n) : n <= 10 ? 5 : 6)
+  const place = (n: number, top: number, down: boolean) => {
+    const c = cols(n)
+    const rows = Math.ceil(n / c)
+    return Array.from({ length: n }, (_, i) => {
+      // Their front row is the one nearest the middle, so the last row up top and the first row below.
+      const r = Math.floor(i / c)
+      const inRow = Math.min(c, n - r * c)
+      const k = i % c
+      const row = down ? r : rows - 1 - r
+      const x = ((k + 0.5) / inRow) * 100
+      const y = top + row * FIELD.row + FIELD.row / 2 + ((k % 2 ? 1 : -1) * (inRow > 1 ? 7 : 0))
+      return { x, y }
+    })
+  }
+  const themRows = Math.ceil(them / cols(them))
+  const usRows = Math.ceil(us / cols(us))
+  const frontY = FIELD.pad + themRows * FIELD.row + FIELD.front / 2
+  return {
+    them: place(them, FIELD.pad, false),
+    us: place(us, FIELD.pad + themRows * FIELD.row + FIELD.front, true),
+    frontY,
+    height: FIELD.pad * 2 + (themRows + usRows) * FIELD.row + FIELD.front,
+    small: Math.max(them, us) > 10,
+  }
+}
+
+// War races the player hasn't watched yet: newer than the last one they saw on this device.
+const SEEN = 'cartopia.warSeen'
+export function unseenRaces(b: Battle) {
+  let seen = ''
+  try { seen = localStorage.getItem(`${SEEN}.${b.week}`) ?? '' } catch { /* private mode */ }
+  const fresh = (b.attacks ?? []).filter((a) => a.at > seen)
+  return { fresh, mark: () => { try { localStorage.setItem(`${SEEN}.${b.week}`, (b.attacks ?? []).reduce((m, a) => (a.at > m ? a.at : m), seen)) } catch { /* private mode */ } } }
+}

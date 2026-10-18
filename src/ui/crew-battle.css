@@ -118,36 +118,80 @@
 
 /* War map: their crew across the top, yours along the bottom, the front line between */
 .wm { display: flex; flex-direction: column; gap: 5px; padding: 6px; border-radius: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--them) 30%, #0c1020) 0%, #0c1020 55%, color-mix(in srgb, var(--us) 24%, #0c1020) 100%); border: 2px solid rgba(255,255,255,.18); }
-/* The goal: stars each crew has taken, the line saying how */
-.wm-goal { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 10px; background: rgba(0,0,0,.35); }
-.wm-goal > b { flex: 1; text-align: center; font: 15px var(--display); font-weight: normal; color: #ffe082; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wm-goal > span { display: flex; align-items: center; gap: 4px; font: 20px var(--display); color: #fff; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
-.wm-goal > span small { padding: 1px 6px; border-radius: 8px; font-size: 12px; background: var(--us); }
-.wm-goal > span.them small { background: var(--them); }
-.wm-row { display: flex; gap: 4px; overflow-x: auto; padding: 2px; scrollbar-width: none; }
-.wm-row::-webkit-scrollbar { display: none; }
-.wm-side { flex: none; display: grid; place-items: center; width: 22px; border-radius: 8px; font-style: normal; font-size: 14px; background: color-mix(in srgb, var(--them) 55%, transparent); }
-.wm-row.us .wm-side { background: color-mix(in srgb, var(--us) 55%, transparent); }
-.wm-spot { position: relative; flex: 1 0 58px; max-width: 76px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px; border-radius: 12px; color: #fff; background: rgba(255,255,255,.07); border: 2px solid transparent; }
+/* The battlefield: each crew's turf in its colour, streaks for war races, the star tug as the front */
+.wm-field { position: relative; overflow: hidden; border-radius: 10px; background: #0b1124; }
+.wm-turf { position: absolute; left: 0; right: 0; pointer-events: none; }
+.wm-turf.them { top: 0; height: var(--front); background: repeating-linear-gradient(135deg, transparent 0 14px, rgba(255,255,255,.035) 14px 28px), radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--them) 55%, transparent), color-mix(in srgb, var(--them) 18%, transparent) 70%); }
+.wm-turf.us { top: var(--front); bottom: 0; background: repeating-linear-gradient(45deg, transparent 0 14px, rgba(255,255,255,.035) 14px 28px), radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--us) 50%, transparent), color-mix(in srgb, var(--us) 14%, transparent) 70%); }
+.wm-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.wm-streak { fill: none; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-dasharray: .06 .04; opacity: .8; animation: wm-march 1.6s linear infinite; }
+.wm-streak.us { stroke: color-mix(in srgb, var(--us) 70%, #fff); }
+.wm-streak.them { stroke: color-mix(in srgb, var(--them) 70%, #fff); }
+.wm-streak.lost { stroke-dasharray: .015 .045; opacity: .5; }
+.wm-streak.newest { opacity: .95; stroke-width: 3.5; filter: drop-shadow(0 0 3px rgba(255,255,255,.6)); }
+.wm:not(.go) .wm-streak.fresh, .wm:not(.go) .wm-spot.fresh .wm-flag, .wm:not(.go) .wm-spot.fresh .wm-stars i.on { opacity: 0; }
+.wm.go .wm-streak.fresh { stroke-dasharray: 1 1; opacity: .95; animation: wm-draw .45s ease-out var(--d) both; }
+@keyframes wm-march { to { stroke-dashoffset: -.1; } }
+@keyframes wm-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.wm-aimline { stroke: #ffd54f; stroke-width: 2; vector-effect: non-scaling-stroke; stroke-dasharray: 4 6; opacity: .8; animation: wm-aim 0.8s linear infinite; }
+@keyframes wm-aim { to { stroke-dashoffset: -10; } }
+
+/* The front: stars each crew has taken, as a tug across the middle of the field */
+.wm-front { position: absolute; left: 6px; right: 6px; top: var(--front); transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 12px; background: rgba(6,10,24,.82); border: 1.5px solid rgba(255,255,255,.18); z-index: 2; }
+.wm-front > span:not(.wm-tug) { display: flex; align-items: center; gap: 3px; font: 18px var(--display); color: #fff; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
+.wm-front small { padding: 1px 5px; border-radius: 7px; font-size: 11px; background: var(--us); }
+.wm-front .them small { background: var(--them); }
+.wm-tug { position: relative; flex: 1; height: 10px; border-radius: 5px; background: #263238; box-shadow: inset 0 1px 3px rgba(0,0,0,.6); }
+.wm-tug > i { position: absolute; top: 0; bottom: 0; transition: width .8s cubic-bezier(.3,1.3,.5,1); }
+.wm-tug > .u { left: 0; width: var(--split); border-radius: 5px 0 0 5px; background: linear-gradient(90deg, color-mix(in srgb, var(--us) 60%, #000), var(--us)); box-shadow: 0 0 8px var(--us); }
+.wm-tug > .t { right: 0; width: calc(100% - var(--split)); border-radius: 0 5px 5px 0; background: linear-gradient(270deg, color-mix(in srgb, var(--them) 60%, #000), var(--them)); box-shadow: 0 0 8px var(--them); }
+.wm-tug > b { position: absolute; top: 50%; left: var(--split); transform: translate(-50%, -50%); font-size: 15px; font-weight: normal; filter: drop-shadow(0 1px 2px #000); transition: left .8s cubic-bezier(.3,1.3,.5,1); animation: cb-vs 2.4s ease-in-out infinite; }
+
+/* A racer on the field */
+.wm-spot { position: absolute; z-index: 1; width: 62px; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0; color: #fff; background: none; border: 0; }
 .wm-spot:disabled { opacity: 1; cursor: default; }
-.wm-spot.them:not(:disabled):active { transform: translateY(1px); }
-.wm-spot.sel { border-color: #ffd54f; background: rgba(255,213,79,.2); box-shadow: 0 0 12px rgba(255,213,79,.5); }
-.wm-spot.sel::after { content: '▼'; position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #ffd54f; }
-.wm-spot.me { border-color: rgba(255,213,79,.6); }
-.wm-spot.down .wm-car > :not(.wm-done) { filter: grayscale(.9) brightness(.55); }
-.wm-spot > em { max-width: 100%; font: 11px var(--display); font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wm-row.us .wm-spot { flex-basis: 50px; padding: 2px; background: rgba(255,255,255,.04); }
-.wm-row.us .wm-car { width: 34px; height: 34px; }
+.wm-spot.them:not(:disabled):active .wm-car { transform: scale(.94); }
+.wm-spot.sel { z-index: 3; }
+.wm-spot.sel .wm-car { border-color: #ffd54f; box-shadow: 0 0 0 3px rgba(255,213,79,.35), 0 0 16px rgba(255,213,79,.8); animation: wm-pulse 1.1s ease-in-out infinite; }
+@keyframes wm-pulse { 50% { box-shadow: 0 0 0 6px rgba(255,213,79,.12), 0 0 22px rgba(255,213,79,.9); } }
+.wm-aim { position: absolute; inset: -2px; border-radius: 50%; border: 2px dashed #ffd54f; animation: wm-spin 4s linear infinite; pointer-events: none; }
+@keyframes wm-spin { to { transform: rotate(360deg); } }
+.wm-spot.me .wm-car { border-color: #ffd54f; box-shadow: 0 0 10px rgba(255,213,79,.6); }
+.wm-spot.down .wm-car > :not(.wm-aim) { filter: grayscale(.9) brightness(.5); }
+.wm-flag { position: absolute; top: -8px; right: 4px; font-style: normal; font-size: 20px; filter: drop-shadow(0 0 3px var(--flag)) drop-shadow(0 1px 1px #000); transform-origin: 20% 100%; animation: wm-wave 1.8s ease-in-out infinite; }
+@keyframes wm-wave { 50% { transform: rotate(-10deg) scale(1.05); } }
+.wm.go .wm-spot.fresh .wm-flag { animation: wm-plant .5s cubic-bezier(.3,1.6,.5,1) var(--d) both, wm-wave 1.8s ease-in-out calc(var(--d) + .5s) infinite; }
+@keyframes wm-plant { from { transform: translateY(-24px) scale(1.6); opacity: 0; } }
+.wm.go .wm-spot.fresh .wm-stars i.on { animation: wm-star .5s cubic-bezier(.3,1.8,.5,1) var(--d) both; }
+@keyframes wm-star { from { transform: scale(2.6); opacity: 0; } }
+.wm.go .wm-spot.fresh .wm-car { animation: wm-hit .5s ease-out var(--d); }
+@keyframes wm-hit { 30% { transform: scale(1.18); box-shadow: 0 0 20px #fff; } }
+.wm-spot > em { max-width: 100%; padding: 0 4px; border-radius: 6px; font: 11px var(--display); font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(0,0,0,.45); }
+.wm-stars { display: flex; gap: 1px; margin-top: -6px; padding: 0 3px; border-radius: 6px; font-size: 12px; line-height: 1.05; background: rgba(0,0,0,.55); }
+.wm-stars i { font-style: normal; color: rgba(255,255,255,.25); }
+.wm-stars i.on { color: #ffd54f; text-shadow: 0 0 4px rgba(255,213,79,.7); }
+.wm.small .wm-spot { width: 52px; }
+.wm.small .wm-spot .wm-car { width: 34px; height: 34px; }
+.wm.small .wm-spot > em { font-size: 10px; }
+
+/* The latest war race, as one line under the field */
+.wm-feed { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 10px; font: 13px var(--display); color: #fff; background: rgba(0,0,0,.35); box-shadow: inset 3px 0 0 var(--us); animation: wm-in .4s ease-out; }
+.wm-feed.them { box-shadow: inset 3px 0 0 var(--them); }
+.wm-feed i { font-style: normal; }
+.wm-feed em { min-width: 0; font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wm-feed b { font-weight: normal; color: #ffd54f; }
+.wm-feed small { margin-left: auto; color: #90a4ae; }
+@keyframes wm-in { from { transform: translateY(6px); opacity: 0; } }
+.wm-car { width: 34px; height: 34px; }
 .wm-stars { display: flex; gap: 1px; font-size: 12px; line-height: 1; }
 .wm-stars i { font-style: normal; color: rgba(255,255,255,.22); }
 .wm-stars i.on { color: #ffd54f; text-shadow: 0 0 4px rgba(255,213,79,.7); }
 .wm-car { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; background: radial-gradient(circle, #2b3556, #141b33); border: 2px solid var(--c); }
-.wm-car > :not(.wm-done) { width: 100%; height: 100%; }
+.wm-car > :not(.wm-aim) { width: 100%; height: 100%; }
 .wm-car.big { flex: none; width: 58px; height: 58px; border-width: 3px; }
-.wm-done { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-size: 24px; color: #69f0ae; text-shadow: 0 0 6px #000, 0 2px 0 #000; }
 /* The rival to race next and the one button */
 .wm-target { display: flex; align-items: center; gap: 8px; margin-top: 4px; padding: 6px 8px; border-radius: 12px; background: rgba(255,213,79,.12); border: 2px solid rgba(255,213,79,.55); }
-.wm-target.all { justify-content: center; font: 16px var(--display); color: #69f0ae; }
+.wm-target.all { justify-content: center; font: 18px var(--display); color: #69f0ae; border-color: #69f0ae; background: rgba(105,240,174,.12); animation: wm-in .4s ease-out; }
 .wm-vs { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .wm-vs b { font: 18px var(--display); font-weight: normal; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wm-vs small { font: 13px var(--display); color: #cfd8dc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -175,7 +219,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cb-vs, .cb-claim, .cb-duel, .cb-node.ready { animation: none; }
+  .cb-vs, .cb-claim, .cb-duel, .cb-node.ready, .wm *, .wm-feed { animation: none !important; }
+  .wm:not(.go) .wm-streak.fresh, .wm:not(.go) .wm-spot.fresh .wm-flag, .wm:not(.go) .wm-spot.fresh .wm-stars i.on { opacity: 0; }
+.wm.go .wm-streak.fresh { stroke-dasharray: .06 .04; stroke-dashoffset: 0; }
 }
 
 /* No crew yet */

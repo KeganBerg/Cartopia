@@ -4,7 +4,7 @@ import { useGame, type OwnedCar } from '../game/store'
 import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt, performance } from '../game/data'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
-import { BATTLE_RULES, WAR_RULES, battleChests, battleShare, claimBattle, claimWarTier, demoBattle, refreshCrewBattle, useCrewBattle, warLeague, warTiers, type Battle, type BattleRecord, type BattleRules, type BattleSide, type WarLog } from '../lib/battles'
+import { BATTLE_RULES, WAR_RULES, battleChests, battleShare, claimBattle, claimWarTier, demoBattle, refreshCrewBattle, useCrewBattle, warLeague, warTiers, type Battle, type BattleRecord, type BattleRules, type BattleSide, type WarAttack, type WarLog } from '../lib/battles'
 import { BattleScene } from '../scene/BattleScene'
 import { venue as venueOf } from '../scene/venues'
 import { useNow } from '../scene/useNow'
@@ -17,7 +17,7 @@ import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { CarThumb } from '../scene/BuildingPreview'
-import { attackSpot, streetTime, warMap, type MapSpot } from '../lib/warMap'
+import { attackSpot, fieldLayout, streetTime, unseenRaces, warMap, type MapSpot } from '../lib/warMap'
 import { sfx } from '../lib/sound'
 
 // Drawn in the shared full-screen canvas (scene/Stage.tsx), not a new one each visit.
@@ -243,15 +243,18 @@ function YourPart({ b, rules }: { b: Battle; rules: BattleRules }) {
   )
 }
 
-// One crew member on the war map: their car, name, and the stars the other crew has taken off them (✔ when all 3).
-function Spot({ s, side, sel, onPick }: { s: MapSpot; side: 'us' | 'them'; sel: boolean; onPick?: () => void }) {
+// One crew member on the war map: their car, name, and the stars the other crew has taken off them. Three
+// stars and the other crew's flag goes up on them.
+function Spot({ s, side, at, sel, flag, fresh, onPick }: { s: MapSpot; side: 'us' | 'them'; at: { x: number; y: number }; sel: boolean; flag: string; fresh: number; onPick?: () => void }) {
   return (
-    <button className={`wm-spot ${side}${sel ? ' sel' : ''}${s.stars === 3 ? ' down' : ''}${s.me ? ' me' : ''}`} disabled={!onPick} onClick={onPick}
+    <button className={`wm-spot ${side}${sel ? ' sel' : ''}${s.stars === 3 ? ' down' : ''}${s.me ? ' me' : ''}${fresh >= 0 ? ' fresh' : ''}`} disabled={!onPick} onClick={onPick}
+      style={{ left: `${at.x}%`, top: at.y, '--flag': flag, '--d': `${Math.max(0, fresh) * 0.45 + 0.3}s` } as React.CSSProperties}
       title={`${s.name} · ${s.car}${s.t ? ` · ${s.t.toFixed(2)}s` : ''} · ${s.stars}★ taken`}>
       <span className="wm-car" style={{ '--c': s.color } as React.CSSProperties}>
         <CarThumb size="xs" body={s.body} model={s.model} color={s.color} />
-        {s.stars === 3 && <i className="wm-done">✔</i>}
+        {sel && <i className="wm-aim" />}
       </span>
+      {s.stars === 3 && <i className="wm-flag">🚩</i>}
       <span className="wm-stars">{[1, 2, 3].map((i) => <i key={i} className={i <= s.stars ? 'on' : ''}>★</i>)}</span>
       <em>{s.me ? 'You' : s.name}</em>
     </button>
@@ -262,16 +265,34 @@ function Spot({ s, side, sel, onPick }: { s: MapSpot; side: 'us' | 'them'; sel: 
 const nextTarget = (spots: MapSpot[], myPi: number) => [...spots].filter((s) => s.stars < 3)
   .sort((x, y) => x.stars - y.stars || (y.t ?? streetTime(myPi, y.w ?? 1)) - (x.t ?? streetTime(myPi, x.w ?? 1)))[0] ?? null
 
-// The war map. Goal: take stars off their racers (each star is war points). The star score sits on top, their
-// racers below it, the one to race next in the middle with the only button, and your crew (defending) at the bottom.
-function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; me: string | null }) {
+const ago = (at: string, now: number) => {
+  const m = Math.max(1, Math.round((now - Date.parse(at)) / 60000))
+  return m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`
+}
+
+// The war map: a battlefield. Their racers hold the top, your crew the bottom, and the star tug is the front
+// between them. Every war race is a streak across the field from racer to racer, and races run since the player
+// last looked replay one by one. Taking all 3 stars off a racer plants your flag on them. Tap a rival to aim;
+// the one race button sits under the field.
+function WarMap({ b, myPi, left, me, ready }: { b: Battle; myPi: number; left: number; me: string | null; ready: boolean }) {
   const map = useMemo(() => warMap(b, me), [b, me])
+  const lay = useMemo(() => fieldLayout(map.them.length, map.us.length), [map])
+  const seen = useMemo(() => unseenRaces(b), [b])
+  // The replay waits for the loading screen to lift.
+  useEffect(() => {
+    if (!ready || !seen.fresh.length) return
+    const id = setTimeout(seen.mark, 1000)
+    // A blip per replayed race as its streak lands.
+    const blips = seen.fresh.slice(-6).map((a, i) => setTimeout(() => (a.won ? sfx.coin() : sfx.click()), 600 + i * 450))
+    return () => { clearTimeout(id); blips.forEach(clearTimeout) }
+  }, [seen, ready])
+  const now = useNow(30000)
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const target = map.them.find((s) => s.id === pick) ?? nextTarget(map.them, myPi)
   const ours = map.them.reduce((t, s) => t + s.stars, 0)
   const theirs = map.us.reduce((t, s) => t + s.stars, 0)
-  const max = map.them.length * 3
+  const max = Math.max(1, map.them.length * 3)
   const go = async () => {
     if (!target) return
     setBusy(true)
@@ -280,14 +301,59 @@ function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; 
   }
   const time = target ? target.t ?? streetTime(myPi, target.w ?? 1) : 0
   const gain = `+${WAR_RULES.starPoints}–${WAR_RULES.starPoints * 3}`
+  // Where each racer stands, by id and side, for the streaks.
+  const where = (side: 'us' | 'them', id: string) => {
+    const i = map[side].findIndex((s) => s.id === id)
+    return i < 0 ? null : lay[side][i]
+  }
+  // The latest races, oldest first so the newest draws on top. Fresh ones replay in order.
+  const recent = [...(b.attacks ?? [])].sort((x, y) => x.at.localeCompare(y.at)).slice(-8)
+  const freshAt = (a: WarAttack) => seen.fresh.slice(-6).indexOf(a)
+  const streaks = recent.map((a) => {
+    const from = where(a.side === 'us' ? 'us' : 'them', a.by)
+    const to = where(a.side === 'us' ? 'them' : 'us', a.target)
+    return from && to ? { a, from, to, fresh: freshAt(a) } : null
+  }).filter((x) => x !== null)
+  // Fresh-replay order for each spot: when the last fresh streak into it lands.
+  const landing = (side: 'us' | 'them', id: string) => Math.max(-1, ...streaks.filter((k) => k.fresh >= 0 && k.a.target === id && (k.a.side === 'us') === (side === 'them')).map((k) => k.fresh))
+  const share = ours + theirs <= 0 ? 0.5 : ours / (ours + theirs)
+  const last = recent[recent.length - 1]
+  const lastTarget = last ? map[last.side === 'us' ? 'them' : 'us'].find((s) => s.id === last.target) : undefined
+  const lead = ours - theirs
   return (
-    <div className="wm" style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
-      <div className="wm-goal" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
-        <span className="us"><small>{b.us.tag}</small>⭐ {ours}</span>
-        <b>Beat their racers for ⭐</b>
-        <span className="them">⭐ {theirs}<small>{b.them.tag}</small></span>
+    <div className={`wm${lay.small ? ' small' : ''}${ready ? ' go' : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
+      <div className="wm-field" style={{ height: lay.height, '--front': `${lay.frontY}px` } as React.CSSProperties}>
+        <i className="wm-turf them" title={`${b.them.name}: race them for stars`} />
+        <i className="wm-turf us" title={`${b.us.name}: stars ${b.them.tag} took off your crew`} />
+        <svg className="wm-lines" viewBox={`0 0 100 ${lay.height}`} preserveAspectRatio="none" aria-hidden>
+          {target && (() => {
+            const t = where('them', target.id)!
+            const mine = map.us.find((s) => s.me)
+            const f = mine ? where('us', mine.id)! : { x: 50, y: lay.height - 8 }
+            return <line className="wm-aimline" x1={f.x} y1={f.y} x2={t.x} y2={t.y} />
+          })()}
+          {streaks.map(({ a, from, to, fresh }, i) => (
+            <line key={`${a.at}${a.by}${i}`} className={`wm-streak ${a.side}${a.won ? ' won' : ' lost'}${fresh >= 0 ? ' fresh' : ''}${i === streaks.length - 1 ? ' newest' : ''}`}
+              style={{ '--d': `${Math.max(0, fresh) * 0.45}s` } as React.CSSProperties} x1={from.x} y1={from.y} x2={to.x} y2={to.y} pathLength={1} />
+          ))}
+        </svg>
+        <div className="wm-front" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
+          <span className="us"><small>{b.us.tag}</small>⭐{ours}</span>
+          <span className="wm-tug" style={{ '--split': `${(share * 100).toFixed(1)}%` } as React.CSSProperties}><i className="u" /><i className="t" /><b>⚔️</b></span>
+          <span className="them">⭐{theirs}<small>{b.them.tag}</small></span>
+        </div>
+        {map.them.map((s, i) => <Spot key={s.id} s={s} side="them" at={lay.them[i]} sel={s.id === target?.id} flag={b.us.color} fresh={landing('them', s.id)} onPick={() => { sfx.click(); setPick(s.id) }} />)}
+        {map.us.map((s, i) => <Spot key={s.id} s={s} side="us" at={lay.us[i]} sel={false} flag={b.them.color} fresh={landing('us', s.id)} />)}
       </div>
-      <div className="wm-row them"><i className="wm-side" title={`${b.them.name}: race them`}>🎯</i>{map.them.map((s) => <Spot key={s.id} s={s} side="them" sel={s.id === target?.id} onPick={() => { sfx.click(); setPick(s.id) }} />)}</div>
+      {last && (
+        <div className={`wm-feed ${last.side}`} key={last.at} title="Latest war race">
+          <i>{last.side === 'us' ? '⚔️' : '🛡️'}</i>
+          <em>{last.by === me ? 'You' : last.byName}</em>
+          <b>{last.won ? '★'.repeat(last.stars) : '✖'}</b>
+          <em>{lastTarget ? (lastTarget.me ? 'You' : lastTarget.name) : ''}</em>
+          <small>{ago(last.at, now)}</small>
+        </div>
+      )}
       {target ? (
         <div className="wm-target">
           <span className="wm-car big" style={{ '--c': target.color } as React.CSSProperties}><CarThumb size="xs" body={target.body} model={target.model} color={target.color} /></span>
@@ -300,8 +366,7 @@ function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; 
             ⚔️ Race<small>🎟 {left}/{WAR_RULES.attacksPerDay}</small>
           </button>
         </div>
-      ) : <div className="wm-target all">✔ All {map.them.length} beaten · ⭐ {ours}/{max}</div>}
-      <div className="wm-row us"><i className="wm-side" title={`${b.us.name}: stars ${b.them.tag} took off your crew`}>🛡️</i>{map.us.map((s) => <Spot key={s.id} s={s} side="us" sel={false} />)}</div>
+      ) : <div className={`wm-target all${lead >= 0 ? ' ahead' : ''}`} title={`${b.them.name}: every racer beaten`}>🚩 {map.them.length}/{map.them.length} · ⭐ {ours}/{max}</div>}
     </div>
   )
 }
@@ -399,7 +464,7 @@ export function BattlePanel() {
           <button className={tab === 'log' ? 'sel' : ''} onClick={() => setTab('log')}>📜 Log</button>
         </div>
         {tab === 'map' ? (
-          <WarMap b={b} myPi={myPi} left={battle!.attacksLeft ?? WAR_RULES.attacksPerDay} me={me} />
+          <WarMap b={b} myPi={myPi} left={battle!.attacksLeft ?? WAR_RULES.attacksPerDay} me={me} ready={stageReady} />
         ) : tab === 'crews' ? (
           <div className="cb-rosters">
             <Roster s={b.us} side="us" me={me} online={online} />

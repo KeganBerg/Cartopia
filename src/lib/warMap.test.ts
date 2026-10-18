@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { raceFloor } from '../game/race'
 import type { Battle, BattleSide, WarAttack } from './battles'
-import { streetTime, warMap, warStars } from './warMap'
+import { FIELD, fieldLayout, streetTime, warMap, warStars } from './warMap'
 
 const sql = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
 
@@ -45,5 +45,22 @@ describe('crew war map', () => {
     expect(sql).toContain("'id', 'bot' || i")
     expect(sql).toMatch(/with ordinality as e\(m, i\)/)
     expect(sql).toContain("i := substr(p_target, 4)::int")
+  })
+
+  it('lays the battlefield out with their crew above the front and ours below, nobody overlapping', () => {
+    for (const [them, us] of [[3, 4], [5, 5], [1, 1], [12, 30], [7, 2]]) {
+      const lay = fieldLayout(them, us)
+      expect(lay.them).toHaveLength(them)
+      expect(lay.us).toHaveLength(us)
+      for (const p of lay.them) expect(p.y).toBeLessThan(lay.frontY - FIELD.front / 2)
+      for (const p of lay.us) expect(p.y).toBeGreaterThan(lay.frontY + FIELD.front / 2)
+      for (const p of [...lay.them, ...lay.us]) {
+        expect(p.x).toBeGreaterThan(0)
+        expect(p.x).toBeLessThan(100)
+        expect(p.y).toBeLessThan(lay.height)
+      }
+      const all = [...lay.them, ...lay.us].map((p) => `${p.x.toFixed(1)},${p.y}`)
+      expect(new Set(all).size).toBe(all.length)
+    }
   })
 })
