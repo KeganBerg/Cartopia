@@ -51,10 +51,11 @@ export function SocialTabs({ current }: { current: PanelId }) {
   const shelled = useContext(InShell)
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const warLeft = useCrewBattle((b) => (b.battle?.current && !b.battle.current.result ? b.battle.attacksLeft ?? 0 : 0))
   const locked = useGame((s) => !hasCrewHouse(s) && !s.clanBadge)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
-    { id: 'clan', label: <>{locked ? '🔒' : '🛡️'} Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'clan', label: <>{locked ? '🔒' : '🛡️'} Crew{chests > 0 ? <span className="tab-dot">{chests}</span> : warLeft > 0 && <span className="tab-dot war" title={`War races left today: ${warLeft}`}>⚔️{warLeft}</span>}</> },
     { id: 'meet', label: '🚗 Meet' },
     { id: 'leaders', label: '🏅 Leaderboards' },
   ]

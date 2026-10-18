@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { raceCarOf } from '../game/raceCar'
 import { useGame, type OwnedCar } from '../game/store'
-import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt, performance } from '../game/data'
+import { CARS, CLAN_COLORS, CLAN_EMBLEMS, CREW_CHEST, carDef, msToNextWeek, payAt, performance, type Body } from '../game/data'
 import { signedInUser } from '../lib/cloud'
 import { useLive, challenge } from '../lib/live'
 import { BATTLE_RULES, WAR_RULES, battleChests, battleShare, claimBattle, claimWarTier, demoBattle, refreshCrewBattle, useCrewBattle, warLeague, warTiers, type Battle, type BattleRecord, type BattleRules, type BattleSide, type WarLog } from '../lib/battles'
@@ -17,7 +17,7 @@ import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { CarThumb } from '../scene/BuildingPreview'
-import { attackSpot, streetTime, warMap, type MapSpot } from '../lib/warMap'
+import { attackSpot, msToWarRaces, nextTarget, streetTime, warMap, type MapSpot } from '../lib/warMap'
 import { sfx } from '../lib/sound'
 
 // Drawn in the shared full-screen canvas (scene/Stage.tsx), not a new one each visit.
@@ -136,6 +136,8 @@ function LastBattle({ b, payable }: { b: Battle; payable: boolean }) {
       setBusy(false)
     }
   }
+  // Only while there's something to claim: the war log has the rest.
+  if (!due.length && !tiers.length && !busy) return null
   const head = b.result === 'win' ? '🏆 Victory!' : b.result === 'draw' ? '🤝 Draw' : '💥 Defeat'
   return (
     <div className={`cb-last ${b.result ?? ''}`}>
@@ -213,7 +215,7 @@ function WarTrack({ b, rules }: { b: Battle; rules: BattleRules }) {
             title={t.claimed ? 'Opened' : t.reached ? (b.mine < rules.minPoints ? `Score ${rules.minPoints} to open` : 'Open') : `Crew reaches ${n(t.need)}`}
             onClick={() => claim(t.tier)}>
             {t.claimed ? '✔' : '🧰'}
-            <small>{compact(t.need)}</small>
+            <small>{t.claimable ? 'Claim!' : compact(t.need)}</small>
           </button>
         ))}
       </div>
@@ -252,55 +254,99 @@ function Spot({ s, side, sel, onPick }: { s: MapSpot; side: 'us' | 'them'; sel: 
         <CarThumb size="xs" body={s.body} model={s.model} color={s.color} />
         {s.stars === 3 && <i className="wm-done">✔</i>}
       </span>
+      {s.revenge && s.stars < 3 && <i className="wm-revenge" title="Revenge: they took stars off you">🔥</i>}
       <span className="wm-stars">{[1, 2, 3].map((i) => <i key={i} className={i <= s.stars ? 'on' : ''}>★</i>)}</span>
       <em>{s.me ? 'You' : s.name}</em>
     </button>
   )
 }
 
-// The next rival worth racing: fewest stars taken so far, then the slowest time.
-const nextTarget = (spots: MapSpot[], myPi: number) => [...spots].filter((s) => s.stars < 3)
-  .sort((x, y) => x.stars - y.stars || (y.t ?? streetTime(myPi, y.w ?? 1)) - (x.t ?? streetTime(myPi, x.w ?? 1)))[0] ?? null
+// First visit to the map: three taps that show the goal, the rivals and the button.
+const COACH = ['⭐ Stars = war points for your crew', '🎯 Tap a rival to pick who to race', '⚔️ Beat their time to take their stars']
+const COACH_KEY = 'cartopia-war-coach'
+function coachStep() {
+  try { return localStorage.getItem(COACH_KEY) ? COACH.length : 0 } catch { return COACH.length }
+}
+function saveCoachDone() {
+  try { localStorage.setItem(COACH_KEY, '1') } catch { /* private mode: shows again next time */ }
+}
+// Time until the day's war races come back: "3h 12m", or "12m".
+const left0 = (ms: number) => {
+  const m = Math.max(1, Math.ceil(ms / 60_000))
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`
+}
 
 // The war map. Goal: take stars off their racers (each star is war points). The star score sits on top, their
 // racers below it, the one to race next in the middle with the only button, and your crew (defending) at the bottom.
-function WarMap({ b, myPi, left, me }: { b: Battle; myPi: number; left: number; me: string | null }) {
+function WarMap({ b, myPi, left, me, mine }: { b: Battle; myPi: number; left: number; me: string | null; mine: { body: Body; model: string; color: string; name: string } }) {
   const map = useMemo(() => warMap(b, me), [b, me])
   const [pick, setPick] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const target = map.them.find((s) => s.id === pick) ?? nextTarget(map.them, myPi)
+  const now = useNow(30_000)
+  const [coach, setCoach] = useState(coachStep)
+  const step = () => setCoach((c) => { const n = c + 1; if (n >= COACH.length) saveCoachDone(); return n })
+  // The coach bubble sits under the part it points at.
+  const tip = (i: number) => coach === i && (
+    <button className="wm-coach" onClick={() => { sfx.click(); step() }}>
+      <b>{COACH[i]}</b><small>{i + 1}/{COACH.length} 👆</small>
+    </button>
+  )
   const ours = map.them.reduce((t, s) => t + s.stars, 0)
   const theirs = map.us.reduce((t, s) => t + s.stars, 0)
   const max = map.them.length * 3
   const go = async () => {
     if (!target) return
+    sfx.click()
     setBusy(true)
     await attackSpot(target, myPi, b.us.tag)
     setBusy(false)
   }
   const time = target ? target.t ?? streetTime(myPi, target.w ?? 1) : 0
-  const gain = `+${WAR_RULES.starPoints}–${WAR_RULES.starPoints * 3}`
+  const latest = (b.attacks ?? [])[0]
+  const nameOf = (id: string) => [...map.them, ...map.us].find((s) => s.id === id)?.name ?? '?'
+  const swept = max > 0 && ours >= max
   return (
-    <div className="wm" style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
-      <div className="wm-goal" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
+    <div className={`wm${coach < COACH.length ? ` coach-${coach}` : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
+      <div className="wm-goal" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs} · each ⭐ is ${WAR_RULES.starPoints} war points`}>
         <span className="us"><small>{b.us.tag}</small>⭐ {ours}</span>
-        <b>Beat their racers for ⭐</b>
+        <b>{swept ? '👑 All their racers beaten!' : 'Beat their racers for ⭐'}</b>
         <span className="them">⭐ {theirs}<small>{b.them.tag}</small></span>
       </div>
+      {tip(0)}
       <div className="wm-row them"><i className="wm-side" title={`${b.them.name}: race them`}>🎯</i>{map.them.map((s) => <Spot key={s.id} s={s} side="them" sel={s.id === target?.id} onPick={() => { sfx.click(); setPick(s.id) }} />)}</div>
-      {target ? (
-        <div className="wm-target">
-          <span className="wm-car big" style={{ '--c': target.color } as React.CSSProperties}><CarThumb size="xs" body={target.body} model={target.model} color={target.color} /></span>
-          <span className="wm-vs">
+      {tip(1)}
+      {target && (
+        <div className={`wm-duel${target.revenge && target.stars < 3 ? ' revenge' : ''}`}>
+          <div className="wm-fighter me" style={{ '--c': b.us.color } as React.CSSProperties}>
+            <CarThumb size="xs" body={mine.body} model={mine.model} color={mine.color} />
+            <b>You</b>
+            <small>{mine.name}</small>
+          </div>
+          <div className="wm-mid">
+            {target.revenge && target.stars < 3 ? <span className="wm-rev" title="They took stars off you">🔥 REVENGE</span>
+              : target.stars === 3 ? <span className="wm-rev re" title="Race them again: still war points for your crew">🔁 REMATCH</span> : null}
+            <button className="wm-fight" disabled={busy || left <= 0} onClick={go} title={left > 0 ? `Win ★ · by 1% ★★ · by 3% ★★★ · ${WAR_RULES.starPoints} war points a star` : 'War races come back at midnight UTC'}>
+              <span>⚔️</span><b>RACE</b>
+            </button>
+            <small className="wm-tix">{left > 0 ? `🎟 ${left}/${WAR_RULES.attacksPerDay} today` : `🎟 back in ${left0(msToWarRaces(now))}`}</small>
+          </div>
+          <div className="wm-fighter them" style={{ '--c': target.color } as React.CSSProperties}>
+            <CarThumb size="xs" body={target.body} model={target.model} color={target.color} />
             <b>{target.name}</b>
             <small title="Their time: beat it to win a star">⏱ {target.t === null ? '~' : ''}{time.toFixed(2)}s</small>
-            <small className="wm-gain" title={`★ win · ★★ by 1% · ★★★ by 3% · ${WAR_RULES.starPoints} war points a star`}>⚔️ {gain}</small>
-          </span>
-          <button className="cb-race wm-go" disabled={busy || left <= 0} onClick={go} title={left > 0 ? 'Race them' : 'New war races at midnight UTC'}>
-            ⚔️ Race<small>🎟 {left}/{WAR_RULES.attacksPerDay}</small>
-          </button>
+            <span className="wm-stake" title="Stars your crew has taken off them">{[1, 2, 3].map((i) => <i key={i} className={i <= target.stars ? 'on' : ''}>★</i>)}</span>
+          </div>
         </div>
-      ) : <div className="wm-target all">✔ All {map.them.length} beaten · ⭐ {ours}/{max}</div>}
+      )}
+      {tip(2)}
+      {latest && (
+        <div className={`wm-feed ${latest.side}`} title="Latest war race">
+          {latest.side === 'us' ? '🟢' : '🔴'} <b>{latest.byName || nameOf(latest.by)}</b>
+          {latest.won ? <> took <em>{'★'.repeat(latest.stars)}</em> off </> : ' lost to '}
+          <b>{nameOf(latest.target)}</b>
+        </div>
+      )}
       <div className="wm-row us"><i className="wm-side" title={`${b.us.name}: stars ${b.them.tag} took off your crew`}>🛡️</i>{map.us.map((s) => <Spot key={s.id} s={s} side="us" sel={false} />)}</div>
     </div>
   )
@@ -399,7 +445,7 @@ export function BattlePanel() {
           <button className={tab === 'log' ? 'sel' : ''} onClick={() => setTab('log')}>📜 Log</button>
         </div>
         {tab === 'map' ? (
-          <WarMap b={b} myPi={myPi} left={battle!.attacksLeft ?? WAR_RULES.attacksPerDay} me={me} />
+          <WarMap b={b} myPi={myPi} left={battle!.attacksLeft ?? WAR_RULES.attacksPerDay} me={me} mine={{ body: carDef(car.model).body, model: car.model, color: car.color, name: carDef(car.model).name }} />
         ) : tab === 'crews' ? (
           <div className="cb-rosters">
             <Roster s={b.us} side="us" me={me} online={online} />

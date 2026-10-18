@@ -10,7 +10,8 @@ import { Panel } from './Menus'
 import { PlayerName } from './Username'
 import { isCrewMate } from '../lib/crewRaces'
 import { usePrefs } from '../lib/prefs'
-import { submitWarRun, warStars, type WarResult } from '../lib/warMap'
+import { attackSpot, myWarPi, nextWarRival, submitWarRun, warStars, type WarResult } from '../lib/warMap'
+import { useCrewBattle } from '../lib/battles'
 import './war-result.css'
 
 // The race itself loads with the Race menu's code, the first time a ghost race starts.
@@ -136,6 +137,9 @@ function WarResultCard({ myTime, onMap }: { myTime: number; onMap: () => void })
   const their = posted?.their ?? ghost.target
   const won = posted ? posted.won : time < their
   const stars = posted ? posted.stars : warStars(time, their)
+  // The next rival to race, once this run is posted (the map refreshes with its stars).
+  const left = useCrewBattle((c) => (c.battle?.current && !c.battle.current.result ? c.battle.attacksLeft ?? 0 : 0))
+  const next = posted === undefined ? null : nextWarRival(ghost.war?.target)
   return (
     <div className={won ? 'rr win' : 'rr lose'}>
       <div className="rr-card ghost-card war-card">
@@ -147,7 +151,10 @@ function WarResultCard({ myTime, onMap }: { myTime: number; onMap: () => void })
         </div>
         <p className="rr-sub war-pts" title="Each star is 5 war points. Win by 1% for 2 stars, 3% for 3">{posted === undefined ? 'Posting...' : `⚔️ +${posted?.points ?? stars * 5} for ${ghost.war?.tag ?? 'your crew'}`}</p>
         <div className="row trial-row">
-          <button className="buy rr-go" onClick={onMap}>🗺️ War map</button>
+          <button className={next ? 'buy alt rr-go' : 'buy rr-go'} onClick={onMap}>🗺️ Map</button>
+          {next && <button className="buy rr-go war-next" onClick={() => void attackSpot(next, myWarPi(), ghost.war?.tag ?? '')} title={`War races left today: ${left}`}>
+            {next.revenge ? '🔥' : '⚔️'} {next.name}<small>🎟 {left}</small>
+          </button>}
         </div>
       </div>
     </div>
