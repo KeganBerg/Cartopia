@@ -88,6 +88,21 @@ const bob = (el: HTMLElement, now: number) => {
   return bobAt(now - t0)
 }
 
+// The last layout: what went in (each bubble's spot and size, the screen, the HUD) and where each
+// bubble was headed. While nothing moves (the camera still and the bubbles settled) the same
+// inputs give the same spots, so the search below is skipped: it weighs every bubble against
+// every other, the biggest part of the town's per-frame work in a big town on a phone.
+const before = { els: [] as HTMLElement[], at: [] as number[], to: [] as number[], under: [] as boolean[], w: 0, h: 0, hud, settled: false }
+function sameAsBefore(w: number, h: number) {
+  const b = before
+  if (!b.settled || b.w !== w || b.h !== h || b.hud !== hud || b.els.length !== placed.length) return false
+  for (let i = 0; i < placed.length; i++) {
+    const a = placed[i], k = i * 4
+    if (b.els[i] !== a.el || b.at[k] !== a.x0 || b.at[k + 1] !== a.y0 || b.at[k + 2] !== a.w || b.at[k + 3] !== a.h) return false
+  }
+  return true
+}
+
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -160,6 +175,27 @@ export function AnchorProjector() {
     // above or below the ones already placed, but only a short hop so it still reads as its
     // building's, and never up under the HUD.
     placed.sort((a, b) => b.y - a.y)
+    if (sameAsBefore(size.width, size.height)) {
+      let settled = true
+      for (let i = 0; i < placed.length; i++) {
+        const a = placed[i]
+        toggle(a.el, 'under', before.under[i])
+        if (!a.fixed) {
+          const n = nudges.get(a.el)!
+          const tx = before.to[i * 2] - a.x0, ty = before.to[i * 2 + 1] - a.y0
+          n.x += (tx - n.x) * slide
+          n.y += (ty - n.y) * slide
+          if (Math.abs(tx - n.x) > 0.05 || Math.abs(ty - n.y) > 0.05) settled = false
+          a.x = a.x0 + n.x
+          a.y = a.y0 + n.y
+        }
+        move(a.el, a.x, a.y + bob(a.el, now))
+      }
+      before.settled = settled
+      return
+    }
+    before.els.length = before.at.length = before.to.length = before.under.length = 0
+    let settled = true
     const top = Math.min(200, size.height / 3)
     const free = (a: Placed, x: number, y: number, upto: number) => {
       // A bubble already up near the HUD may dodge sideways at its own height, just not higher.
@@ -195,17 +231,28 @@ export function AnchorProjector() {
         if (best) [a.x, a.y] = best
       }
       // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
-      toggle(a.el, 'under', !a.fixed && underHud(a.x, a.y, a.w, a.h))
+      const under = !a.fixed && underHud(a.x, a.y, a.w, a.h)
+      toggle(a.el, 'under', under)
+      before.els.push(a.el)
+      before.at.push(a.x0, a.y0, a.w, a.h)
+      before.to.push(a.x, a.y)
+      before.under.push(under)
       if (!a.fixed) {
         let n = nudges.get(a.el)
         if (!n) nudges.set(a.el, (n = { x: a.x - a.x0, y: a.y - a.y0 }))
-        n.x += (a.x - a.x0 - n.x) * slide
-        n.y += (a.y - a.y0 - n.y) * slide
+        const tx = a.x - a.x0, ty = a.y - a.y0
+        n.x += (tx - n.x) * slide
+        n.y += (ty - n.y) * slide
+        if (Math.abs(tx - n.x) > 0.05 || Math.abs(ty - n.y) > 0.05) settled = false
         a.x = a.x0 + n.x
         a.y = a.y0 + n.y
       }
       move(a.el, a.x, a.y + bob(a.el, now))
     }
+    before.w = size.width
+    before.h = size.height
+    before.hud = hud
+    before.settled = settled
   })
   return null
 }
