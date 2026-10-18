@@ -1875,7 +1875,7 @@ button.book-car { font: inherit; color: inherit; }
    touch-action: none so a wobbling thumb never turns into a pan that cancels the press. */
 .rf-bottom { display: grid; grid-template-columns: auto 1fr auto; align-items: end; justify-items: center; touch-action: none; }
 .rf-bottom * { touch-action: none; -webkit-touch-callout: none; }
-.rf-dial { display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+.rf-dial { display: flex; flex-direction: column; align-items: center; gap: 7px; pointer-events: none; }
 .rf-dial .tach { width: 120px; height: 120px; flex: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
 .rf-speed { font: 34px var(--display); color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.4); line-height: 1; white-space: nowrap; }
 .rf-speed small { font-size: 15px; }
