@@ -139,10 +139,13 @@ function echoTail(ctx: BaseAudioContext, seconds: number, random = Math.random) 
   for (let c = 0; c < 2; c++) {
     const d = buf.getChannelData(c)
     let lp = 0
+    // Plain multiplies, not Math.pow: this runs for every sample when the town's sounds first
+    // start, often on a tap, and pow made that tap stall on a slow phone.
+    const quiet = ctx.sampleRate * 0.012
     for (let i = 0; i < d.length; i++) {
-      const x = i / d.length
+      const q = 1 - i / d.length
       lp += 0.35 * (random() * 2 - 1 - lp) // soften the highs a little
-      d[i] = i < ctx.sampleRate * 0.012 ? 0 : lp * Math.pow(1 - x, 3)
+      d[i] = i < quiet ? 0 : lp * q * q * q
     }
   }
   return buf

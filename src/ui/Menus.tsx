@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { CallCardPicker } from './CallCardPicker'
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Activity, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
@@ -18,6 +18,7 @@ import { rotateCurrent } from '../game/placement'
 import { TRAFFIC, TRAFFIC_MIN, roadShare, roadsShort, trafficLevel } from '../game/traffic'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
+import { KeepTabs } from './KeepTabs'
 import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
@@ -213,8 +214,16 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   useEffect(() => () => clearTimeout(timer.current), [])
   const box = useRef<HTMLDivElement>(null)
   usePauseTownUnder(box)
-  const [still] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  const [still, setStill] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  // A menu kept out of sight (Kept) and shown again: no slide-out left over from closing it, and
+  // it slides in again only when it opens over the town.
+  const shown = useRef(false)
   useLayoutEffect(() => {
+    if (shown.current) {
+      setClosing(false)
+      setStill(panelsUp > 0 || Date.now() - panelGoneAt < 250)
+    }
+    shown.current = true
     panelsUp++
     return () => {
       panelsUp--
@@ -280,21 +289,26 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
     const el = row.current
     if (!el) return
     const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
-    check()
     el.addEventListener('scroll', check, { passive: true })
+    // The observer's first report comes once the row is laid out. Measuring here instead made
+    // the page lay out on the spot each time a kept menu showed again (on a slow phone, a freeze).
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check)
-    ro?.observe(el)
+    if (ro) ro.observe(el)
+    else check()
     return () => {
       el.removeEventListener('scroll', check)
       ro?.disconnect()
     }
   }, [items.length])
   // Bring the picked tab into view by scrolling only the row: scrollIntoView would also
-  // scroll the page while a menu slides in, pushing its header off the top.
+  // scroll the page while a menu slides in, pushing its header off the top. Not again when a
+  // kept menu shows again on the same tab: it's already in view, and measuring costs a layout.
+  const placed = useRef<T | null>(null)
   useEffect(() => {
     const el = row.current
     const sel = el?.querySelector<HTMLElement>('.sel')
-    if (!el || !sel) return
+    if (!el || !sel || placed.current === value) return
+    placed.current = value
     const r = el.getBoundingClientRect()
     const t = sel.getBoundingClientRect()
     // Keep it clear of the › strip too, which covers the row's right edge.
@@ -371,11 +385,7 @@ export function ShopPanel() {
   // A search looks through every tab at once.
   const [find, setFind] = useState('')
   const term = find.trim().toLowerCase()
-  const group = term ? null : SHOP_GROUPS.find((g) => g.id === tab)
-  const shown = term
-    ? BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))
-    : group ? BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)) : []
-  const rows = shown.map((b) => {
+  const rowsOf = (shown: BuildingDef[]) => shown.map((b) => {
     const locked = gate < b.unlockLevel
     const sale = buildPrice({ deals, level }, b.id)
     // Gem decor (the statue, the arch) is short on gems, not coins.
@@ -386,6 +396,44 @@ export function ShopPanel() {
     const rank = owned ? 3 : locked ? 2 : broke ? 1 : 0
     return { b, locked, sale, brokeGems, broke, owned, rank }
   }).sort((x, y) => (y.rank < 2 ? featureRank(y.b) : 0) - (x.rank < 2 ? featureRank(x.b) : 0) || x.rank - y.rank || x.b.unlockLevel - y.b.unlockLevel || x.b.price - y.b.price)
+  const found = term ? rowsOf(BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))) : []
+  const grid = (rows: ReturnType<typeof rowsOf>) => (
+    <div className="shop-grid">
+      {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
+        const highlight = b.id === 'rescue' && !rusty
+        const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
+        const focused = b.id === focus
+        const every = b.jobSeconds ? (b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`) : null
+        return (
+          <button
+            key={b.id}
+            ref={focused ? focusRef : undefined}
+            className={`card shop-card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
+            disabled={owned}
+            title={FEATURES[b.id] ? FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1) : undefined}
+            onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
+          >
+            {highlight && <span className="ribbon">START HERE</span>}
+            {feature && <span className="ribbon feature">★ NEW</span>}
+            {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
+            {b.event && <span className="ribbon spooky">LIMITED</span>}
+            <BuildingThumb def={b} />
+            <div className="card-name">{b.name}</div>
+            {/* What it makes, as icons and numbers: coins (and parts) per job, how often, the fuel each job takes. */}
+            <div className="shop-chips">
+              {!!b.jobSeconds && <span className="c-coin">${compact(b.payout ?? 0)}{b.partsPayout ? <em>+{b.partsPayout}⚙</em> : null}</span>}
+              {every && <span title="Every job">⏱{every}</span>}
+              {!!b.jobSeconds && <span className="c-fuel" title="Fuel per job">⛽{b.fuelCost}</span>}
+              {b.nightOnly && <span title="Open at night only">🌙</span>}
+              {b.fuelCap && <span className="c-cap" title="Max fuel">⛽+{b.fuelCap}</span>}
+            </div>
+            {(highlight || feature) && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
+            {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Lv {b.unlockLevel}</span> : price(b, sale.deal && sale)}
+          </button>
+        )
+      })}
+    </div>
+  )
   return (
     <Panel title="Shop" wide>
       <SheetTabs items={tabs} value={tab} onChange={(t) => { setFind(''); setTab(t) }} />
@@ -394,45 +442,11 @@ export function ShopPanel() {
         <input type="search" value={find} placeholder={tab === 'upgrades' ? 'Find your building' : 'Find a building'} aria-label="Find a building" onChange={(e) => setFind(e.target.value)} />
         {find && <button aria-label="Clear" onClick={() => setFind('')}>✕</button>}
       </label>
-      {tab === 'upgrades' && <ShopUpgrades find={term} />}
-      {term && tab !== 'upgrades' && !rows.length && <p className="shop-none">🔍 No match</p>}
-      {(group || (term && tab !== 'upgrades')) && (
-          <div className="shop-grid">
-            {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
-              const highlight = b.id === 'rescue' && !rusty
-              const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
-              const focused = b.id === focus
-              const every = b.jobSeconds ? (b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`) : null
-              return (
-                <button
-                  key={b.id}
-                  ref={focused ? focusRef : undefined}
-                  className={`card shop-card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
-                  disabled={owned}
-                  title={FEATURES[b.id] ? FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1) : undefined}
-                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
-                >
-                  {highlight && <span className="ribbon">START HERE</span>}
-                  {feature && <span className="ribbon feature">★ NEW</span>}
-                  {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
-                  {b.event && <span className="ribbon spooky">LIMITED</span>}
-                  <BuildingThumb def={b} />
-                  <div className="card-name">{b.name}</div>
-                  {/* What it makes, as icons and numbers: coins (and parts) per job, how often, the fuel each job takes. */}
-                  <div className="shop-chips">
-                    {!!b.jobSeconds && <span className="c-coin">${compact(b.payout ?? 0)}{b.partsPayout ? <em>+{b.partsPayout}⚙</em> : null}</span>}
-                    {every && <span title="Every job">⏱{every}</span>}
-                    {!!b.jobSeconds && <span className="c-fuel" title="Fuel per job">⛽{b.fuelCost}</span>}
-                    {b.nightOnly && <span title="Open at night only">🌙</span>}
-                    {b.fuelCap && <span className="c-cap" title="Max fuel">⛽+{b.fuelCap}</span>}
-                  </div>
-                  {(highlight || feature) && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
-                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Lv {b.unlockLevel}</span> : price(b, sale.deal && sale)}
-                </button>
-              )
-            })}
-          </div>
-      )}
+      {term && (tab === 'upgrades' ? <ShopUpgrades find={term} /> : <>{!found.length && <p className="shop-none">🔍 No match</p>}{grid(found)}</>)}
+      {/* Each tab's grid is kept once seen (KeepTabs), and kept out of sight during a search. */}
+      <Activity mode={term ? 'hidden' : 'visible'}>
+        <KeepTabs tab={tab} render={(t) => (t === 'upgrades' ? <ShopUpgrades find="" /> : grid(rowsOf(BUILDINGS.filter((b) => b.unlockLevel < 99 && SHOP_GROUPS.find((g) => g.id === t)!.filter(b)))))} />
+      </Activity>
     </Panel>
   )
 }
@@ -1004,6 +1018,9 @@ let lastRoom: Room = 'garage'
 // How long the depot takes to fade in over the room, or out of it (ms; garage-env.css too).
 const DEPOT_FADE = 420
 
+// The section showing: the others the page has kept (KeepTabs) are out of sight.
+const shownGarage = () => [...document.querySelectorAll<HTMLElement>('.cars-page div.garage')].find((e) => e.offsetParent !== null)
+
 export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.ReactNode }) {
   const panel = useGame((s) => s.panel)
   const cars = useGame((s) => s.cars)
@@ -1036,7 +1053,7 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
       doorTrip.on = (e) => { if (e === 'there') setFlown(true) }
       depotWalk.go = 'hold'
       depotWalk.p = 0
-      document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+      shownGarage()?.scrollTo({ top: 0, behavior: 'smooth' })
       // No room view to walk (a car looked at full screen): go anyway.
       const t = setTimeout(() => setFlown(true), 5000)
       return () => clearTimeout(t)
@@ -1079,7 +1096,19 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
     const t = setTimeout(() => setDepotReady(true), 15000)
     return () => clearTimeout(t)
   }, [trip])
-  useEffect(() => () => { doorTrip.go = null; doorTrip.on = undefined; depotWalk.go = null }, [])
+  useEffect(() => () => {
+    doorTrip.go = null
+    doorTrip.on = undefined
+    depotWalk.go = null
+    // Kept out of sight (Kept): it comes back in a room, not part way to or in the depot.
+    depotOn.current = false
+    setDepot(false)
+    setTrip(null)
+    setFlown(false)
+  }, [])
+  // Shown again: on the tab it was asked for (a ready set opens the Collection).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => setShowTab(focus ? 'shop' : lastShowroomTab), [])
   const onDepotReady = useCallback(() => setDepotReady(true), [])
   // The depot sits under the tabs, over the room.
   const [tabsH, setTabsH] = useState(0)
@@ -1103,14 +1132,11 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
     toShowroom('shop')
   })
   // Phones: a car picked from the grid goes up on the turntable, so scroll back up to it.
-  const top = () => document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+  const top = () => shownGarage()?.scrollTo({ top: 0, behavior: 'smooth' })
   return (
     <Panel title="Cars" wide className={`garage-env cars-page sec-${room ?? 'crates'}${trip ? ` trip-${trip}` : ''}`} head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current={section} onShowroom={toShowroom} />
-      {room === 'garage' && <GarageSection />}
-      {room === 'shop' && <SaleSection onPick={top} />}
-      {room === 'book' && <BookSection onFind={find} />}
-      {room === 'cards' && <CardsSection onCrates={() => swap('crates')} />}
+      <KeepTabs tab={room} render={(r) => (r === 'garage' ? <GarageSection /> : r === 'shop' ? <SaleSection onPick={top} /> : r === 'book' ? <BookSection onFind={find} /> : <CardsSection onCrates={() => swap('crates')} />)} />
       {depot && <div className="cars-crates" style={{ top: tabsH }} aria-hidden={trip === 'out' || trip === 'wait' || trip === 'back' || undefined}>{crates?.(onDepotReady)}</div>}
     </Panel>
   )
