@@ -1,5 +1,5 @@
 // A player's 🚩 Report on a chat message (src/lib/chat.ts reportChat). Files it as that player
-// through chat_report (supabase/migrations/0117_chat_reports.sql), which checks they can see the
+// through chat_report (supabase/migrations/0118_chat_reports.sql), which checks they can see the
 // message and keeps a copy for the admin panel, then emails support so nobody has to be watching.
 // Needs VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY; the email also needs RESEND_API_KEY
 // (resend.com, cartopia.lol verified there). REPORT_EMAIL overrides support@cartopia.lol.

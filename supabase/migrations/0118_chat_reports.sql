@@ -1,10 +1,12 @@
--- Chat reports: a player flags a chat message; admins see it in the admin panel (🚩 Reports)
+-- 0118 Chat reports (2026-10-18; Kegan: chat needs a Report button that reaches the admin panel and
+-- support@cartopia.lol. "Launch readiness check" thread; numbered and reviewed by "Cheat-proof economy").
+-- A player flags a chat message; admins see it in the admin panel (🚩 Reports)
 -- and netlify/functions/chat-report.mts emails support@cartopia.lol.
 --   * chat_report(id, reason): any signed-in player who can read that room. One report per
 --     player per message, 10 a day. Keeps a copy of the message so deleting it keeps the report.
 --   * admin_reports(): open reports, newest first, one row per message with how many reported it.
 --   * admin_report_close(message, outcome): closes every open report on that message.
--- Standalone: no econ_catalog/econ_guard change. Run before the game update ships.
+-- Standalone: no econ_catalog/econ_guard change. Run before the game update ships. Running it again changes nothing.
 
 create table if not exists public.chat_reports (
   id bigint generated always as identity primary key,
@@ -37,6 +39,8 @@ begin
   if not found then raise exception 'gone'; end if;
   if not public.chat_room_ok(m.room) then raise exception 'not in that room'; end if;
   if m.owner_id = uid then raise exception 'yours'; end if;
+  -- One report at a time per player, so reports sent together can't slip past the daily limit.
+  perform pg_advisory_xact_lock(hashtext('chat_report:' || uid::text));
   if (select count(*) from public.chat_reports r where r.reporter = uid and r.created_at > now() - interval '1 day') >= 10 then
     raise exception 'slow down';
   end if;

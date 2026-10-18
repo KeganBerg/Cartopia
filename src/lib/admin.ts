@@ -13,7 +13,7 @@ export type AdminPlayer = {
   cars: AdminCar[]; muted: string | true | null; admin: boolean; joined: string; seen: string | null; chat?: AdminChat[]
 }
 export type AdminLogRow = { id: number; at: string; action: string; target: string | null; name: string | null; detail: Record<string, unknown> }
-// One reported chat message (0117_chat_reports.sql): every open report on it rolled up.
+// One reported chat message (0118_chat_reports.sql): every open report on it rolled up.
 export type AdminReport = {
   message: number; at: string; room: string; body: string; reported: string | null; reportedName: string
   reasons: string[]; count: number; reporter: string; live: boolean
