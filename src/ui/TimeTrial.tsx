@@ -168,7 +168,7 @@ function Row({ r, name, car, leader, mine }: { r: BoardRow; name: string; car?: 
       </span>
       <span className="ttr-time">
         <b>{r.t.toFixed(3)}</b>
-        {gap !== null && <small>+{gap.toFixed(3)}</small>}
+        {gap !== null && <small>{gap < 0.0005 ? '🤝 Tie' : `+${gap.toFixed(3)}`}</small>}
       </span>
       <span className="ttr-go" aria-hidden>›</span>
     </button>
