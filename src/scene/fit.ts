@@ -8,7 +8,8 @@ export type Bounds = { r: number; h: number }
 // centred on the turntable's axis and its base sits on the floor. `scale` can
 // shrink or grow it to taste from its natural bounds. Shared by every
 // turntable preview so tall towers and wide lots all frame the same way.
-export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) => number): Bounds {
+// `precise` measures vertices instead of each part's turned box (slower; one big preview only).
+export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) => number, precise = false): Bounds {
   const turn = turntable.rotation.y
   const at = turntable.position.clone()
   turntable.rotation.y = 0
@@ -19,7 +20,7 @@ export function seat(model: Object3D, turntable: Object3D, scale?: (b: Bounds) =
   // Effects that reach far beyond the model (searchlight beams) opt out with userData.noFit.
   const box = new Box3()
   model.traverse((o) => {
-    if ((o as Mesh).isMesh && !o.userData.merged && !hasNoFit(o, model)) box.expandByObject(o, false)
+    if ((o as Mesh).isMesh && !o.userData.merged && !hasNoFit(o, model)) box.expandByObject(o, precise)
   })
   turntable.rotation.y = turn
   turntable.position.copy(at)
