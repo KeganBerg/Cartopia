@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { chooseFocus, pickThumbs, spinsFor, STILL_PER_FRAME, type Slot as S } from './thumbCopy'
+import { chooseFocus, costEach, pickThumbs, spinsFor, STILL_PER_FRAME, type Slot as S } from './thumbCopy'
 
 const slot = (key: string, o: Partial<S> = {}): S => ({ key, still: false, scene: false, angle: 0.12, at: -Infinity, fresh: true, seen: true, ctx: {} as CanvasRenderingContext2D, canvas: { width: 100, height: 80 } as HTMLCanvasElement, ...o })
 const box = (left: number, top: number, width: number, height: number) => ({ left, top, width, height })
@@ -122,5 +122,51 @@ describe('thumbnails on a slow phone', () => {
     const rates = play(page, 2000, spinsFor(6, 20), page[0])
     expect(rates[0]).toBeGreaterThanOrEqual(59)
     for (const r of rates) expect(r).toBeGreaterThanOrEqual(11)
+  })
+})
+
+// Kegan, Car Packs on a desktop: "All previews are choppy". Each frame pays a fixed read back of the
+// 3D picture however many thumbnails draw; counted as theirs, a page of cars looked so dear that two
+// turned a frame and the rest moved a few times a second. Plays a page with the drawing costs a
+// real frame has, the share sized from what drawing cost, and checks every car turns smoothly.
+describe('a page of turning cars with a costly read back', () => {
+  function playCosted(n: number, readMs: number, eachMs: number, ms = 3000) {
+    const page = Array.from({ length: n }, (_, i) => slot(`c|car${i}`))
+    const gaps = new Map<S, number>()
+    let cost = 2, usual = Infinity
+    for (let now = 0; now < ms; now += 1000 / 60) {
+      const { need } = pickThumbs(page, () => true, { focus: page[0], now, gap: GAP, spins: spinsFor(6, cost) })
+      const drawn = [...need.values()]
+      if (!drawn.length) continue
+      for (const d of drawn) for (const s of d.slots) {
+        if (now > 1000) gaps.set(s, Math.max(gaps.get(s) ?? 0, now - s.at))
+        s.at = now
+        s.fresh = false
+      }
+      // The read back waits a little longer for each extra drawing (GPU work).
+      const read = readMs + drawn.length * 0.05
+      usual = Math.min(read, usual + 0.05)
+      cost = cost * 0.8 + costEach(read + drawn.length * eachMs, read, usual, drawn.length) * 0.2
+    }
+    return page.map((s) => gaps.get(s) ?? Infinity)
+  }
+
+  // The Car Packs showcase keeps every car mounted, the others faded right out: they took turns
+  // (and the hero's place) from the cars on show.
+  it('gives no turns to a car faded out of sight', () => {
+    const on = slot('c|on'), off = slot('c|off', { hidden: true })
+    const rates = play([on, off], 1000, 2)
+    expect(rates[0]).toBeGreaterThanOrEqual(59)
+    expect(rates[1]).toBe(0)
+  })
+
+  it('turns every car on a 14-car page at 30 frames a second or better', () => {
+    for (const gap of playCosted(14, 4, 0.3)) expect(gap).toBeLessThanOrEqual(34)
+  })
+
+  it('still shares out a dear drawing on a slow phone', () => {
+    const gaps = playCosted(14, 6, 2)
+    expect(gaps[0]).toBeLessThanOrEqual(17)
+    for (const gap of gaps) expect(gap).toBeLessThanOrEqual(150)
   })
 })

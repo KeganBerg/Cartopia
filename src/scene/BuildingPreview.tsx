@@ -15,7 +15,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
-import { chooseFocus, copyThumbs, nextMounts, pickThumbs, spinsFor, type Slot } from './thumbCopy'
+import { chooseFocus, copyThumbs, costEach, nextMounts, pickThumbs, spinsFor, type Slot } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -34,6 +34,8 @@ const BUDGET_MS = 6
 const REST = 0.12
 // With reduced motion they stand still, so they're redrawn only when something changes.
 let dirty = true
+// Thumbnails came, went, resized or scrolled in or out: where they sit is looked at again (see the hero).
+let moved = true
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
@@ -80,6 +82,7 @@ let version = 0
 const changed = () => {
   version++
   dirty = true
+  moved = true
   listeners.forEach((fn) => fn())
 }
 
@@ -99,6 +102,7 @@ function fit(slot: Slot, w: number, h: number) {
   slot.canvas.height = ph
   slot.fresh = true
   dirty = true
+  moved = true
 }
 
 function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
@@ -120,6 +124,7 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
           if (!s || s.seen === e.isIntersecting) continue
           s.seen = e.isIntersecting
           dirty = true
+          moved = true
         }
       },
       { rootMargin: '40px' },
@@ -251,6 +256,7 @@ function Renderer() {
   const focus = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: -Infinity })
   // What one turning thumbnail has been costing to draw (ms), to size the next frame's share.
   const cost = useRef(2)
+  const readUsual = useRef(Infinity)
   const rank = (n: { spin: boolean; slots: Slot[] }) => (n.slots.includes(focus.current.slot!) ? 0 : n.spin ? 1 : 2)
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
@@ -270,17 +276,28 @@ function Renderer() {
     const now = performance.now()
     const still = reduceMotionOn()
     const over = hover && slots.has(hover) ? hover : null
-    // The hero, drawn every frame, looked for a few times a second (it reads places on the page).
+    // The hero, drawn every frame, looked for a few times a second (it reads places on the page),
+    // not every frame something is waiting its turn.
     const f = focus.current
     if (still) f.slot = null
-    else if (dirty || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
+    else if (moved || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
       f.at = now
+      moved = false
       const cands: { slot: Slot; box: DOMRect }[] = []
-      for (const s of slots) if (s.seen && !s.still && !s.scene) cands.push({ slot: s, box: s.canvas.getBoundingClientRect() })
+      for (const s of slots) {
+        // Faded right out (the Car Packs showcase keeps its other cars mounted, see-through): it
+        // neither turns nor takes the hero's place until it shows, and draws as soon as it does.
+        const hidden = s.seen && typeof s.canvas.checkVisibility === 'function' && !s.canvas.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+        if (hidden !== !!s.hidden) {
+          s.hidden = hidden
+          if (!hidden) s.fresh = true
+        }
+        if (s.seen && !s.hidden && !s.still && !s.scene) cands.push({ slot: s, box: s.canvas.getBoundingClientRect() })
+      }
       f.slot = chooseFocus(cands, window.innerWidth, window.innerHeight)
     }
     let turning = false
-    if (!still) for (const s of slots) if (s.seen && !s.scene && (!s.still || s === over)) { turning = true; break }
+    if (!still) for (const s of slots) if (s.seen && !s.hidden && !s.scene && (!s.still || s === over)) { turning = true; break }
     const scenes = !still && now - lastScene.current >= 1000 / FPS - 4
     const due = turning && now - last.current >= 1000 / SPIN_FPS - 4
     if (!dirty && !due && !scenes) return
@@ -375,8 +392,10 @@ function Renderer() {
     gl.setScissorTest(false)
 
     // Copy in the same frame, before the browser discards the drawing buffer.
-    copyThumbs(src, width, height, drawn)
-    if (spun) cost.current = cost.current * 0.8 + ((performance.now() - t0) / drawn.length) * 0.2
+    const read = copyThumbs(src, width, height, drawn)
+    // The usual read back: the quickest lately, creeping up so one quick read doesn't set it for good.
+    readUsual.current = Math.min(read, readUsual.current + 0.05)
+    if (spun) cost.current = cost.current * 0.8 + costEach(performance.now() - t0, read, readUsual.current, drawn.length) * 0.2
     for (const n of drawn) for (const s of n.slots) {
       s.fresh = false
       s.at = now

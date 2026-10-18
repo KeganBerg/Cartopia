@@ -24,8 +24,11 @@ type Placed = { x: number; y: number; w: number; h: number; slots: { canvas: { w
 // Each thumb gets its part of the atlas. Copying straight out of the 3D canvas made the
 // browser read the whole 3D picture back once per thumb (a dozen thumbs in a player's card
 // ran the page at a few frames a second), so it's read back once and shared.
+// Returns how long the read back took (ms).
 export function copyThumbs(src: CanvasImageSource, width: number, height: number, placed: Iterable<Placed>, flat = readBack) {
+  const t = performance.now()
   const from = flat(src, width, height) ?? src
+  const read = performance.now() - t
   for (const n of placed) {
     for (const s of n.slots) {
       const ctx = s.ctx!
@@ -33,6 +36,7 @@ export function copyThumbs(src: CanvasImageSource, width: number, height: number
       ctx.drawImage(from, n.x, n.y, n.w, n.h, 0, 0, s.canvas.width, s.canvas.height)
     }
   }
+  return read
 }
 
 // A thumbnail on the page. Every one on screen turns. Drawing them all every frame made a page of
@@ -42,8 +46,8 @@ export function copyThumbs(src: CanvasImageSource, width: number, height: number
 // `still`: holds still (Shop > Upgrades' many buildings) unless the mouse is over it.
 // `scene`: an arcade card that animates itself; those keep drawing (at 24 a second).
 // `angle`: how far round it has turned (0-1). `at`: when it was last drawn (ms).
-// `fresh`: it needs drawing (new, or resized).
-export type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean; still: boolean; scene: boolean; angle: number; at: number; fresh: boolean }
+// `fresh`: it needs drawing (new, or resized). `hidden`: on screen but faded right out.
+export type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean; still: boolean; scene: boolean; angle: number; at: number; fresh: boolean; hidden?: boolean }
 
 // Held pictures drawn per frame, so a page full of them fills in over a few frames
 // instead of stalling one.
@@ -65,6 +69,13 @@ export function chooseFocus<T>(cands: { slot: T; box: Box }[], vw: number, vh: n
 // never fewer than two, the hero and one more, so the hero stays smooth and the rest keep turning.
 export const spinsFor = (budgetMs: number, msEach: number) => Math.max(2, Math.floor(budgetMs / Math.max(0.1, msEach)))
 
+// What one turning thumbnail cost to draw this frame, from the frame's whole drawing time (`ms`,
+// copying out included) and its read back (`read`). The read back is paid once a frame however many
+// draw, so only what it grew by past its usual (`usual`: more to draw makes it wait longer on the
+// GPU) counts against them. Shared out among them all, it made a page of cars look so dear that two
+// turned a frame and the rest moved a few times a second (Kegan: "All previews are choppy").
+export const costEach = (ms: number, read: number, usual: number, drawn: number) => (ms - read + Math.max(0, read - usual)) / Math.max(1, drawn)
+
 // Which thumbnails to draw this frame: the hero, then the turning ones that have waited longest
 // (up to `spins`, none drawn again within `gap` ms), the self-animating scenes when they're due,
 // and the next few held ones that haven't been drawn. Held ones of the same model at the same
@@ -77,7 +88,7 @@ type Opts = { focus?: Slot | null; hover?: Slot | null; scenes?: boolean; budget
 export function pickThumbs(all: Iterable<Slot>, mounted: (key: string) => boolean, { focus = null, hover = null, scenes = true, budget = STILL_PER_FRAME, spins = Infinity, now = 0, gap = 0, still = false }: Opts = {}) {
   const need = new Map<string, Need>()
   let waiting = false
-  const ok = (s: Slot) => s.seen && !!s.ctx && s.canvas.width >= 2
+  const ok = (s: Slot) => s.seen && !s.hidden && !!s.ctx && s.canvas.width >= 2
   const turns = (s: Slot) => !still && !s.scene && (s === hover || !s.still)
   // The turning ones due a drawing, longest waiting first; the hero goes first when there's room
   // for more than one, so on a slow phone the others still get their turns.
