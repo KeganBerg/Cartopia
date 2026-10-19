@@ -131,6 +131,30 @@ every level with the game's own code and writes each piece as a Roblox part.
 - Merged buildings (two or more of the same side by side) use `Builder.build(id, level, cf, { scale = n })` for now; the web game's merged looks are in `src/game/merge.ts` and `src/scene/mergeScale.tsx`.
 - Re-export after any building changes on the web: `node scripts/roblox/models.mjs` (all buildings) or `node scripts/roblox/models.mjs roblox-export pizza,house` (some). `node scripts/roblox/check.mjs roblox-export pizza 1,10` runs this builder on the data and saves pictures of each level beside the web model.
 
+## Linking a web town
+
+Players bring the progress they earned on the web with a one-time code: web Settings > Play on
+Roblox > **Get** shows an 8-character code that lasts 15 minutes. They type it in your Settings
+> Web town box. Your **server** (never the client) trades it in by calling the web game's database:
+
+```lua
+local HttpService = game:GetService("HttpService")
+local KEY = HttpService:GetSecret("CARTOPIA_LINK_KEY") -- Creator Dashboard > your experience > Secrets
+local res = HttpService:RequestAsync({
+	Url = SUPABASE_URL .. "/rest/v1/rpc/roblox_claim",
+	Method = "POST",
+	Headers = { ["Content-Type"] = "application/json", apikey = PUBLISHABLE_KEY, ["x-cartopia-key"] = KEY },
+	Body = HttpService:JSONEncode({ p_code = code, p_roblox_user = player.UserId }),
+})
+```
+
+- The reply is `{ state, paid }` (the web save and its paid packs) or `{ error }`: `code` (wrong, used or expired), `other` (that web account is linked to a different Roblox player) or `server` (the key is missing or wrong).
+- **Take the paid packs out** before loading the town (`paid`: Gems, coins, parts and pack cars bought on the web). Roblox's rules don't let off-platform purchases unlock anything in Roblox.
+- The key is what stops someone with a stolen code from linking a player's town to their own Roblox account, so it only ever goes in that header, from the server. Never put it in a client script or a ModuleScript in ReplicatedStorage.
+- Rate-limit the Link button (one try every few seconds per player) and show a short error icon on `code`.
+- `SUPABASE_URL` and `PUBLISHABLE_KEY` are public; ask Kegan for them. Studio keeps its own local secrets for testing (see Secrets on the Creator Hub); the live key stays in the Creator Dashboard only.
+- One web account links to one Roblox player. Players unlink from web Settings.
+
 ## House rules that carry over
 
 - **Names are invented**, never real brands, people, tragedies or wars (the web repo has a banned-names test; car names in `CARS` are already safe).
