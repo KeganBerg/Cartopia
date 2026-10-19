@@ -10,7 +10,7 @@ import { Panel } from './Menus'
 import { PlayerName } from './Username'
 import { isCrewMate } from '../lib/crewRaces'
 import { usePrefs } from '../lib/prefs'
-import { attackSpot, myWarPi, nextWarRival, submitWarRun, warStars, type WarResult } from '../lib/warMap'
+import { attackSpot, myWarPi, nextWarRival, recordDemoWarRun, submitWarRun, warStars, type WarResult } from '../lib/warMap'
 import { useCrewBattle } from '../lib/battles'
 import './war-result.css'
 
@@ -56,6 +56,7 @@ export function GhostRacePanel() {
       onFinish={(_won, myTime) => {
         if (ghost.war) {
           useGame.getState().crewRace()
+          if (!ghost.real) recordDemoWarRun(ghost.war.target, myTime, ghost.target)
           posting = { t: myTime, posted: null, war: ghost.real ? submitWarRun(myTime) : null }
           return
         }
