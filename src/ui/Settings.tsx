@@ -5,7 +5,8 @@ import { AmbienceControl, EffectsControl, MusicControl, SoundControl } from './M
 import { AlertsMenu } from './Alerts'
 import { useLive, setClosed, unmute } from '../lib/live'
 import { setPrefs, usePrefs, reduceMotionOn, type Graphics, type Steer } from '../lib/prefs'
-import { deleteAccount, exportData, resetAccount, resetLocal } from '../lib/cloud'
+import { deleteAccount, exportData, flushSave, resetAccount, resetLocal } from '../lib/cloud'
+import { supabase } from '../lib/supabase'
 import { BuckIcon, CoinIcon } from './Icon'
 import { compact } from './format'
 import { useNames } from '../lib/profiles'
@@ -130,6 +131,7 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Row>
         {user && <ChallengeSettings />}
       </Group>
+      {user && <RobloxLink />}
       {!touch && showDesktopApp() && (
         <Group icon="🖥️" title="Desktop app">
           <Row label="Cartopia for Windows" sub="Updates itself with the game">
@@ -138,6 +140,36 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Group>
       )}
     </>
+  )
+}
+
+// A one-time code that carries this town's earned progress into Cartopia on Roblox (typed in its
+// Settings). Paid packs stay on the web: Roblox's rules don't let them unlock anything there, so the
+// Roblox game takes them out (supabase/migrations/0119_roblox_link.sql).
+function RobloxLink() {
+  const [code, setCode] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const make = async () => {
+    if (!supabase) return
+    setBusy(true)
+    setErr('')
+    // The code carries the town as saved, so save what's just been earned first.
+    await flushSave()
+    const { data, error } = await supabase.rpc('roblox_link_code')
+    setBusy(false)
+    if (error || !data?.code) return setErr('Could not make a code. Try again soon.')
+    setCode(data.code as string)
+  }
+  return (
+    <Group icon="🟥" title="Play on Roblox">
+      <Row label="Roblox code" sub="Earned progress only. Paid packs stay here.">
+        <button className="buy small alt" disabled={busy} title="Roblox code: type it in Cartopia on Roblox, Menu, Settings. Works once, for 15 minutes." onClick={make}>{code ? 'New' : 'Get'}</button>
+      </Row>
+      {code && <p className="rbx-code" aria-label="Roblox code">{code}</p>}
+      {code && <small className="set-note">Roblox: Menu ⚙️ Settings. Works once, 15 minutes.</small>}
+      {err && <small className="set-note">{err}</small>}
+    </Group>
   )
 }
 

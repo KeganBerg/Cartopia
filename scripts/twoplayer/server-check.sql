@@ -222,4 +222,25 @@ update public.game_saves set corrections = null, state = state || jsonb_build_ob
 :as_admin
 select pg_temp.ok((select not coalesce(corrections ? 'endless', false) from public.game_saves where owner_id = :C), 'first endless board saves without an endless correction');
 
+-- 11. Roblox link codes: a code from the web trades once for the town and its paid packs, and a web
+-- account links to one Roblox player.
+:as_admin
+insert into public.purchases (owner_id, seq, session_id, pack, cents, bucks, coins, parts) select :A, 1, 'cs_roblox_check', 'pocket', 99, 70, 0, 0 where not exists (select 1 from public.purchases where owner_id = :A);
+:as_a
+select public.roblox_link_code() ->> 'code' as rcode \gset
+reset role; set role anon;
+select public.roblox_claim(:'rcode', 111) as claim \gset
+:as_admin
+select pg_temp.ok((:'claim'::jsonb -> 'state' ->> 'townName') = 'Sql A' and jsonb_array_length(:'claim'::jsonb -> 'paid') >= 1, 'roblox code returns the town and its paid packs');
+reset role; set role anon;
+select public.roblox_claim(:'rcode', 111) as again \gset
+:as_admin
+select pg_temp.ok((:'again'::jsonb ->> 'error') = 'code', 'a roblox code works once');
+:as_a
+select public.roblox_link_code() ->> 'code' as rcode2 \gset
+reset role; set role anon;
+select public.roblox_claim(:'rcode2', 222) as other \gset
+:as_admin
+select pg_temp.ok((:'other'::jsonb ->> 'error') = 'other', 'a web account links to one roblox player');
+
 do $$ begin raise notice 'ok   all server checks passed'; end $$;
