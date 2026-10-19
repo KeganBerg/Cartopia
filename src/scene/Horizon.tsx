@@ -5,11 +5,12 @@ import {
   Object3D, RingGeometry, ShaderMaterial, SphereGeometry, Vector2, Vector3, type InstancedMesh, type Mesh,
 } from 'three'
 import { weatherNow } from '../game/weather'
-import { moonLit, moonPhase } from '../game/skyExtras'
+import { moonLit, moonPhase, skyClear } from '../game/skyExtras'
 import { south } from '../game/sun'
 import { dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lightDir } from './look'
 import { hazeColor } from './weatherLook'
+import { COSMOS_GLSL } from './cosmos'
 import { Kit, kitMat } from './kit'
 import { PAL, SEASON } from './season'
 import { A_CITY, A_LAKE, A_MTN, A_WOODS, CITY, HWY0, HWY_DIR, HWY_LEN, R0, R1, SNOWLINE, TAU, angDist, buildTerrain, forest, heightAt, hwy, hwyHeight, lakeOf, polar, rail, smooth, SNOW_COVER } from './horizonLand'
@@ -152,7 +153,9 @@ uniform float uDusk;
 uniform float uCover;
 uniform float uTime;
 uniform vec2 uDrift;
+uniform float uCosmos;
 varying vec3 vDir;
+${COSMOS_GLSL}
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -203,6 +206,9 @@ void main() {
     star *= 0.6 + 0.4 * sin(uTime * (2.0 + h * 5.0) + h * 40.0);
     col += vec3(star) * uNight * clear * smoothstep(0.02, 0.25, y) * 1.4;
   }
+  // The Milky Way, galaxies and planets, gathered off to the left of the
+  // moon and the city; gone behind clouds and in storms.
+  if (uCosmos > 0.01) col += cosmos(vec3(d.x * COSMOS_C + d.z * COSMOS_S, d.y, -d.x * COSMOS_S + d.z * COSMOS_C)) * uCosmos;
   // Puffy clouds drifting overhead, more of them when the weather turns. Crisp
   // edges, a bright side towards the sun (or moon) and a shaded belly, like the
   // low-poly town under them. They're pinned to the sky, not the screen.
@@ -249,6 +255,8 @@ const sunTmp = new Vector3()
 const MOON_EL = 9 * (Math.PI / 180)
 const MOON_DISC = new Vector3(Math.cos(A_CITY + 0.28) * Math.cos(MOON_EL), Math.sin(MOON_EL), Math.sin(A_CITY + 0.28) * Math.cos(MOON_EL))
 const MOON_R = 0.034
+// Where the planets and galaxies gather: well left of the moon, so both show.
+const COSMOS_FRONT = A_CITY - 1.1
 const haze = new Color()
 const grey = new Color()
 
@@ -258,7 +266,7 @@ function Sky({ small }: { small: boolean }) {
       new ShaderMaterial({
         vertexShader: SKY_VERT,
         fragmentShader: SKY_FRAG,
-        defines: { OCTAVES: small ? 3 : 4, MOON_R: MOON_R.toFixed(4) },
+        defines: { OCTAVES: small ? 3 : 4, MOON_R: MOON_R.toFixed(4), COSMOS_OCT: small ? 2 : 3, COSMOS_C: Math.cos(COSMOS_FRONT).toFixed(5), COSMOS_S: Math.sin(COSMOS_FRONT).toFixed(5) },
         side: BackSide,
         depthWrite: false,
         fog: false,
@@ -266,6 +274,7 @@ function Sky({ small }: { small: boolean }) {
           uZenith: { value: new Color() }, uHorizon: { value: new Color() }, uGlow: { value: new Color() }, uSunDir: { value: new Vector3() }, uSunCol: { value: new Color('#fff4d6') },
           uMoonDir: { value: new Vector3() }, uCloudLit: { value: new Color() }, uCloudShade: { value: new Color() }, uNight: { value: 0 }, uDusk: { value: 0 }, uCover: { value: 0 },
           uTime: { value: 0 }, uDrift: { value: new Vector2() }, uMoonPhase: { value: 0 }, uMoonLit: { value: 0 }, uMoonFlip: { value: south() ? -1 : 1 },
+          uCosmos: { value: 0 },
         },
       }),
     [small],
@@ -287,6 +296,7 @@ function Sky({ small }: { small: boolean }) {
     // Overcast skies go grey; fog and dust bleach them towards the haze.
     const cover = Math.min(1, w.cloud * 1.05 + w.haze * 0.4)
     u.uCover.value = cover
+    u.uCosmos.value = n * skyClear(w)
     grey.set(w.dust > 0 ? '#c9a57a' : w.snow > 0 ? '#c3cad2' : '#8f99a4').lerp(K['night.horizon'], n * 0.85)
     const z = (u.uZenith.value as Color).copy(K['day.zenith']).lerp(K['night.zenith'], n).lerp(K['dusk.zenith'], dusk * (1 - n) * 0.8)
     const h = (u.uHorizon.value as Color).copy(K['day.horizon']).lerp(K['night.horizon'], n).lerp(K['dusk.horizon'], dusk * (1 - n * 0.6))
