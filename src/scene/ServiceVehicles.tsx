@@ -107,6 +107,17 @@ const tailGeo = bakeParts([
 ])
 // The same helicopter for the ones that fly over town (FlyByModels.tsx).
 export const heliParts = { body: heliBody, blades: bladeGeo, tail: tailGeo, mat }
+
+// How far the main rotor turns this frame (radians), at full speed times `rpm`. Its
+// four blades look the same every quarter turn, so drawn at a real rotor's speed it
+// strobed: at 30 frames a second it crept backwards and near 18 (a busy phone) it
+// stood still. Turned at a pace the eye can follow, and never more than a fifth of a
+// quarter turn in one frame, it always reads as turning forwards.
+const ROTOR_SPEED = 10
+export const ROTOR_MAX_STEP = (Math.PI / 2) * 0.2
+export const rotorStep = (dt: number, rpm = 1) => Math.min(ROTOR_SPEED * Math.max(0, dt), ROTOR_MAX_STEP) * rpm
+// The tail rotor (also four arms) turns a little faster, still well under the strobe.
+export const TAIL_RATIO = 1.4
 const discGeo = new CircleGeometry(1.02, 28)
 const discMat = new MeshBasicMaterial({ color: '#263238', transparent: true, opacity: 0, depthWrite: false, side: DoubleSide })
 const tailDiscGeo = new CircleGeometry(0.17, 14)
@@ -171,9 +182,9 @@ export function Helicopter({ look, fly: wantsFly, seed = 0, radius = 7, height =
     }
     const s = spin.current
     s.rpm += (rpm - s.rpm) * Math.min(1, dt * 3)
-    s.a += s.rpm * 28 * Math.min(dt, 0.1)
+    s.a += rotorStep(dt, s.rpm)
     if (rotor.current) rotor.current.rotation.y = s.a
-    if (tail.current) tail.current.rotation.x = s.a * 1.6
+    if (tail.current) tail.current.rotation.x = s.a * TAIL_RATIO
   })
   return (
     // A helicopter is helicopter-sized however big the block it lands on.
