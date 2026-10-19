@@ -158,6 +158,9 @@ writeFileSync(join(out, 'Data', 'Curves.luau'), `${header('formulas in src/game 
 index.push({ module: 'Curves', source: 'sampled formulas', exports: Object.keys(cv) })
 
 copyFileSync('scripts/roblox/HANDOFF.md', join(out, 'HANDOFF.md'))
+// The hand-written menu and button motion module (not generated).
+copyFileSync('scripts/roblox/UIMotion.luau', join(out, 'Data', 'UIMotion.luau'))
+index.push({ module: 'UIMotion', source: 'scripts/roblox/UIMotion.luau (menu and button motion)', exports: ['init', 'open', 'close', 'swap', 'bindButton', 'bindAll', 'pop', 'bump', 'shake', 'playSfx'] })
 writeFileSync(join(out, 'index.json'), JSON.stringify(index, null, 1))
 console.log(`${index.length} modules, ${index.reduce((n, x) => n + x.exports.length, 0)} tables -> ${out}`)
 process.exit(0) // jsdom and store timers would keep node alive
