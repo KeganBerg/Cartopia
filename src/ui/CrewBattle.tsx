@@ -17,7 +17,7 @@ import { Crest } from './CrewHub'
 import { artStyle } from './venueArt'
 import { StageSlot, useStageReady } from '../scene/Stage'
 import { CarThumb } from '../scene/BuildingPreview'
-import { attackSpot, fieldLayout, msToWarRaces, nextTarget, streetTime, unseenRaces, warMap, type MapSpot } from '../lib/warMap'
+import { attackSpot, fieldLayout, msToWarRaces, nextTarget, streetTime, unseenRaces, warFinal, warMap, watchWar, type MapSpot } from '../lib/warMap'
 import { sfx } from '../lib/sound'
 
 // Drawn in the shared full-screen canvas (scene/Stage.tsx), not a new one each visit.
@@ -247,7 +247,7 @@ function YourPart({ b, rules }: { b: Battle; rules: BattleRules }) {
 
 // One crew member on the war map: their car, name, and the stars the other crew has taken off them. Three
 // stars and the other crew's flag goes up on them.
-function Spot({ s, side, at, sel, flag, fresh, onPick }: { s: MapSpot; side: 'us' | 'them'; at: { x: number; y: number }; sel: boolean; flag: string; fresh: number; onPick?: () => void }) {
+function Spot({ s, side, at, sel, flag, fresh, burst, onPick }: { s: MapSpot; side: 'us' | 'them'; at: { x: number; y: number }; sel: boolean; flag: string; fresh: number; burst?: string; onPick?: () => void }) {
   return (
     <button className={`wm-spot ${side}${sel ? ' sel' : ''}${s.stars === 3 ? ' down' : ''}${s.me ? ' me' : ''}${fresh >= 0 ? ' fresh' : ''}`} disabled={!onPick} onClick={onPick}
       style={{ left: `${at.x}%`, top: at.y, '--flag': flag, '--d': `${Math.max(0, fresh) * 0.45 + 0.3}s` } as React.CSSProperties}
@@ -257,6 +257,7 @@ function Spot({ s, side, at, sel, flag, fresh, onPick }: { s: MapSpot; side: 'us
         {sel && <i className="wm-aim" />}
       </span>
       {s.stars === 3 && <i className="wm-flag">🚩</i>}
+      {burst && <i className="wm-burst">{burst}</i>}
       {s.revenge && s.stars < 3 && <i className="wm-revenge" title="Revenge: they took stars off you">🔥</i>}
       <span className="wm-stars">{[1, 2, 3].map((i) => <i key={i} className={i <= s.stars ? 'on' : ''}>★</i>)}</span>
       <em>{s.me ? 'You' : s.name}</em>
@@ -309,6 +310,9 @@ function WarMap({ b, myPi, left, me, mine, ready }: { b: Battle; myPi: number; l
   }, [])
   const px = (x: number) => (x * w) / 100
   const [pick, setPick] = useState<string | null>(null)
+  // The racer whose story shows under the field: who raced them and how it went.
+  const [peek, setPeek] = useState<{ side: 'us' | 'them'; id: string } | null>(null)
+  useEffect(watchWar, [])
   const [busy, setBusy] = useState(false)
   const target = map.them.find((s) => s.id === pick) ?? nextTarget(map.them, myPi)
   const now = useNow(30_000)
@@ -349,11 +353,18 @@ function WarMap({ b, myPi, left, me, mine, ready }: { b: Battle; myPi: number; l
   // When the last unseen streak into a spot lands, for its stars and flag.
   const landing = (side: 'us' | 'them', id: string) => Math.max(-1, ...streaks.filter((k) => k.fresh >= 0 && k.a.target === id && (k.a.side === 'us') === (side === 'them')).map((k) => k.fresh))
   const mySpot = map.us.find((s) => s.me)
+  // Your own win, replayed: the biggest streak and a star burst where it lands.
+  const myWin = streaks.filter((k) => k.fresh >= 0 && k.a.side === 'us' && k.a.by === me && k.a.won).pop()
+  // The last day of the war: a countdown, and a shaking front line when the score is close.
+  const toEnd = msToNextWeek(now)
+  const { final, close } = warFinal(b, toEnd)
+  const story = peek && map[peek.side].find((s) => s.id === peek.id)
+  const storyRaces = story ? (b.attacks ?? []).filter((a) => a.target === story.id && (a.side === 'us') === (peek!.side === 'them')).slice(0, 6) : []
   return (
-    <div className={`wm${coach < COACH.length ? ` coach-${coach}` : ''}${lay.small ? ' small' : ''}${ready ? ' go' : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
+    <div className={`wm${coach < COACH.length ? ` coach-${coach}` : ''}${lay.small ? ' small' : ''}${ready ? ' go' : ''}${final ? ' last-day' : ''}${close ? ' neck' : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
       <div className="wm-goal" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs} · each ⭐ is ${WAR_RULES.starPoints} war points`}>
         <span className="us"><small>{b.us.tag}</small>⭐ {ours}</span>
-        <b>{swept ? '👑 All their racers beaten!' : 'Beat their racers for ⭐'}</b>
+        <b>{final ? <span className="wm-clock" title="The war ends at midnight UTC on Sunday">⏳ {left0(toEnd)}</span> : null}{swept ? '👑 All their racers beaten!' : final ? (close ? 'Too close!' : 'Last day!') : 'Beat their racers for ⭐'}</b>
         <span className="them">⭐ {theirs}<small>{b.them.tag}</small></span>
       </div>
       {tip(0)}
@@ -368,12 +379,12 @@ function WarMap({ b, myPi, left, me, mine, ready }: { b: Battle; myPi: number; l
             return <line className="wm-aimline" x1={px(f.x)} y1={f.y} x2={px(t.x)} y2={t.y} />
           })()}
           {streaks.map(({ a, from, to, fresh }, i) => (
-            <line key={`${a.at}${a.by}${i}`} className={`wm-streak ${a.side}${a.won ? ' won' : ' lost'}${fresh >= 0 ? ' fresh' : ''}${i === streaks.length - 1 ? ' newest' : ''}`}
+            <line key={`${a.at}${a.by}${i}`} className={`wm-streak ${a.side}${a.won ? ' won' : ' lost'}${fresh >= 0 ? ' fresh' : ''}${i === streaks.length - 1 ? ' newest' : ''}${myWin?.a === a ? ' mine' : ''}`}
               style={{ '--d': `${Math.max(0, fresh) * 0.45}s` } as React.CSSProperties} x1={px(from.x)} y1={from.y} x2={px(to.x)} y2={to.y} pathLength={1} />
           ))}
         </svg>
-        {map.them.map((s, i) => <Spot key={s.id} s={s} side="them" at={lay.them[i]} sel={s.id === target?.id} flag={b.us.color} fresh={landing('them', s.id)} onPick={() => { sfx.click(); setPick(s.id) }} />)}
-        {map.us.map((s, i) => <Spot key={s.id} s={s} side="us" at={lay.us[i]} sel={false} flag={b.them.color} fresh={landing('us', s.id)} />)}
+        {map.them.map((s, i) => <Spot key={s.id} s={s} side="them" at={lay.them[i]} sel={s.id === target?.id} flag={b.us.color} fresh={landing('them', s.id)} burst={myWin?.a.target === s.id ? `+${'★'.repeat(myWin.a.stars)}` : undefined} onPick={() => { sfx.click(); setPick(s.id); setPeek({ side: 'them', id: s.id }) }} />)}
+        {map.us.map((s, i) => <Spot key={s.id} s={s} side="us" at={lay.us[i]} sel={peek?.id === s.id} flag={b.them.color} fresh={landing('us', s.id)} onPick={() => { sfx.click(); setPeek((p) => (p?.id === s.id ? null : { side: 'us', id: s.id })) }} />)}
       </div>
       {tip(1)}
       {target && (
@@ -400,8 +411,17 @@ function WarMap({ b, myPi, left, me, mine, ready }: { b: Battle; myPi: number; l
         </div>
       )}
       {tip(2)}
-      {latest && (
-        <div className={`wm-feed ${latest.side}`} title="Latest war race">
+      {story ? (
+        <div className={`wm-story ${peek!.side}`} key={story.id} title={`${story.name}: every war race at them this week`}>
+          <b>{story.me ? 'You' : story.name}</b>
+          {storyRaces.length ? storyRaces.map((a, i) => (
+            <span key={i} className={a.won ? 'won' : 'lost'}>{a.by === me ? 'You' : a.byName || nameOf(a.by)} <em>{a.won ? '★'.repeat(a.stars) : '✖'}</em></span>
+          )) : <span className="none">{peek!.side === 'us' ? '🛡️ Not raced yet' : '🎯 Nobody has raced them'}</span>}
+          {peek!.side === 'them' && story.stars < 3 && <small title="Stars still to take off them">{'☆'.repeat(3 - story.stars)} left</small>}
+          <button className="wm-story-x" onClick={() => setPeek(null)} aria-label="Close">✕</button>
+        </div>
+      ) : latest && (
+        <div className={`wm-feed ${latest.side}`} key={latest.at} title="Latest war race">
           {latest.side === 'us' ? '🟢' : '🔴'} <b>{latest.byName || nameOf(latest.by)}</b>
           {latest.won ? <> took <em>{'★'.repeat(latest.stars)}</em> off </> : ' lost to '}
           <b>{nameOf(latest.target)}</b>

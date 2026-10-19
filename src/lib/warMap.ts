@@ -5,7 +5,7 @@ import { raceCarOf } from '../game/raceCar'
 import { raceFloor } from '../game/race'
 import { useGame, spendFuel } from '../game/store'
 import { GHOST_FUEL, isBody, runWarGhost, type Ghost } from './ghosts'
-import { WAR_RULES, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide } from './battles'
+import { WAR_RULES, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide, type WarAttack } from './battles'
 
 // The crew war map (supabase/migrations/0114_crew_war_map.sql): every member of both crews is a spot on the
 // map. A member races a rival's ghost (a war race); a win takes 1 to 3 stars from that rival and adds war
@@ -202,4 +202,32 @@ export function unseenRaces(b: Battle) {
   try { seen = localStorage.getItem(`${SEEN}.${b.week}`) ?? '' } catch { /* private mode */ }
   const fresh = (b.attacks ?? []).filter((a) => a.at > seen)
   return { fresh, mark: () => { try { localStorage.setItem(`${SEEN}.${b.week}`, (b.attacks ?? []).reduce((m, a) => (a.at > m ? a.at : m), seen)) } catch { /* private mode */ } } }
+}
+
+// A demo war race (?battle=demo) lands on the map like a real one: the server isn't there to record it.
+export function recordDemoWarRun(target: string, t: number, their: number) {
+  const d = demoBattle()
+  const b = d?.current
+  if (!d || !b) return
+  const stars = warStars(t, their)
+  const attack: WarAttack = { side: 'us', by: 'me', byName: 'You', target, won: stars > 0, stars, points: stars * WAR_RULES.starPoints, at: new Date().toISOString() }
+  d.current = { ...b, us: { ...b.us, score: b.us.score + attack.points }, attacks: [attack, ...(b.attacks ?? [])] }
+  useCrewBattle.setState({ battle: { ...d } })
+}
+
+// While the map is open, new war races (crewmates' and rivals') come in on their own.
+export const WAR_LIVE_MS = 20_000
+export function watchWar() {
+  if (demoBattle()) return () => {}
+  const id = setInterval(() => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') void refreshCrewBattle()
+  }, WAR_LIVE_MS)
+  return () => clearInterval(id)
+}
+
+// The final stretch of the war: its last day, and whether the score is close enough to swing.
+export function warFinal(b: Battle, msLeft: number) {
+  const final = !b.result && msLeft < 86_400_000
+  const gap = Math.abs(b.us.score - b.them.score)
+  return { final, close: final && gap <= Math.max(10, Math.max(b.us.score, b.them.score) * 0.1) }
 }

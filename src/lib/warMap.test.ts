@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { raceFloor } from '../game/race'
 import type { Battle, BattleSide, WarAttack } from './battles'
-import { FIELD, SMALL_FIELD, SPOT, fieldLayout, msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
+import { FIELD, SMALL_FIELD, SPOT, fieldLayout, warFinal, msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
 
 const sql = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
 
@@ -97,5 +97,16 @@ describe('crew war map', () => {
 
   it('counts down to UTC midnight', () => {
     expect(msToWarRaces(Date.UTC(2026, 9, 18, 21, 0))).toBe(3 * 3600_000)
+  })
+
+  it('calls the last day of a war, and a close score on it', () => {
+    const side = (score: number): BattleSide => ({ bot: true, name: 'X', tag: 'X', emblem: '🏁', color: '#fff', score, members: [] })
+    const war = (us: number, them: number, result: Battle['result'] = null): Battle => ({ week: '2026-10-12', venue: 'main', result, mine: 0, mvp: false, claimed: [], us: side(us), them: side(them) })
+    const day = 86_400_000
+    expect(warFinal(war(100, 50), 2 * day)).toEqual({ final: false, close: false })
+    expect(warFinal(war(100, 50), day / 2)).toEqual({ final: true, close: false })
+    expect(warFinal(war(100, 92), day / 2)).toEqual({ final: true, close: true })
+    expect(warFinal(war(3, 9), day / 2).close).toBe(true)
+    expect(warFinal(war(100, 92, 'win'), day / 2).final).toBe(false)
   })
 })
