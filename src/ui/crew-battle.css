@@ -136,8 +136,9 @@
 .wm-aimline { stroke: #ffd54f; stroke-width: 2; stroke-dasharray: 4 6; opacity: .8; animation: wm-aim 0.8s linear infinite; }
 @keyframes wm-aim { to { stroke-dashoffset: -10; } }
 
-/* The front: stars each crew has taken, as a tug across the middle of the field */
-.wm-front { position: absolute; left: 6px; right: 6px; top: var(--front); transform: translateY(-50%); display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 12px; background: rgba(6,10,24,.82); border: 1.5px solid rgba(255,255,255,.18); z-index: 1; }
+/* Stars each crew has taken, as a tug over the field */
+.wm-front { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 12px; background: rgba(6,10,24,.82); border: 1.5px solid rgba(255,255,255,.18); }
+.wm-frontline { position: absolute; left: 8px; right: 8px; top: var(--front); height: 0; border-top: 2px dashed rgba(255,213,79,.55); filter: drop-shadow(0 0 4px rgba(255,213,79,.6)); pointer-events: none; }
 .wm-front > span:not(.wm-tug) { display: flex; align-items: center; gap: 3px; font: 18px var(--display); color: #fff; white-space: nowrap; text-shadow: 0 2px 0 rgba(0,0,0,.4); }
 .wm-front small { padding: 1px 5px; border-radius: 7px; font-size: 11px; background: var(--us); }
 .wm-front .them small { background: var(--them); }

@@ -270,8 +270,8 @@ const ago = (at: string, now: number) => {
   return m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`
 }
 
-// The war map: a battlefield. Their racers hold the top, your crew the bottom, and the star tug is the front
-// between them. Every war race is a streak across the field from racer to racer, and races run since the player
+// The war map: a battlefield. The star tug sits on top; below it their racers hold the top of the field and
+// your crew the bottom, with the front line between them. Every war race is a streak across the field from racer to racer, and races run since the player
 // last looked replay one by one. Taking all 3 stars off a racer plants your flag on them. Tap a rival to aim;
 // the one race button sits under the field.
 function WarMap({ b, myPi, left, me, ready }: { b: Battle; myPi: number; left: number; me: string | null; ready: boolean }) {
@@ -334,6 +334,11 @@ function WarMap({ b, myPi, left, me, ready }: { b: Battle; myPi: number; left: n
   const px = (x: number) => (x * w) / 100
   return (
     <div className={`wm${lay.small ? ' small' : ''}${ready ? ' go' : ''}`} style={{ '--us': b.us.color, '--them': b.them.color } as React.CSSProperties}>
+      <div className="wm-front" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
+        <span className="us"><small>{b.us.tag}</small>⭐{ours}</span>
+        <span className="wm-tug" style={{ '--split': `${(share * 100).toFixed(1)}%` } as React.CSSProperties}><i className="u" /><i className="t" /><b>⚔️</b></span>
+        <span className="them">⭐{theirs}<small>{b.them.tag}</small></span>
+      </div>
       <div className="wm-field" ref={field} style={{ height: lay.height, '--front': `${lay.frontY}px` } as React.CSSProperties}>
         <i className="wm-turf them" title={`${b.them.name}: race them for stars`} />
         <i className="wm-turf us" title={`${b.us.name}: stars ${b.them.tag} took off your crew`} />
@@ -349,11 +354,7 @@ function WarMap({ b, myPi, left, me, ready }: { b: Battle; myPi: number; left: n
               style={{ '--d': `${Math.max(0, fresh) * 0.45}s` } as React.CSSProperties} x1={px(from.x)} y1={from.y} x2={px(to.x)} y2={to.y} pathLength={1} />
           ))}
         </svg>
-        <div className="wm-front" title={`Stars taken · ${b.us.tag} ${ours} of ${max} · ${b.them.tag} ${theirs}`}>
-          <span className="us"><small>{b.us.tag}</small>⭐{ours}</span>
-          <span className="wm-tug" style={{ '--split': `${(share * 100).toFixed(1)}%` } as React.CSSProperties}><i className="u" /><i className="t" /><b>⚔️</b></span>
-          <span className="them">⭐{theirs}<small>{b.them.tag}</small></span>
-        </div>
+        <i className="wm-frontline" />
         {map.them.map((s, i) => <Spot key={s.id} s={s} side="them" at={lay.them[i]} sel={s.id === target?.id} flag={b.us.color} fresh={landing('them', s.id)} onPick={() => { sfx.click(); setPick(s.id) }} />)}
         {map.us.map((s, i) => <Spot key={s.id} s={s} side="us" at={lay.us[i]} sel={false} flag={b.them.color} fresh={landing('us', s.id)} />)}
       </div>

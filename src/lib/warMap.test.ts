@@ -47,13 +47,18 @@ describe('crew war map', () => {
     expect(sql).toContain("i := substr(p_target, 4)::int")
   })
 
-  it('lays the battlefield out with their crew above the front and ours below, nobody overlapping', () => {
+  it('lays the battlefield out with their crew above the front and ours below, no spot touching another or the front', () => {
     for (const [them, us] of [[3, 4], [5, 5], [1, 1], [12, 30], [7, 2]]) {
       const lay = fieldLayout(them, us)
       expect(lay.them).toHaveLength(them)
       expect(lay.us).toHaveLength(us)
-      for (const p of lay.them) expect(p.y).toBeLessThan(lay.frontY - FIELD.front / 2)
-      for (const p of lay.us) expect(p.y).toBeGreaterThan(lay.frontY + FIELD.front / 2)
+      // A spot reaches 22px above its car's centre and 44px below (stars and name).
+      for (const p of lay.them) expect(p.y + 44).toBeLessThanOrEqual(lay.frontY - FIELD.front / 2)
+      for (const p of lay.us) expect(p.y - 22).toBeGreaterThanOrEqual(lay.frontY + FIELD.front / 2)
+      for (const side of [lay.them, lay.us]) {
+        const rows = [...new Set(side.map((p) => Math.round(p.y / FIELD.row)))].length
+        if (rows > 1) for (const p of side) for (const q of side) if (q.y - p.y > FIELD.row / 2) expect(q.y - 22).toBeGreaterThan(p.y + 44)
+      }
       for (const p of [...lay.them, ...lay.us]) {
         expect(p.x).toBeGreaterThan(0)
         expect(p.x).toBeLessThan(100)
