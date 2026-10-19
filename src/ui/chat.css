@@ -23,11 +23,12 @@
 .chat-at { display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; background: #ffb300; color: #4e342e; font: 11px/1 var(--display); margin-left: 2px; }
 .chat-msg.mine:not(.first) .chat-bubble { border-radius: 14px; }
 .chat-bubble small { margin-left: 8px; font-size: 11px; opacity: .75; }
-.chat-menu { display: flex; gap: 6px; margin: 2px 0 4px; }
+.chat-menu { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 4px; }
 .chat-menu button { border: 2px solid #b9cde8; background: #fff; border-radius: 10px; padding: 3px 9px; font: 13px var(--display); color: #4a6283; }
 .chat-menu .chat-del { border-color: #ef9a9a; color: #c62828; }
 .chat-menu .chat-del.sure { background: #e53935; border-color: #e53935; color: #fff; }
 .chat-menu .chat-x { padding: 3px 7px; color: #78909c; }
+.chat-menu .chat-why { border-color: #ffb74d; color: #e65100; }
 .chat-line { display: flex; align-items: center; gap: 4px; max-width: 100%; }
 .chat-msg.mine .chat-line { flex-direction: row-reverse; }
 .chat-bubble { -webkit-touch-callout: none; }

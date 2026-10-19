@@ -10,3 +10,7 @@
 @media (prefers-reduced-motion: reduce) {
   .war-stars span.on { animation: none; }
 }
+
+/* Race the next rival straight from the result */
+.war-next { display: flex; flex-direction: column; align-items: center; line-height: 1.1; max-width: 60%; }
+.war-next small { font-size: 12px; opacity: .9; }

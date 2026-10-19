@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
-import { MAX_CHAT, canDelete, deleteChat, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
+import { MAX_CHAT, REPORT_REASONS, canDelete, deleteChat, firstRoom, reportChat, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type ReportReason, type Room } from '../lib/chat'
 import { useNames } from '../lib/profiles'
 import { mentions } from '../lib/mentions'
 import { MentionInput, MentionText } from './MentionInput'
@@ -90,7 +90,9 @@ function ChatRoom({ room }: { room: Room }) {
   const [menu, setMenuId] = useState<number | null>(null)
   // The message whose Delete was tapped once: the next tap deletes it.
   const [sure, setSure] = useState<number | null>(null)
-  const setMenu = (id: number | null) => { setMenuId(id); setSure(null) }
+  // The message whose Report was tapped: the menu shows the reasons to pick from.
+  const [reporting, setReporting] = useState<number | null>(null)
+  const setMenu = (id: number | null) => { setMenuId(id); setSure(null); setReporting(null) }
   const press = useRef<number>(0)
   const log = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
@@ -138,6 +140,12 @@ function ChatRoom({ room }: { room: Room }) {
     if (err) toast(err)
   }
 
+  const report = async (m: ChatMsg, reason: ReportReason) => {
+    setMenu(null)
+    const err = await reportChat(m.id, reason)
+    toast(err ?? '🚩 Reported. Thanks!')
+  }
+
   return (
     <>
       <div
@@ -168,6 +176,10 @@ function ChatRoom({ room }: { room: Room }) {
                 <div className="chat-menu">
                   {!mine && <button onClick={() => { setMenu(null); void go(m.owner) }}>🏘️ Visit town</button>}
                   {!mine && <button onClick={() => { setMenu(null); setMuted(m.owner, senderName(m)); toast(`Muted ${senderName(m)}`) }}>🔇 Mute</button>}
+                  {!mine && reporting !== m.id && <button onClick={() => setReporting(m.id)}>🚩 Report</button>}
+                  {!mine && reporting === m.id && REPORT_REASONS.map((r) => (
+                    <button key={r.id} className="chat-why" onClick={() => void report(m, r.id)}>{r.label}</button>
+                  ))}
                   {del && (
                     <button className={`chat-del${sure === m.id ? ' sure' : ''}`} onClick={() => void remove(m)}>
                       🗑️ {sure === m.id ? 'Delete?' : 'Delete'}

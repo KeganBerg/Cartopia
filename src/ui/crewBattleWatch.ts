@@ -3,6 +3,11 @@ import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
 import { battleChests, demoBattle, refreshCrewBattle, useCrewBattle, warPoints } from '../lib/battles'
 import { sfx } from '../lib/sound'
+import { warRacesLeft } from '../lib/warMap'
+
+const DAY_KEY = 'cartopia-war-told'
+const readDay = () => { try { return localStorage.getItem(DAY_KEY) } catch { return null } }
+const saveDay = (d: string) => { try { localStorage.setItem(DAY_KEY, d) } catch { /* told again next time */ } }
 
 // Keeps the battle fresh while the crew screens are open, and says when a victory chest is waiting.
 let toldWeek = ''
@@ -24,6 +29,13 @@ export function useCrewBattleWatcher() {
         toldWeek = b!.last.week
         sfx.notify()
         useGame.getState().toast(b!.last.result === 'win' ? '⚔️ Your crew won its battle! Claim your victory chest.' : '⚔️ Your crew battle ended in a draw. Claim your chest.')
+      }
+      // Once a day: the war races waiting (the Social button goes straight to the map).
+      const left = warRacesLeft()
+      const day = new Date().toISOString().slice(0, 10)
+      if (!due.length && left > 0 && readDay() !== day) {
+        saveDay(day)
+        useGame.getState().toast(`⚔️ ${left} war races ready · tap SOCIAL`)
       }
     }, 5000))
     return () => sub.data.subscription.unsubscribe()

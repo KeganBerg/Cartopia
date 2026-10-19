@@ -2176,7 +2176,7 @@ export function InvitesPanel() {
   return (
     <Panel title="Race challenges">
       {invites.length === 0 ? (
-        <p className="hint">No challenges right now.</p>
+        <div className="inv-empty" title="Friends can challenge you to a live race"><span className="empty-ico">🏁</span><div>No challenges yet</div></div>
       ) : (
         <>
           <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>

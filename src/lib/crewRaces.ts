@@ -38,6 +38,19 @@ export function rankLadder<T extends Pick<Racer, 'time' | 'par'>>(rows: T[]): T[
   return [...rows].sort((a, b) => key(a) - key(b) || (a.time ?? 0) - (b.time ?? 0))
 }
 
+// Each racer's place on a ranked ladder. Equal real times share a place (1, 1, 3): runs are kept
+// to the thousandth, so two cars on the same PI floor can land on exactly the same time.
+// tied: shares its place with someone else.
+export function ladderPlaces<T extends Pick<Racer, 'time' | 'par'>>(ladder: T[]): { place: number; tied: boolean }[] {
+  const real = (r: T) => r.time !== null && !r.par
+  const places = ladder.map((r, i) => {
+    let j = i
+    while (j > 0 && real(r) && real(ladder[j - 1]) && ladder[j - 1].time === r.time) j--
+    return j + 1
+  })
+  return places.map((place) => ({ place, tied: places.filter((p) => p === place).length > 1 }))
+}
+
 // How far the player is off the next racer up the ladder: who to beat and by how much.
 export function nextUp<T extends Pick<Racer, 'id' | 'time' | 'par'>>(ladder: T[], me: string) {
   const i = ladder.findIndex((r) => r.id === me)

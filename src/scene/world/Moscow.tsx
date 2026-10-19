@@ -1467,7 +1467,7 @@ export default function Moscow({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`moscow:${len}`} cell={24}>
+      <Batch version={`moscow:${len}`} cell={24} freeze prune>
         <group position={[0, 0, gz]}><PropMesh parts={gateP} /></group>
         <group position={[WX, 0, 30]}><PropMesh parts={clockP} /></group>
         <group position={[EDGE + 9, 0, cz]} rotation-y={-Math.PI / 2}><PropMesh parts={cathedralP} /></group>

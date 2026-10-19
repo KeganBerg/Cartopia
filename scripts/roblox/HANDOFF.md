@@ -25,6 +25,7 @@ cars, mods, skins, hats and Call Cards with published odds.
 | `Data/ServerCatalog.luau` | The tables the web server checks every save against (prices, rewards, unlock levels, upgrade costs per level) plus `crateTables` (what a crate rolls from). Treat these as the source of truth for the economy. |
 | `Data/Curves.luau` | Formulas sampled at levels 1-100: `xpToNext`, `levelXpBoost`, `playXpMult`, `townXpMult`, `fuelPerMin`, `baseFuelCap`, `gemCoins`, plot prices, crate odds and cost by level. Use them as **expected values** for tests of your Luau versions of the formulas. |
 | `Data/CarShapes.luau` | Every car body's proportions (length, width, cabin, hood, wheel size, spoiler, fins...). The web cars are procedural boxes and tapers, so these build the same cars from Parts/Wedges/MeshParts. Per-car tweaks are in `CarLooks.luau`. |
+| `Audio/` + `Data/Audio.luau` | All the game's music, club tracks, ambience, sound effects and tutorial voice as MP3s, with a map of where each plays (see Audio below). |
 | `json/` | The same data as JSON, if you prefer `HttpService:JSONDecode`. |
 | `index.json` | Which module holds which exports, and the web source file of each. |
 
@@ -68,7 +69,31 @@ they are short pure functions. Where to find them:
 | Admin (KBerg, `is_admin()`) | An allowlist of Roblox UserIds checked on the server (KeganBergeron's own account). |
 | Push notifications | Roblox experience notifications (opt-in) for "your job is done" style alerts. |
 | Clock (UTC days, fuel regen) | `os.time()` on the server only. |
-| Music, voiceover, sound effects | Upload as Roblox audio assets (only audio Kegan owns the rights to). |
+| Music, voiceover, sound effects | Rendered in `Audio/`: upload as Roblox audio assets (see Audio below). |
+
+## Audio
+
+The web game synthesises all its music and sounds live in code (Web Audio), which Roblox
+can't do, so the kit has them **rendered to MP3 from the current game code** under `Audio/`:
+
+| Folder | What | Plays |
+|---|---|---|
+| `music/` | 24 town songs, 6 per season (3 day, 3 night), about 2 minutes each | One at a time, shuffled from the songs for the season and time of day, a short gap between songs |
+| `club/` | 18 nightclub tracks, one 64-bar pass each, made to loop | One track all night, a different one every night (`trackOf(night)` in `src/lib/clubSet.ts`), louder near the club |
+| `rave/` | Rave Mode build-up (10 s) and drop loop | Build-up once over the warning, then the loop |
+| `ambience/` | 20 one-minute seamless loops: season x day/night x weather (calm, rain, storm, wind, snow), plus 2 thunder claps | Under everything, crossfaded when season, time or weather changes |
+| `sfx/` + `sfx-sprite.mp3` | 77 sound effects (taps, coins, level up, crates, Rusty, wheel, races, arcade) | On their action |
+| `voice/` | 12 tutorial voice lines | Once on their tutorial step |
+
+`Data/Audio.luau` lists every file with where it plays, its length and an empty `assetId`
+to fill in after upload, plus starting volumes (`Volume`) and the play rules (`Rules`).
+
+Roblox audio rules to plan around (check the Creator Hub, they change):
+- Formats MP3, OGG, WAV or FLAC; at most **7 minutes** and **20 MB** per file. Every file here fits.
+- Uploads are free but capped per 30 days: about **100 with a verified ID**, about **10 without**. Upload from the account or group that owns the experience, or grant the experience permission to use each asset.
+- New audio is checked by moderation before it plays.
+- To stay inside the cap, upload `sfx-sprite.mp3` once instead of the 77 effect files and play each effect as a region of it: `Sound.PlaybackRegionsEnabled = true`, `Sound.PlaybackRegion = NumberRange.new(start, stop)` from `Sfx[name].sprite`. That makes the whole set **79 uploads**: 24 songs, 18 club tracks, 2 rave, 20 ambience loops, 2 thunder claps, 1 sprite and 12 voice lines.
+- Car engines are not in the kit: the web game synthesises them per car as you drive. On Roblox, use a short engine loop per body type with `PlaybackSpeed` following RPM.
 
 ## House rules that carry over
 
@@ -94,4 +119,5 @@ For each step: port the rule, write a test against the kit's numbers (e.g. your 
 ## Re-exporting the kit
 
 In the web repo: `npm ci && node scripts/roblox/export.mjs` writes a fresh kit to
-`roblox-export/`. Ask Kegan for a new kit from the web project whenever a number there changes.
+`roblox-export/`, and `node scripts/roblox/audio.mjs` re-renders the audio into the same folder.
+Ask Kegan for a new kit from the web project whenever a number or a sound there changes.
