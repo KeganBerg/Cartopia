@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useGame } from '../game/store'
 import { AmbienceControl, EffectsControl, MusicControl, SoundControl } from './MuteButton'
@@ -148,8 +148,15 @@ export function SettingsTab({ user }: { user: User | null }) {
 // Roblox game takes them out (supabase/migrations/0119_roblox_link.sql).
 function RobloxLink() {
   const [code, setCode] = useState<string | null>(null)
+  const [linked, setLinked] = useState(false)
+  const [sure, setSure] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    supabase?.rpc('roblox_link_status').then(({ data }) => { if (live && data) setLinked(!!data.linked) })
+    return () => { live = false }
+  }, [])
   const make = async () => {
     if (!supabase) return
     setBusy(true)
@@ -160,9 +167,28 @@ function RobloxLink() {
     setBusy(false)
     if (error || !data?.code) return setErr('Could not make a code. Try again soon.')
     setCode(data.code as string)
+    setLinked(!!data.linked)
+  }
+  const unlink = async () => {
+    if (!supabase) return
+    setBusy(true)
+    setErr('')
+    const { data, error } = await supabase.rpc('roblox_unlink')
+    setBusy(false)
+    setSure(false)
+    if (error || !data) return setErr('Could not unlink. Try again soon.')
+    setLinked(false)
+    setCode(null)
   }
   return (
     <Group icon="🟥" title="Play on Roblox">
+      {linked && (
+        <Row label="✅ Linked" sub="Your Roblox account plays this town">
+          {sure
+            ? <button className="sell small" disabled={busy} title="Unlink Roblox" onClick={unlink}>Sure?</button>
+            : <button className="buy small alt" disabled={busy} title="Unlink Roblox" onClick={() => setSure(true)}>Unlink</button>}
+        </Row>
+      )}
       <Row label="Roblox code" sub="Earned progress only. Paid packs stay here.">
         <button className="buy small alt" disabled={busy} title="Roblox code: type it in Cartopia on Roblox, Menu, Settings. Works once, for 15 minutes." onClick={make}>{code ? 'New' : 'Get'}</button>
       </Row>
