@@ -33,6 +33,7 @@ export function signTexture(text: string, bg = '#ffffff', fg = '#c62828', aspect
   t.userData.text = true
   t.userData.label = text
   t.userData.aspect = aspect
+  t.userData.colors = [bg, fg]
   cache.set(k, t)
   return t
 }

@@ -26,6 +26,7 @@ cars, mods, skins, hats and Call Cards with published odds.
 | `Data/Curves.luau` | Formulas sampled at levels 1-100: `xpToNext`, `levelXpBoost`, `playXpMult`, `townXpMult`, `fuelPerMin`, `baseFuelCap`, `gemCoins`, plot prices, crate odds and cost by level. Use them as **expected values** for tests of your Luau versions of the formulas. |
 | `Data/CarShapes.luau` | Every car body's proportions (length, width, cabin, hood, wheel size, spoiler, fins...). The web cars are procedural boxes and tapers, so these build the same cars from Parts/Wedges/MeshParts. Per-car tweaks are in `CarLooks.luau`. |
 | `Data/UIMotion.luau` | Menu and button motion, ported from the web game: panels rise in and drop away (a bottom sheet on phones), instant swaps between menus, button press and hover, reward pops, number bumps, error shakes, each with its sound. See Menu motion below. |
+| `Data/BuildingBuilder.luau` + `Data/Buildings/` + `Data/ModelAssets.luau` + `Models/` | Every building's 3D model at every level, exported from the web game's own models, and the module that builds them as Parts and swaps in the new detail on level up. See Building models below. |
 | `Audio/` + `Data/Audio.luau` | All the game's music, club tracks, ambience, sound effects and tutorial voice as MP3s, with a map of where each plays (see Audio below). |
 | `json/` | The same data as JSON, if you prefer `HttpService:JSONDecode`. |
 | `index.json` | Which module holds which exports, and the web source file of each. |
@@ -56,7 +57,7 @@ they are short pure functions. Where to find them:
 | Web | Roblox |
 |---|---|
 | Rules and data (`src/game`) | Port to ModuleScripts in ReplicatedStorage. Keep the same names and numbers so both versions stay comparable. |
-| React Three Fiber scenes | Rebuild with Parts/MeshParts. Town grid: `Data.GRID` (24) tiles of `Data.TILE` (2) units; pick a stud scale (e.g. 1 web unit = 4 studs) and keep it everywhere. Reuse instancing ideas: clone templates, never one-off unions per frame. |
+| React Three Fiber scenes | Rebuild with Parts/MeshParts. Town grid: `Data.GRID` (24) tiles of `Data.TILE` (2) units; use 1 web unit = 5.5 studs everywhere (`BuildingBuilder.studsPerUnit`: a web townsperson is 0.9 units, a Roblox avatar about 5 studs, so a lot tile is 11 studs). Reuse instancing ideas: clone templates, never one-off unions per frame. |
 | React UI panels | ScreenGui (or React-Luau / Fusion). Same rules: phone first, icons and numbers, at most one short line of text per card, one primary action, yellow back arrow, X closes to town. |
 | Supabase `game_saves` + `guard_game_save` / `econ_guard` anti-cheat | **ProfileStore (or DataStoreService) on the server.** On Roblox the server owns state, so the whole save-guard layer goes away: clients send intents over RemoteEvents ("collect building 12"), the server checks and applies them. Never trust a client number. Rate-limit every remote. |
 | Supabase RPCs (crate_open, race_finish, trial_submit...) | Server-side ModuleScripts behind RemoteFunctions. Their SQL is the spec for what to check. |
@@ -110,6 +111,26 @@ with TweenService, with the web game's own timings and easing. Use it on **every
 
 Buttons inside a UIListLayout or UIGridLayout can't move (the layout owns their position), so they only scale on press. That's fine. The module respects Roblox's Reduced Motion setting.
 
+## Building models
+
+Every building in the web game looks different at each level (a house becomes a tower, a pizza
+place grows floors, signs and a fire escape). That look lives in the web game's 3D code, not in
+its data, so it is exported separately: `scripts/roblox/models.mjs` renders every building at
+every level with the game's own code and writes each piece as a Roblox part.
+
+- `Data/Buildings/<id>.luau`: one module per building (`BUILDINGS` ids). Each part is listed once with the levels it shows at, so a level up only adds and removes what changed.
+- `Data/BuildingBuilder.luau`: builds them. Call `Builder.init({ buildings = CartopiaData.Buildings, assets = require(CartopiaData.ModelAssets) })` once, then:
+  - `Builder.build(id, level, lotCFrame)` returns a Model (parent it yourself; the pivot is the middle of the lot at ground level).
+  - `Builder.setLevel(model, level)` on every upgrade: the new detail rises in, staggered, and old pieces go.
+  - `Builder.setNight(model, on)` lights windows and signs after dark.
+  - `Builder.count(id, level)` gives the part count, for a budget check.
+- All parts are Anchored with CanCollide, CanTouch and CanQuery off; one invisible `Hitbox` part per building handles walking into it and tapping it. Keep it that way: it is what keeps a full town cheap.
+- **Upload once, on a computer:** `Models/meshes/*.obj` (shapes that aren't blocks, balls or cylinders: roofs, cones, rings) and `Models/images/*.png` (brick, siding, shingles, windows, awnings) through Studio's Asset Manager bulk import, then paste each asset id into `Data/ModelAssets.luau`. Import meshes at 1 unit = 1 stud with no rescaling; the builder sizes them. Until an id is filled in, a mesh shows as a block of the same size and a texture as the matching Roblox material in its average colour, so buildings look right in shape from day one.
+- Signs are SurfaceGui text, so they need no uploads. Textured round shapes (striped canopies, balloons) are meshes whose image rides on `SpecialMesh.TextureId`.
+- Left out on purpose: things the web game animates around a building, its crowds (Speedway stands, Funfair, Nightclub) and the Speedway's race cars. Each module's `crowd` says how many people the web game shows at each level; spawn that many of your own NPCs (cheap rigs or R15 dummies) so they can move.
+- Merged buildings (two or more of the same side by side) use `Builder.build(id, level, cf, { scale = n })` for now; the web game's merged looks are in `src/game/merge.ts` and `src/scene/mergeScale.tsx`.
+- Re-export after any building changes on the web: `node scripts/roblox/models.mjs` (all buildings) or `node scripts/roblox/models.mjs roblox-export pizza,house` (some). `node scripts/roblox/check.mjs roblox-export pizza 1,10` runs this builder on the data and saves pictures of each level beside the web model.
+
 ## House rules that carry over
 
 - **Names are invented**, never real brands, people, tragedies or wars (the web repo has a banned-names test; car names in `CARS` are already safe).
@@ -121,7 +142,7 @@ Buttons inside a UIListLayout or UIGridLayout can't move (the layout owns their 
 
 ## A suggested build order
 
-1. **Town core:** grid, roads, place/move buildings from `BUILDINGS`, jobs that cost fuel and pay coins and XP, fuel regen, levels from `Curves.xpToNext`, ProfileStore save.
+1. **Town core:** grid, roads, place/move buildings from `BUILDINGS` (models from `BuildingBuilder`, `setLevel` on every upgrade), jobs that cost fuel and pay coins and XP, fuel regen, levels from `Curves.xpToNext`, ProfileStore save.
 2. **Cars:** showroom buying from `CARS`, garage, procedural car models from `CarShapes`, paints.
 3. **Drag race:** port `race.ts` (shift timing, launch, boost) and an AI rival from `raceSim.ts`; campaign races.
 4. **Rusty's Rescue and restores**, building upgrades and merges, goals and daily tasks.
@@ -134,5 +155,5 @@ For each step: port the rule, write a test against the kit's numbers (e.g. your 
 ## Re-exporting the kit
 
 In the web repo: `npm ci && node scripts/roblox/export.mjs` writes a fresh kit to
-`roblox-export/`, and `node scripts/roblox/audio.mjs` re-renders the audio into the same folder.
+`roblox-export/`, `node scripts/roblox/audio.mjs` re-renders the audio and `node scripts/roblox/models.mjs` re-exports the building models into the same folder (run export.mjs first: it clears the folder).
 Ask Kegan for a new kit from the web project whenever a number or a sound there changes.
