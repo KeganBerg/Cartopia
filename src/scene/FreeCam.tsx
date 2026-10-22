@@ -7,6 +7,7 @@ import { START_LAND } from '../game/data'
 import { FREE, VIEW, nearFor, setFreeCam, setFreeFingers, useFreeCam } from './freeCam'
 import { RAMP, cameraSpot, distToLot, lotsOf, roamBox, type Carry, type Lot } from './freeCamBounds'
 import { Horizon } from './Horizon'
+import { cruisePose, useCruise } from './cruise'
 import { heightAt } from './horizonLand'
 
 // The opening move: the camera swoops down from the bird's-eye angle to a lower
@@ -20,6 +21,10 @@ const SWOOP_IN = 0.72 // and how much closer it comes
 // is the same at 30 and 120 frames a second.
 const FOLLOW = 16
 const COAST = 3.2
+// Driving your own car round town (scene/cruise.ts): the camera rides behind and a
+// little above it, looking just ahead of the bonnet, and lags a touch so turns swing.
+const CHASE = { dist: 6, pitch: 1.13, ahead: 1.2, follow: 5 }
+const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
 
 const fwdV = new Vector3()
 const rightV = new Vector3()
@@ -144,6 +149,26 @@ function Rig() {
     if (!c || !r) return
     const dt = Math.min(delta, 0.1)
     const { goal, cur, vel } = r
+    if (useCruise.getState().uid) {
+      // Behind the car: the camera's yaw is the way it looks from, so half a turn round
+      // from the car's heading, taken the short way from where the camera is now.
+      const p = cruisePose
+      r.swoop = null
+      vel.x = vel.z = vel.yaw = 0
+      goal.x = p.x + Math.sin(p.h) * CHASE.ahead
+      goal.z = p.z + Math.cos(p.h) * CHASE.ahead
+      goal.yaw = cur.yaw + wrapAngle(p.h + Math.PI - cur.yaw)
+      goal.pitch = CHASE.pitch
+      goal.dist = CHASE.dist
+      const f = 1 - Math.exp(-CHASE.follow * dt)
+      cur.x += (goal.x - cur.x) * Math.min(1, f * 2)
+      cur.z += (goal.z - cur.z) * Math.min(1, f * 2)
+      cur.yaw += (goal.yaw - cur.yaw) * f
+      cur.pitch += (goal.pitch - cur.pitch) * f
+      cur.dist *= (goal.dist / cur.dist) ** f
+      place(c, cur, lots(c), r, dt)
+      return
+    }
     // Opening swoop: steer the goal along an eased path; anything the player does
     // ends it and takes over from wherever it got to.
     if (r.swoop) {

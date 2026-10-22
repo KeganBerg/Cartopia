@@ -10,6 +10,7 @@ import { compact } from './format'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DOOR_FLY, depotWalk, doorTrip } from '../scene/doorTrip'
 import { usePauseTownUnder } from '../scene/renderGate'
+import { startCruise } from '../scene/cruise'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -762,6 +763,22 @@ function RaceCarToggle({ car }: { car: string }) {
   )
 }
 
+// Takes the car out for a drive round town by hand (scene/cruise.ts). A car on a flat
+// or out of fuel stays put until it's fixed.
+function DriveToggle({ car }: { car: OwnedCar }) {
+  const stuck = !!(car.flat || car.lowFuel)
+  const go = () => {
+    const s = useGame.getState()
+    s.closePanel()
+    if (!startCruise(car.uid)) s.toast('No road to drive on yet')
+  }
+  return (
+    <button className="showcase-toggle drive-toggle" onClick={go} disabled={stuck} title={stuck ? 'Fix it up first' : 'Drive it round town'}>
+      {stuck ? '🔧 Drive' : '🚗 Drive'}
+    </button>
+  )
+}
+
 // My Cars list filter and sort, kept while the game is open. Default: top PI first.
 type CarSort = 'pi' | 'pi-low' | 'name' | 'new'
 const CAR_SORTS: { id: CarSort; label: string }[] = [
@@ -974,6 +991,7 @@ function GarageSection() {
             <div className="car-toggles">
               <RaceCarToggle car={car.uid} />
               <ShowcaseToggle car={car.uid} />
+              <DriveToggle car={car} />
             </div>
           </div>
           <div className="garage-tabs" role="tablist">
