@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { SkillIcon } from './TapTip'
 import { useGame, gateLevel, type OwnedCar } from '../game/store'
 import { type CarDef, CAMPAIGN, CAMPAIGN_RACES, GP_ROUNDS, GP_SERIES, RACE_FUEL, SKILLS, campaignCleared, campaignOpen, campaignRaceId, gpOpen, carDef, msToNextWeek, performance, skinDef } from '../game/data'
-import { BUILDS, DIST, buildOf, raceCharacter, fit, tourDist, type RaceDist } from '../game/distance'
+import { BUILDS, buildOf, raceCharacter, fit, type RaceDist } from '../game/distance'
 import { EVENT_RACES, eventFor, eventPrize, eventProgress } from '../game/events'
 import { TOUR_RACES, tourLeg, tourLegOf, tourRivalName } from '../game/tour'
 import { campaignPayNow, tourPayNow } from '../game/fairRace'
@@ -23,9 +23,10 @@ import { flairChip, flairNew } from './Flair'
 import { dailyBest } from './DailyRun'
 import { dailyDay } from '../game/daily'
 import { worldChip } from './WorldTour'
+import { MODE_LEVEL, MODE_NAME, nextRace, type HubMode } from '../game/hubModes'
 
-// The Race menu's front page: every race mode as a tile on one screen, each
-// showing its next race, so nothing needs scrolling to find.
+// The Race menu's front page: the next race big at the top with the screen's one button,
+// then three lanes (Story, Events, Free play) whose tiles open their modes.
 
 export type HubTab = 'quick' | 'campaign' | 'tour' | 'gp' | 'trial' | 'event' | 'rivals' | 'tuner' | 'cups' | 'road' | 'flair' | 'daily' | 'world'
 
@@ -86,7 +87,6 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
   const evBase = evp?.pi ?? cars.reduce((m, c) => Math.max(m, performance(carDef(c.model), c.upgrades, c.mods)), 0)
   const evSkin = skinDef(ev.skin)!
   const evHas = useGame((s) => (s.skins ?? []).includes(ev.skin))
-  const evCar = [...cars].sort((a, b) => performance(carDef(b.model), b.upgrades, b.mods) - performance(carDef(a.model), a.upgrades, a.mods))[0]
 
   const week = trialWeek()
   const trial = trialVenue(week)
@@ -96,100 +96,127 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
   const tile = (tab: HubTab) => ({ role: 'button', tabIndex: 0, onClick: () => onOpen(tab), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && onOpen(tab) })
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
 
+  // The one race the menu leads with: the next campaign race, else this week's event, else the
+  // next Pro Tour leg, else a quick race. Its button is the screen's one big button.
+  const pick = nextRace(next, evWon < EVENT_RACES, tourOpen)
+  const hero = pick === 'campaign'
+    ? { tag: 'CAMPAIGN', title: ch.rivals[next], meta: `${ch.name} · ${next + 1}/${CAMPAIGN_RACES}`, art: artStyle('camp', ch.venue), clip: <TileClip mode="camp" venue={ch.venue} />, prize: campaignPayNow(ci, next, true), go: () => onCampaign(ci, next), open: 'campaign' as HubTab }
+    : pick === 'event'
+      ? { tag: 'WEEKLY EVENT', title: ev.name, meta: `${evWon + 1}/${EVENT_RACES} · ⏳ ${shortLeft(msToNextWeek())}`, art: { ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color }, clip: <TileClip mode="tour" venue={ev.venue} night={ev.night} sky={ev.sky} event={ev.id} />, prize: eventPrize(evBase, evWon), go: onEvent, open: 'event' as HubTab }
+      : pick === 'tour'
+        ? { tag: 'PRO TOUR', title: tourRivalName(won), meta: leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`, art: artStyle('tour', leg.venue, leg.night), clip: <TileClip mode="tour" venue={leg.venue} night={leg.night} sky={tourSky} />, prize: tourPayNow(won), go: onTour, open: 'tour' as HubTab }
+        : { tag: 'QUICK RACE', title: 'Pick a rival', meta: '🏁', art: artStyle('camp', 'main'), clip: <TileClip mode="camp" venue="main" />, prize: null, go: () => onOpen('quick'), open: 'quick' as HubTab }
+
+  // Modes arrive with levels, so a new player starts with a short menu. Each lane ends on the next one coming.
+  const has = (m: HubMode) => level >= MODE_LEVEL[m]
+  const soon = (ms: HubMode[]) => {
+    const m = ms.filter((x) => !has(x)).sort((x, y) => MODE_LEVEL[x] - MODE_LEVEL[y])[0]
+    return m && <span className="rm-mini rm-soon" title={`${MODE_NAME[m]} opens at level ${MODE_LEVEL[m]}`}><span className="rm-dot rm-lv">Lv {MODE_LEVEL[m]}</span><span className="rm-mi">🔒</span><span><b>{MODE_NAME[m]}</b></span></span>
+  }
+
   return (
-    <div className="rm-hub">
-      <div className="rm-tile rm-camp rm-photo" style={artStyle('camp', ch.venue)} {...tile('campaign')}>
-        <TileClip mode="camp" venue={ch.venue} />
-        <span className="rm-tag">CAMPAIGN</span>
-        <b className="rm-ttl">{ch.name}</b>
-        <span className="rm-meta">Chapter {ci + 1} of {CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
-        <span className="rm-progress"><i style={{ width: `${(stars / maxStars) * 100}%` }} /></span>
-        {next >= 0 && (
-          <span className="rm-cta"><span>{ch.rivals[next]}</span><button className="buy small" onClick={stop(() => onCampaign(ci, next))}>{money(campaignPayNow(ci, next, true))}<small>⛽{RACE_FUEL}</small></button></span>
-        )}
+    <div className="rm-hub rm-lanes">
+      <div className="rm-tile rm-photo rm-lead" style={hero.art as React.CSSProperties} {...tile(hero.open)}>
+        {hero.clip}
+        <span className="rm-tag">▶ NEXT RACE</span>
+        <span className="rm-lead-mode">{hero.tag}</span>
+        <b className="rm-ttl">{hero.title}</b>
+        <span className="rm-meta">{hero.meta}</span>
+        <button className="buy rm-lead-go" onClick={stop(hero.go)}>🏁 {hero.prize !== null ? money(hero.prize) : 'Go'}{hero.prize !== null && <small>⛽{RACE_FUEL}</small>}</button>
       </div>
 
-      <div className={`rm-tile rm-tour rm-photo${tourOpen ? '' : ' rm-locked'}`} style={artStyle('tour', leg.venue, leg.night)} {...tile('tour')}>
-        <TileClip mode="tour" venue={leg.venue} night={leg.night} sky={tourSky} />
-        <span className="rm-tag">PRO TOUR</span>
-        <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
-        {tourOpen ? (
-          <>
-            <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} · {DIST[tourDist(won)].label} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
-            <span className="rm-cta"><span>{tourRivalName(won)}</span><button className="buy small" onClick={stop(onTour)}>{money(tourPayNow(won))}<small>⛽{RACE_FUEL}</small></button></span>
-          </>
-        ) : <span className="rm-meta">🔒 Clear Back Streets to open</span>}
-      </div>
+      <section className="rm-lane rm-story" aria-label="Story">
+        <h4 className="rm-lane-h">📖 Story</h4>
+        <div className="rm-lane-photos">
+          <div className="rm-tile rm-camp rm-photo" style={artStyle('camp', ch.venue)} {...tile('campaign')}>
+            <TileClip mode="camp" venue={ch.venue} />
+            <span className="rm-tag">CAMPAIGN</span>
+            <b className="rm-ttl">{ch.name}</b>
+            <span className="rm-meta">{ci + 1}/{CAMPAIGN.length} · ⭐ {stars}/{maxStars}</span>
+            <span className="rm-progress"><i style={{ width: `${(stars / maxStars) * 100}%` }} /></span>
+          </div>
+          <div className={`rm-tile rm-tour rm-photo${tourOpen ? '' : ' rm-locked'}`} style={artStyle('tour', leg.venue, leg.night)} {...tile('tour')}>
+            <TileClip mode="tour" venue={leg.venue} night={leg.night} sky={tourSky} />
+            <span className="rm-tag">PRO TOUR</span>
+            <b className="rm-ttl">{leg.night ? `${tv.name} at Midnight` : `${tv.name} ${leg.name}`}</b>
+            {tourOpen
+              ? <span className="rm-meta">Leg {leg.index + 1}{leg.night ? ' · 🌙' : ''} <Pips n={won % TOUR_RACES} of={TOUR_RACES} /></span>
+              : <span className="rm-meta" title="Clear Back Streets to open">🔒 {CAMPAIGN[0].name}</span>}
+          </div>
+          <div className={`rm-tile rm-gp rm-photo${gpOpen(gp, GP_SERIES.indexOf(series), level) ? '' : ' rm-locked'}`} style={artStyle('gp')} {...tile('gp')}>
+            <TileClip mode="gp" />
+            <span className="rm-tag">GRAND PRIX</span>
+            <b className="rm-ttl">{series.name}</b>
+            <span className="rm-meta"><Rounds round={round} /></span>
+          </div>
+        </div>
+        <RivalTile onRace={onRival} onOpen={() => onOpen('rivals')} />
+      </section>
 
-      <RivalTile onRace={onRival} onOpen={() => onOpen('rivals')} />
-
-      <div className={`rm-tile rm-ev rm-photo`} style={{ ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
-        <TileClip mode="tour" venue={ev.venue} night={ev.night} sky={ev.sky} event={ev.id} />
-        {evCar && (
-          <span className="rm-ev-car" aria-hidden>
-            <CarThumb size="xs" color={evCar.color} finish={evCar.finish} skin={ev.skin} body={carDef(evCar.model).body} model={evCar.model} stripe={evCar.stripe} mods={evCar.mods} />
-          </span>
-        )}
-        <span className="rm-ev-mid">
-          <span className="rm-tag">WEEKLY EVENT</span>
-          <b className="rm-ttl">{ev.name}</b>
-          <span className="rm-meta"><Pips n={evWon} of={EVENT_RACES} /> <span className="rm-ev-left">⏳ {shortLeft(msToNextWeek())}</span><i className="rm-ev-swatch" style={{ background: evSkin.swatch }} title={`${evSkin.name} skin${evHas ? ' (yours)' : ''}`} /></span>
-        </span>
-        {evWon < EVENT_RACES
-          ? <button className="buy small rm-go" onClick={stop(onEvent)}>🏁 {money(eventPrize(evBase, evWon))}<small>⛽{RACE_FUEL}</small></button>
-          : <span className="rm-ev-done">✔ Cleared</span>}
-      </div>
-
-      <div className={`rm-tile rm-gp rm-photo${gpOpen(gp, GP_SERIES.indexOf(series), level) ? '' : ' rm-locked'}`} style={artStyle('gp')} {...tile('gp')}>
-        <TileClip mode="gp" />
-        <span className="rm-tag">GRAND PRIX</span>
-        <b className="rm-ttl">{series.name}</b>
-        <span className="rm-meta"><Rounds round={round} /></span>
-        <span className="rm-meta">🎁 Mystery car at race {GP_ROUNDS}</span>
-      </div>
-
-      <div className="rm-tile rm-trial rm-photo" style={artStyle('trial', trial.id)} {...tile('trial')}>
-        <TileClip mode="trial" venue={trial.id} />
-        <span className="rm-tag">TIME TRIAL</span>
-        <b className="rm-ttl">{trial.name}</b>
-        <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : '--'}</span>
-        <span className="rm-meta">⏳ {shortLeft(msToNextWeek())}</span>
-      </div>
-
-      <div className="rm-minis">
-        <button className="rm-mini m-quick" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
-        {supabase && (signedIn && live === 0 ? (
-          <button className="rm-mini m-live m-ghostlive" onClick={() => void ghostNow()} title={`Nobody live: race a real player's best run · ⛽${GHOST_FUEL}`}>
-            <span className="rm-mi">👻</span><span><b>Live</b><small>Race a ghost</small></span>
+      <section className="rm-lane rm-events" aria-label="Events">
+        <h4 className="rm-lane-h">📅 Events</h4>
+        <div className="rm-lane-photos">
+          <div className="rm-tile rm-ev rm-photo" style={{ ...artStyle('tour', ev.venue, ev.night), '--ev': ev.color } as React.CSSProperties} {...tile('event')}>
+            <TileClip mode="tour" venue={ev.venue} night={ev.night} sky={ev.sky} event={ev.id} />
+            <span className="rm-tag">WEEKLY EVENT</span>
+            <b className="rm-ttl">{ev.name}</b>
+            <span className="rm-meta"><Pips n={evWon} of={EVENT_RACES} /> <i className="rm-ev-swatch" style={{ background: evSkin.swatch }} title={`${evSkin.name} skin${evHas ? ' (yours)' : ''}`} /></span>
+          </div>
+          <div className="rm-tile rm-trial rm-photo" style={artStyle('trial', trial.id)} {...tile('trial')}>
+            <TileClip mode="trial" venue={trial.id} />
+            <span className="rm-tag">TIME TRIAL</span>
+            <b className="rm-ttl">{trial.name}</b>
+            <span className="rm-meta">⏱️ {best !== null ? `${best.toFixed(3)}s` : '--'} · ⏳ {shortLeft(msToNextWeek())}</span>
+          </div>
+        </div>
+        <div className="rm-minis">
+          <button className="rm-mini m-daily" onClick={() => onOpen('daily')}>
+            {dailyDue && <span className="rm-dot">!</span>}
+            <span className="rm-mi">📅</span><span><b>Daily Run</b><small>{dailyBest(daily, dailyDay())?.toFixed(2) ?? 'New today'}</small></span>
           </button>
-        ) : (
-          <button className="rm-mini m-live" onClick={() => onOpen('quick')}>
-            {live > 0 && <span className="rm-dot">{live}</span>}
-            <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : `${live} online`}</small></span>
-          </button>
-        ))}
-        <button className="rm-mini m-blast" onClick={onBlast} title="Every kart the same, bumps hit hard, the road full of obstacles"><span className="rm-mi">💥</span><span><b>Bumper Blast</b><small>Chaos karts</small></span></button>
-        <button className="rm-mini m-custom" onClick={onCustom}><span className="rm-mi">🛠️</span><span><b>Custom race</b><small>Mix the rules</small></span></button>
-        <button className="rm-mini m-tuner" onClick={() => onOpen('tuner')}><span className="rm-mi">🔧</span><span><b>Tuner Trials</b><small>Built cars only</small></span></button>
-        <button className="rm-mini m-cups" onClick={() => onOpen('cups')}><span className="rm-mi">🏆</span><span><b>Class Cups</b><small>{cupChip(cups)}</small></span></button>
-        <button className="rm-mini m-road" onClick={() => onOpen('road')}>
-          {roadDue > 0 && <span className="rm-dot">{roadDue}</span>}
-          <span className="rm-mi">🛣️</span><span><b>Trophy Road</b><small>🏆 {trophies.toLocaleString()}</small></span>
-        </button>
-        <button className="rm-mini m-daily" onClick={() => onOpen('daily')}>
-          {dailyDue && <span className="rm-dot">!</span>}
-          <span className="rm-mi">📅</span><span><b>Daily Run</b><small>{dailyBest(daily, dailyDay())?.toFixed(2) ?? 'New today'}</small></span>
-        </button>
-        <button className="rm-mini m-world" onClick={() => onOpen('world')}>
-          <span className="rm-mi">🌍</span><span><b>World Tour</b><small>{worldChip(worldTour)}</small></span>
-        </button>
-        <button className="rm-mini m-flair" onClick={() => onOpen('flair')}>
-          {flairDue > 0 && <span className="rm-dot">{flairDue}</span>}
-          <span className="rm-mi">🎆</span><span><b>Flair</b><small>{flairChip(flairSave)}</small></span>
-        </button>
-        <button className="rm-mini m-ghost" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>
-        <button className="rm-mini m-top" onClick={() => openPanel('leaders')}><span className="rm-mi">🏅</span><span><b>Top racers</b><small>Leaders</small></span></button>
-      </div>
+          {has('road') && (
+            <button className="rm-mini m-road" onClick={() => onOpen('road')}>
+              {roadDue > 0 && <span className="rm-dot">{roadDue}</span>}
+              <span className="rm-mi">🛣️</span><span><b>Trophy Road</b><small>🏆 {trophies.toLocaleString()}</small></span>
+            </button>
+          )}
+          {has('cups') && <button className="rm-mini m-cups" onClick={() => onOpen('cups')}><span className="rm-mi">🏆</span><span><b>Class Cups</b><small>{cupChip(cups)}</small></span></button>}
+          {has('world') && (
+            <button className="rm-mini m-world" onClick={() => onOpen('world')}>
+              <span className="rm-mi">🌍</span><span><b>World Tour</b><small>{worldChip(worldTour)}</small></span>
+            </button>
+          )}
+          {soon(['road', 'cups', 'world'])}
+        </div>
+      </section>
+
+      <section className="rm-lane rm-free" aria-label="Free play">
+        <h4 className="rm-lane-h">🎮 Free play</h4>
+        <div className="rm-minis">
+          <button className="rm-mini m-quick" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
+          {supabase && (signedIn && live === 0 ? (
+            <button className="rm-mini m-live m-ghostlive" onClick={() => void ghostNow()} title={`Nobody live: race a real player's best run · ⛽${GHOST_FUEL}`}>
+              <span className="rm-mi">👻</span><span><b>Live</b><small>Race a ghost</small></span>
+            </button>
+          ) : (
+            <button className="rm-mini m-live" onClick={() => onOpen('quick')}>
+              {live > 0 && <span className="rm-dot">{live}</span>}
+              <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : `${live} online`}</small></span>
+            </button>
+          ))}
+          {has('ghosts') && <button className="rm-mini m-ghost" onClick={() => openPanel('friends')}><span className="rm-mi">👻</span><span><b>Ghosts</b><small>Friends</small></span></button>}
+          {has('blast') && <button className="rm-mini m-blast" onClick={onBlast} title="Every kart the same, bumps hit hard, the road full of obstacles"><span className="rm-mi">💥</span><span><b>Bumper Blast</b><small>Chaos karts</small></span></button>}
+          {has('custom') && <button className="rm-mini m-custom" onClick={onCustom}><span className="rm-mi">🛠️</span><span><b>Custom race</b><small>Mix the rules</small></span></button>}
+          {has('tuner') && <button className="rm-mini m-tuner" onClick={() => onOpen('tuner')}><span className="rm-mi">🔧</span><span><b>Tuner Trials</b><small>Built cars only</small></span></button>}
+          {has('flair') && (
+            <button className="rm-mini m-flair" onClick={() => onOpen('flair')}>
+              {flairDue > 0 && <span className="rm-dot">{flairDue}</span>}
+              <span className="rm-mi">🎆</span><span><b>Flair</b><small>{flairChip(flairSave)}</small></span>
+            </button>
+          )}
+          {soon(['ghosts', 'blast', 'custom', 'tuner', 'flair'])}
+        </div>
+      </section>
     </div>
   )
 }
