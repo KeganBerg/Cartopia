@@ -987,3 +987,44 @@ div.rm-node { cursor: default; }
   .tt-pat { font-size: 13px; }
   .tt-easy { font-size: 12px; top: 4px; }
 }
+
+/* ---------- hub lanes: the next race big on top, then Story, Events and Free play ---------- */
+.rm-hub.rm-lanes { flex: none; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.rm-hub.rm-lanes .rm-tile { grid-area: auto; }
+.rm-hub.rm-lanes .rm-lead { min-height: 220px; padding: 50px 16px 16px; flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: flex-end; gap: 6px; border-width: 4px; border-radius: 22px; box-shadow: inset 0 3px 0 rgba(255,255,255,.3), 0 6px 0 rgba(0,0,0,.35); }
+.rm-hub.rm-lanes .rm-lead .rm-tag { --tag: #2fae35; position: absolute; top: -4px; left: -4px; border-radius: 20px 0 18px 0; padding: 9px 18px; font-size: 20px; background: linear-gradient(#7ee05a, #2f9e35); }
+.rm-lead-mode { font: 900 13px Nunito, sans-serif; letter-spacing: 1.5px; color: #ffe066; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+.rm-hub.rm-lanes .rm-lead .rm-ttl { margin-top: 0; font-size: 36px; padding-right: 150px; -webkit-text-stroke-width: 1.2px; }
+.rm-hub.rm-lanes .rm-lead .rm-meta { font-size: 15px; }
+.rm-lead-go { position: absolute; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: center; line-height: 1.05; font-size: 28px; padding: 12px 22px; min-width: 128px; }
+.rm-lead-go small { font: 900 13px Nunito, sans-serif; }
+.rm-lane { display: flex; flex-direction: column; gap: 8px; }
+.rm-lane-h { margin: 0; font: 20px var(--display); color: var(--ink, #1b2a4a); letter-spacing: .3px; }
+.rm-lane-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.rm-events .rm-lane-photos { grid-template-columns: repeat(2, 1fr); }
+.rm-hub.rm-lanes .rm-lane-photos .rm-tile { min-height: 132px; padding: 44px 10px 10px; justify-content: flex-end; }
+.rm-hub.rm-lanes .rm-ev { flex-direction: column; align-items: stretch; gap: 4px; }
+.rm-hub.rm-lanes .rm-ev .rm-tag { position: absolute; top: -3px; left: -3px; border-radius: 16px 0 16px 0; padding: 7px 13px 7px 14px; font-size: 16px; -webkit-text-stroke-width: 4.5px; }
+.rm-hub.rm-lanes .rm-ev .rm-ttl { margin-top: auto; white-space: normal; }
+.rm-hub.rm-lanes .rm-rival { min-height: 96px; }
+.rm-hub.rm-lanes .rm-minis { grid-auto-flow: row; grid-auto-columns: auto; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+.rm-hub.rm-lanes .rm-mini.rm-soon { cursor: default; background: #e8eef7; box-shadow: none; opacity: .75; }
+.rm-hub.rm-lanes .rm-mini.rm-soon:active { transform: none; }
+.rm-hub.rm-lanes .rm-lv { background: #4a6283; font-size: 11px; }
+.rm-hub.rm-lanes .rm-soon b { color: #4a6283; -webkit-text-stroke-width: 0; text-shadow: none; }
+@media (max-width: 600px), (min-width: 601px) and (max-width: 1000px) and (orientation: portrait) {
+  .rm-hub.rm-lanes { gap: 12px; }
+  .rm-hub.rm-lanes .rm-lead { min-height: 240px; padding: 54px 12px 78px; }
+  .rm-hub.rm-lanes .rm-lead .rm-ttl { font-size: 30px; padding-right: 0; }
+  .rm-lead-go { left: 12px; right: 12px; bottom: 12px; flex-direction: row; justify-content: center; gap: 8px; font-size: 24px; padding: 10px 16px; }
+  .rm-lane-photos, .rm-events .rm-lane-photos { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .rm-story .rm-lane-photos .rm-gp { grid-column: span 2; }
+  .rm-hub.rm-lanes .rm-lane-photos .rm-tile { min-height: 140px; }
+  .rm-hub.rm-lanes .rm-minis { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+}
+@media (max-height: 500px) {
+  .rm-hub.rm-lanes .rm-lead { min-height: 150px; padding-top: 44px; }
+  .rm-hub.rm-lanes .rm-lead .rm-ttl { font-size: 26px; }
+  .rm-lead-go { font-size: 20px; padding: 8px 16px; }
+  .rm-hub.rm-lanes .rm-lane-photos .rm-tile { min-height: 110px; }
+}
