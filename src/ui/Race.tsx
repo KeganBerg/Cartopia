@@ -39,7 +39,8 @@ import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, trialRunFor, type
 import { PlayerCardPopup } from './PlayerCard'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
-import { RaceBar, RaceHub, Rounds, campaignFocus } from './RaceHub'
+import { RaceBar, RaceHub, Rounds, campaignFocus, ghostNow } from './RaceHub'
+import { GHOST_FUEL } from '../lib/ghosts'
 import { takeRaceTab, takeStreetRace, type RaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { PaintRivals, firstRowPick, rowChip, rowPrizeOf } from './PaintRivals'
@@ -817,6 +818,13 @@ export function RacePanel() {
                 <CallCardArt tint="#2f9e35" />
                 <span className="rm-qc-top"><span className="rm-mi">🟢</span><span className="tag live">LIVE</span></span>
                 <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
+              </button>
+            )}
+            {supabase && liveSignedIn && !livePlayers.some((p) => !mutedIds[p.id]) && (
+              <button className="rm-qc rm-qc-live rm-qc-ghost" onClick={() => void ghostNow()} title={`Nobody live: race a real player's best run · ⛽${GHOST_FUEL}`}>
+                <CallCardArt tint="#5b4bb7" />
+                <span className="rm-qc-top"><span className="rm-mi">👻</span><span className="tag live">GHOST</span></span>
+                <span className="rm-qc-body"><b>Race a ghost</b><span className="buy small alt">👻 ⛽{GHOST_FUEL}</span></span>
               </button>
             )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id] && !p.closed).length >= 2 && (
