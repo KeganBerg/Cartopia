@@ -22,6 +22,7 @@ import { SkyEnv } from './SkyEnv'
 import { townLook } from './look'
 import { SeasonFx } from './SeasonFx'
 import { TownCars } from './TownCars'
+import { CruiseCar } from './CruiseCar'
 import { Townspeople } from './Townspeople'
 import { Batch } from './Batch'
 import { LampTone, Tint } from './CityTint'
@@ -791,6 +792,7 @@ export const World = memo(function World() {
           <AnchorProjector />
           <Ear />
           <TownCars />
+          <CruiseCar />
           <Townspeople />
           <WorldFx small={lite || small()} />
         </>

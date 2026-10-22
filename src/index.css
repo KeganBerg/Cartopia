@@ -960,6 +960,10 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 .shot-dock .goals-btn { position: static; width: 60px; height: 60px; border-radius: 16px; }
 /* While on, only the town's 3D view is left: every other layer of the page is hidden and lets touches through. */
 html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d):not(.shot-ui) *, html.shot body > :not(#root), html.shot body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+/* Driving your own car round town (src/ui/Cruise.tsx): only the town and the driving controls are left, and the town takes no taps. */
+html.cruise #root > :not(.town-3d):not(.cruise-ui), html.cruise #root > :not(.town-3d):not(.cruise-ui) *, html.cruise body > :not(#root), html.cruise body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+html.cruise .town-3d { pointer-events: none; }
+.cruise-ui { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
 .shot-ui { position: absolute; z-index: 60; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,.45); color: #fff; font: 15px var(--display); pointer-events: none; transition: opacity .6s; }
 .shot-ui.gone { opacity: 0; }
 @media (max-width: 700px) {
@@ -2212,7 +2216,7 @@ button.book-car { font: inherit; color: inherit; }
 .car-traits .loves-ico { padding: 0; background: none; border: 0; font-size: 16px; }
 .car-traits > .driver-row { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 14px; }
 .car-traits > .driver-row b { font: 15px var(--display); }
-.car-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; }
+.car-toggles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; max-width: 420px; }
 .car-toggles .showcase-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 8px; border-radius: 12px; font: 15px var(--display); color: #37474f; background: #fff; border: 2px solid #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; white-space: nowrap; }
 .car-toggles .showcase-toggle.on { background: #ffca28; border-color: #e0a800; box-shadow: 0 2px 0 #c79400; color: #5d4037; }
 .car-toggles .race-toggle.on { background: #43a047; border-color: #2e7d32; box-shadow: 0 2px 0 #1b5e20; color: #fff; opacity: 1; cursor: default; }

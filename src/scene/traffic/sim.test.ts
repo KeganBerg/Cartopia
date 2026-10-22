@@ -573,3 +573,35 @@ describe('honking', () => {
     for (let i = 1; i < times.length; i++) expect(times[i] - times[i - 1]).toBeGreaterThanOrEqual(2.5)
   })
 })
+
+describe('a car driven by hand', () => {
+  it('town cars pull up behind it instead of driving through it', () => {
+    seedRandom(11)
+    const t = new Traffic()
+    t.setTown(grid(2, 6), [], turnOf)
+    t.setCars(cars(6), 6)
+    for (let f = 0; f < 60; f++) t.step(1 / 30)
+    const handBox = () => {
+      const h = (t as unknown as { hand: { boxes: Box[] } }).hand.boxes[0]
+      return { ...h, hl: h.hl - 0.05, hw: h.hw - 0.05 }
+    }
+    const touching = () => [...t.agents.values()].filter((a) => a.boxes.some((b) => overlap(b, handBox()))).map((a) => a.uid)
+    // Stop the hand car on clear road a little ahead of each town car in turn; none may drive into it.
+    const hits = new Set<string>()
+    let placed = 0
+    for (let f = 0; f < 30 * 30; f++) {
+      if (f % 150 === 0) {
+        const lead = [...t.agents.values()][Math.floor(f / 150) % t.agents.size]
+        t.setHand({ x: lead.x + lead.hx * 3, z: lead.z + lead.hz * 3, yaw: lead.yaw, len: 1, wid: 0.54 })
+        if (touching().length) t.setHand({ x: 999, z: 999, yaw: 0, len: 1, wid: 0.54 })
+        else placed++
+      }
+      t.step(1 / 30)
+      for (const uid of touching()) hits.add(uid)
+    }
+    expect(placed).toBeGreaterThan(2)
+    expect([...hits]).toEqual([])
+    t.setHand(null)
+    expect((t as unknown as { hand: unknown }).hand).toBeNull()
+  })
+})
