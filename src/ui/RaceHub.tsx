@@ -9,6 +9,7 @@ import { campaignPayNow, tourPayNow } from '../game/fairRace'
 import { shortLeft, trialVenue, trialWeek } from '../game/trial'
 import { localBest } from '../lib/trialServer'
 import { useLive } from '../lib/live'
+import { GHOST_FUEL, racePlayerGhost } from '../lib/ghosts'
 import { supabase } from '../lib/supabase'
 import { venue as venueById } from '../scene/venues'
 import { raceWeather } from '../game/weather'
@@ -157,12 +158,16 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
 
       <div className="rm-minis">
         <button className="rm-mini m-quick" onClick={() => onOpen('quick')}><span className="rm-mi">🏁</span><span><b>Quick race</b><small>Pick a rival</small></span></button>
-        {supabase && (
+        {supabase && (signedIn && live === 0 ? (
+          <button className="rm-mini m-live m-ghostlive" onClick={() => void ghostNow()} title={`Nobody live: race a real player's best run · ⛽${GHOST_FUEL}`}>
+            <span className="rm-mi">👻</span><span><b>Live</b><small>Race a ghost</small></span>
+          </button>
+        ) : (
           <button className="rm-mini m-live" onClick={() => onOpen('quick')}>
             {live > 0 && <span className="rm-dot">{live}</span>}
-            <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : live > 0 ? `${live} online` : 'Nobody on'}</small></span>
+            <span className="rm-mi">🟢</span><span><b>Live</b><small>{!signedIn ? 'Sign in' : `${live} online`}</small></span>
           </button>
-        )}
+        ))}
         <button className="rm-mini m-blast" onClick={onBlast} title="Every kart the same, bumps hit hard, the road full of obstacles"><span className="rm-mi">💥</span><span><b>Bumper Blast</b><small>Chaos karts</small></span></button>
         <button className="rm-mini m-custom" onClick={onCustom}><span className="rm-mi">🛠️</span><span><b>Custom race</b><small>Mix the rules</small></span></button>
         <button className="rm-mini m-tuner" onClick={() => onOpen('tuner')}><span className="rm-mi">🔧</span><span><b>Tuner Trials</b><small>Built cars only</small></span></button>
@@ -187,6 +192,11 @@ export function RaceHub({ onOpen, onCampaign, onTour, onEvent, onRival, onBlast,
       </div>
     </div>
   )
+}
+
+// The ghost of a real player, for when nobody is live.
+export async function ghostNow() {
+  if (!(await racePlayerGhost())) useGame.getState().toast('No ghosts to race yet')
 }
 
 export function Rounds({ round }: { round: number }) {

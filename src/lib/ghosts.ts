@@ -111,6 +111,23 @@ export async function raceTown(town: { ownerId: string; townName: string; cars: 
   runGhost(g)
 }
 
+// Nobody in the live lobby: race the ghost of a real player instead, the one whose best car is
+// closest to yours among the most recently played towns. False when there's nobody to race.
+export async function racePlayerGhost(): Promise<boolean> {
+  if (!supabase) return false
+  const me = signedInUser()
+  let q = supabase.from('game_saves').select('owner_id, town_name, best_car, cars:state->cars').order('updated_at', { ascending: false }).limit(12)
+  if (me) q = q.neq('owner_id', me)
+  const { data, error } = await q
+  const towns = (error ? [] : data ?? []).filter((r) => typeof r.best_car?.pi === 'number' && Array.isArray(r.cars))
+  if (!towns.length) return false
+  const mine = bestOf(useGame.getState().cars)?.pi ?? 0
+  const near = towns.sort((a, b) => Math.abs(a.best_car.pi - mine) - Math.abs(b.best_car.pi - mine)).slice(0, 3)
+  const pick = near[Math.floor(Math.random() * near.length)]
+  await raceTown({ ownerId: pick.owner_id, townName: pick.town_name ?? 'Town', cars: pick.cars as OwnedCar[] })
+  return true
+}
+
 async function startRun(vs: string): Promise<boolean> {
   if (!supabase || !signedInUser()) return false
   try {
