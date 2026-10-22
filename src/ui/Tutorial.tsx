@@ -152,7 +152,11 @@ export function Tutorial() {
 
   // Say each step's line as it comes up; quiet once the tutorial is done or skipped.
   useEffect(() => {
-    const say = () => sayLine(voiceLine(useGame.getState()))
+    const say = () => {
+      const s = useGame.getState()
+      const id = voiceLine(s)
+      sayLine(id, id ? STEPS[s.tutorial].text(s) : '')
+    }
     say()
     const off = useGame.subscribe(say)
     return () => {

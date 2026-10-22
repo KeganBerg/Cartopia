@@ -167,7 +167,7 @@ function ChatRoom({ room }: { room: Room }) {
               {first && !mine && (
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
-                  <b>{senderName(m)}</b>
+                  <b data-no-i18n>{senderName(m)}</b>
                   {m.mod && <span className="chat-mod" title="Cartopia team" aria-label="Cartopia team">✔</span>}
                   <small>Lv {m.level} · {ago(m.at)}</small>
                 </button>
@@ -189,7 +189,7 @@ function ChatRoom({ room }: { room: Room }) {
                 </div>
               )}
               <div className="chat-line">
-                <p className="chat-bubble" {...holdProps(m, has)}><MentionText text={m.body} me={myName} />{mine && first && <small>{ago(m.at)}</small>}</p>
+                <p className="chat-bubble" {...holdProps(m, has)}><span data-no-i18n><MentionText text={m.body} me={myName} /></span>{mine && first && <small>{ago(m.at)}</small>}</p>
                 {has && menu !== m.id && (
                   <button className="chat-more" aria-label="Message options" onClick={() => setMenu(m.id)}>⋯</button>
                 )}

@@ -15,6 +15,7 @@ import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { showFlashWarning } from './FlashWarning'
 import { useTouchDevice } from './DriveControls'
 import { DISCORD_INVITE, inviteLink, shareLink } from '../lib/invite'
+import { LANGS, setLang, useLang } from '../i18n/lang'
 
 // The Windows app (desktop/) opens the live game, so this download never needs replacing for a deploy.
 export const DESKTOP_DOWNLOAD = 'https://github.com/KeganBerg/Cartopia/releases/latest/download/Cartopia-Setup.exe'
@@ -63,6 +64,18 @@ const STEER: { id: Steer; label: string }[] = [
   { id: 'buttons', label: '◀ ▶ Buttons' },
 ]
 
+// Each language is named in itself, so a player who can't read the current one still finds theirs.
+function LangPicker() {
+  const lang = useLang((l) => l.lang)
+  return (
+    <div className="seg set-seg" role="radiogroup" aria-label="Language" data-no-i18n>
+      {LANGS.map((l) => (
+        <button key={l.id} role="radio" aria-checked={lang === l.id} className={lang === l.id ? 'sel' : ''} onClick={() => setLang(l.id)}>{l.label}</button>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsTab({ user }: { user: User | null }) {
   const prefs = usePrefs()
   const touch = useTouchDevice()
@@ -71,6 +84,9 @@ export function SettingsTab({ user }: { user: User | null }) {
   const calmFlash = useCalmFlashing()
   return (
     <>
+      <Group icon="🌐" title="Language">
+        <LangPicker />
+      </Group>
       <Group icon="🔊" title="Sound">
         <SoundControl />
         <MusicControl />
