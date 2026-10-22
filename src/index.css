@@ -276,6 +276,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-dots i.on { background: #ffca28; }
 .tut-dots i.cur { width: 16px; background: #ffca28; }
 .tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tut-actions .buy { white-space: nowrap; }
 .tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
 .tut-car { flex: none; align-self: center; }
 .tut-car .thumb3d.xs { --tw: 104px; --th: 76px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
@@ -2293,6 +2294,7 @@ button.book-car { font: inherit; color: inherit; }
 @media (max-width: 400px) { .tab-emo { display: none; } }
 /* The Shop's Recreation tab reads "Rec" on a phone. */
 @media (max-width: 600px) { .tab-long { display: none; } }
+@media (min-width: 601px) { .tab-short { display: none; } }
 /* Town news waits while a race fills the screen. */
 body:has(.race-full) .toasts { display: none; }
 .rf-hold { position: absolute; left: 0; right: 0; bottom: calc(200px + var(--sab)); width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #ffd54f; font: 18px var(--display); pointer-events: none; white-space: nowrap; }

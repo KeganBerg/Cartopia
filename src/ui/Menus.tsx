@@ -343,7 +343,7 @@ const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; f
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service && !b.rec && !b.event && !CAR_CARE.has(b.id) },
   { id: 'homes', label: '🏠 Homes', filter: (b) => b.kind === 'house' },
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
+  { id: 'rec', label: <>🎡 <span className="tab-short">Rec</span><span className="tab-long">Recreation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
