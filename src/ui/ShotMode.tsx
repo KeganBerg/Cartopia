@@ -5,18 +5,15 @@ import { savePhoto } from '../scene/photo'
 import { useGame } from '../game/store'
 import { Icon } from './Icon'
 
-import { isTap, setShot, useShot } from './shot'
+import { grabTown, isTap, setGrab, setShot, useShot } from './shot'
 
 const TOUCH = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
-
-// The town's frame as it is now, without any of the page on top. Set by ShotGrabber.
-let grab: (() => HTMLCanvasElement) | null = null
 
 // Lives inside the town's Canvas: a fresh render read straight back into a plain canvas.
 export function ShotGrabber() {
   const get = useThree((s) => s.get)
   useEffect(() => {
-    grab = () => {
+    setGrab(() => {
       const { gl, scene, camera } = get()
       gl.render(scene, camera)
       const src = gl.domElement
@@ -25,14 +22,14 @@ export function ShotGrabber() {
       pic.height = src.height
       pic.getContext('2d')?.drawImage(src, 0, 0)
       return pic
-    }
-    return () => void (grab = null)
+    })
+    return () => setGrab(null)
   }, [get])
   return null
 }
 
 async function savePicture() {
-  const pic = grab?.()
+  const pic = grabTown()
   if (!pic) return
   if (await savePhoto(pic, `town-${new Date().toISOString().slice(0, 10)}`)) useGame.getState().toast('📸 Picture saved!')
 }
