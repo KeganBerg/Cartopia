@@ -10,6 +10,9 @@ import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
 import { sfx } from '../lib/sound'
+import { fetchTownNews, type NewsItem } from '../lib/townNews'
+import { openPlayerCard } from '../lib/playerCard'
+import { PlayerName } from './Username'
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60000)
@@ -148,6 +151,7 @@ function ChatRoom({ room }: { room: Room }) {
 
   return (
     <>
+      {room === 'global' && <TownNews />}
       <div
         className="chat-log"
         ref={log}
@@ -215,5 +219,28 @@ function ChatRoom({ room }: { room: Room }) {
         <button className="buy" disabled={busy || !text.trim()} aria-label="Send">➤</button>
       </form>
     </>
+  )
+}
+
+// This week's board leaders, one tap from their player card.
+function TownNews() {
+  const [items, setItems] = useState<NewsItem[]>([])
+  useEffect(() => {
+    let on = true
+    void fetchTownNews().then((n) => on && setItems(n))
+    return () => { on = false }
+  }, [])
+  if (!items.length) return null
+  return (
+    <div className="chat-news" aria-label="This week">
+      <span className="chat-news-tag" title="This week's leaders">📰</span>
+      {items.map((it) => (
+        <button key={it.metric} className="chat-news-chip" title={it.tip} onClick={() => openPlayerCard(it.row.ownerId, it.row.townName)}>
+          <i>{it.icon}</i>
+          <b><PlayerName id={it.row.ownerId} town={it.row.townName} /></b>
+          <span>{it.n}</span>
+        </button>
+      ))}
+    </div>
   )
 }
