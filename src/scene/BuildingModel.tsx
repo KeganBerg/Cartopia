@@ -784,8 +784,9 @@ export function BuildingModel({ def, ghost, valid, level = 1 }: Props) {
             <cylinderGeometry args={[0.85, 0.9, 0.3, 24]} />
             {m(def.color)}
           </mesh>
-          <mesh position={[0, 0.31, 0]} material={ghost ? undefined : waterKinds().basin}>
-            <cylinderGeometry args={[0.72, 0.72, 0.03, 32]} />
+          {/* Just the surface: a disc, no thin side wall standing proud of the stone. */}
+          <mesh position={[0, 0.322, 0]} rotation-x={-Math.PI / 2} material={ghost ? undefined : waterKinds().basin}>
+            <circleGeometry args={[0.72, 32]} />
             {ghost && m(def.roof)}
           </mesh>
           <mesh position={[0, 0.7, 0]} castShadow>

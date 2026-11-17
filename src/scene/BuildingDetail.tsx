@@ -311,7 +311,7 @@ export function FountainDetail({ stone }: { stone: string }) {
   return (
     <group>
       <mesh position={[0, 0.92, 0]} castShadow><cylinderGeometry args={[0.38, 0.2, 0.12, 20]} />{c(stone)}</mesh>
-      <mesh position={[0, 0.985, 0]} material={waterKinds().bowl}><cylinderGeometry args={[0.32, 0.32, 0.02, 24]} /></mesh>
+      <mesh position={[0, 0.99, 0]} rotation-x={-Math.PI / 2} material={waterKinds().bowl}><circleGeometry args={[0.32, 24]} /></mesh>
       {/* Water spilling over the bowl's rim in arcs down to the pool. */}
       {Array.from({ length: 8 }, (_, i) => (
         <group key={i} rotation-y={(i / 8) * Math.PI * 2}>
