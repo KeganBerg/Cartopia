@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { onFx, reducedMotion } from '../game/fx'
-import { anchorEls } from '../scene/anchors'
+import { anchorCenter, anchorEls } from '../scene/anchors'
 
 // Coins, parts and XP burst out of a building and fly into their HUD counters.
 // Plain DOM driven by the Web Animations API: nothing re-renders while they fly.
@@ -15,35 +15,47 @@ export const FLIGHT_MS = 900
 // Icons inside panels (reward chips) aren't counters.
 const counters = (res: Res) => [...document.querySelectorAll<HTMLElement>(TARGET[res])].filter((el) => !el.closest('.overlay'))
 
-function target(res: Res): DOMRect | null {
+// The counter a resource flies to, and where it is. Read before anything is added to the page:
+// reading positions after adding the flying coins made the browser lay the whole page out again
+// for each kind of reward (four times on a collect), a stall on every tap in a big town.
+// The HUD hardly moves, so a quick run of taps reuses the last look for a moment.
+type Aim = { el: HTMLElement; to: DOMRect }
+const AIM_MS = 1000
+const aimed = new Map<Res, { at: number; aim: Aim | null }>()
+function aim(res: Res): Aim | null {
+  const now = performance.now()
+  const was = aimed.get(res)
+  if (was && now - was.at < AIM_MS && (!was.aim || was.aim.el.isConnected)) return was.aim
+  let found: Aim | null = null
   for (const el of counters(res)) {
-    const r = el.getBoundingClientRect()
-    if (r.width > 0 && r.height > 0) return r
+    const to = el.getBoundingClientRect()
+    if (to.width > 0 && to.height > 0) {
+      found = { el, to }
+      break
+    }
   }
-  return null
+  aimed.set(res, { at: now, aim: found })
+  return found
 }
 
-function bump(res: Res) {
-  for (const el of counters(res)) {
-    const host = (res === 'xp' ? el : el.parentElement) as HTMLElement | null
-    if (!host || !host.getBoundingClientRect().width) continue
-    host.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'ease-out' })
-  }
+// The counter it landed on gives a little bounce. It was on screen when the coins set off, so
+// it isn't measured again (that laid the page out once more as each kind landed).
+function bump(res: Res, el: HTMLElement) {
+  const host = (res === 'xp' ? el : el.parentElement) as HTMLElement | null
+  host?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' }], { duration: 260, easing: 'ease-out' })
 }
 
 function source(uid: string): [number, number] | null {
-  const el = anchorEls.get(uid)
-  if (!el || el.style.visibility === 'hidden') return null
-  const r = (el.firstElementChild as HTMLElement | null)?.getBoundingClientRect() ?? el.getBoundingClientRect()
-  if (!r.width && !r.height) return null
+  const p = anchorCenter(uid)
+  if (!p) return null
   // A badge half off the edge still bursts where you can see it.
   const m = 30
-  return [Math.min(window.innerWidth - m, Math.max(m, r.left + r.width / 2)), Math.min(window.innerHeight - m, Math.max(m, r.top + r.height / 2))]
+  return [Math.min(window.innerWidth - m, Math.max(m, p[0])), Math.min(window.innerHeight - m, Math.max(m, p[1]))]
 }
 
-function launch(layer: HTMLElement, from: [number, number], res: Res, n: number, delay: number) {
-  const to = target(res)
-  if (!to) return
+function launch(layer: HTMLElement, from: [number, number], res: Res, n: number, delay: number, at: Aim | null) {
+  if (!at) return
+  const { to } = at
   const tx = to.left + to.width / 2
   const ty = to.top + to.height / 2
   let landed = false
@@ -71,7 +83,7 @@ function launch(layer: HTMLElement, from: [number, number], res: Res, n: number,
       el.remove()
       if (!landed) {
         landed = true
-        bump(res)
+        bump(res, at.el)
       }
     }
   }
@@ -97,23 +109,30 @@ function label(layer: HTMLElement, from: [number, number], text: string) {
 export type Amounts = { coins?: number; parts?: number; xp?: number; bucks?: number }
 let layerEl: HTMLDivElement | null = null
 
+const KINDS: Res[] = ['coins', 'bucks', 'parts', 'xp']
+
 function burst(froms: [number, number][], e: Amounts) {
   const root = layerEl
   if (!root || !froms.length) return
   const quiet = reducedMotion()
+  // Every position first, then the flying coins: see aim.
+  const aims = Object.fromEntries(KINDS.filter((r) => e[r]).map((r) => [r, aim(r)])) as Partial<Record<Res, Aim | null>>
   // Fewer coins each when many buildings pay out at once.
   const each = Math.max(2, Math.round(8 / Math.sqrt(froms.length)))
   froms.forEach((p, i) => {
     if (quiet) return
     const d = i * 70
-    if (e.coins) launch(root, p, 'coins', each, d)
-    if (e.bucks) launch(root, p, 'bucks', Math.max(1, Math.round(each / 2)), d + 80)
-    if (e.parts) launch(root, p, 'parts', Math.max(1, Math.round(each / 3)), d + 120)
-    if (e.xp) launch(root, p, 'xp', Math.max(1, Math.round(each / 3)), d + 200)
+    if (e.coins) launch(root, p, 'coins', each, d, aims.coins ?? null)
+    if (e.bucks) launch(root, p, 'bucks', Math.max(1, Math.round(each / 2)), d + 80, aims.bucks ?? null)
+    if (e.parts) launch(root, p, 'parts', Math.max(1, Math.round(each / 3)), d + 120, aims.parts ?? null)
+    if (e.xp) launch(root, p, 'xp', Math.max(1, Math.round(each / 3)), d + 200, aims.xp ?? null)
   })
   const bits = [e.coins && `+${e.coins.toLocaleString()}`, e.bucks && `+${e.bucks}💎`, e.parts && `+${e.parts}⚙`, e.xp && `+${e.xp} XP`].filter(Boolean)
   if (bits.length) label(root, froms[0], bits.join('  '))
-  if (quiet) for (const r of ['coins', 'bucks', 'parts'] as const) if (e[r]) bump(r)
+  if (quiet) for (const r of ['coins', 'bucks', 'parts'] as const) {
+    const a = aims[r]
+    if (a) bump(r, a.el)
+  }
 }
 
 // Rewards flying out of a piece of UI (a chest, a goal row) to the counters.

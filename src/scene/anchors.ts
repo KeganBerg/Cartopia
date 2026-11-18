@@ -40,7 +40,7 @@ const CHIP = 8
 const OFF = 120
 const sizes = new WeakMap<HTMLElement, { w: number; h: number; age: number }>()
 // What each bubble was last given, so unchanged ones aren't written again every frame.
-const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; cls: Record<string, boolean> }>()
+const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; x?: number; y?: number; cls: Record<string, boolean> }>()
 const memo = (el: HTMLElement) => {
   let m = last.get(el)
   if (!m) last.set(el, (m = { cls: {} }))
@@ -78,6 +78,8 @@ const toggle = (el: HTMLElement, c: string, on: boolean) => {
 }
 const move = (el: HTMLElement, x: number, y: number) => {
   const m = memo(el)
+  m.x = x
+  m.y = y
   const at = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
   if (m.at === at) return
   m.at = at
@@ -273,6 +275,17 @@ export function AnchorProjector() {
     before.settled = settled
   })
   return null
+}
+
+// Where a bubble on screen was last put (the middle of it), from the projector's own numbers:
+// reading it back from the page made the browser lay the whole page out on every collect.
+export function anchorCenter(id: string): [number, number] | null {
+  const el = anchorEls.get(id)
+  const m = el && last.get(el)
+  if (!el || !m?.seen || m.x === undefined || m.y === undefined) return null
+  const h = sizes.get(el)?.h ?? 0
+  // The bubble sits on its point, above a 9px tail gap (.anchor's padding).
+  return [m.x, m.y - 9 - Math.max(0, h - 9) / 2]
 }
 
 export function anchorRef(id: string) {
