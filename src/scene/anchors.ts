@@ -46,10 +46,28 @@ const memo = (el: HTMLElement) => {
   if (!m) last.set(el, (m = { cls: {} }))
   return m
 }
-const show = (el: HTMLElement, on: boolean) => {
+// Bubbles hidden off screen right now, and what each wants done when it shows again. A job
+// timer off screen needn't redraw every second: a big town had a hundred or more of them
+// redrawing at once each second, a hitch while panning. It catches up as it comes back.
+const offscreen = new Set<string>()
+const onShow = new Map<string, () => void>()
+export const anchorOffscreen = (id: string) => offscreen.has(id)
+export function whenShown(id: string, fn: () => void) {
+  onShow.set(id, fn)
+  return () => {
+    if (onShow.get(id) === fn) onShow.delete(id)
+  }
+}
+export function setAnchorShown(id: string, on: boolean) {
+  if (on) {
+    if (offscreen.delete(id)) onShow.get(id)?.()
+  } else offscreen.add(id)
+}
+const show = (id: string, el: HTMLElement, on: boolean) => {
   const m = memo(el)
   if (m.seen === on) return
   m.seen = on
+  setAnchorShown(id, on)
   el.style.visibility = on ? 'visible' : 'hidden'
 }
 const toggle = (el: HTMLElement, c: string, on: boolean) => {
@@ -120,7 +138,7 @@ export function AnchorProjector() {
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
-        show(el, false)
+        show(id, el, false)
         continue
       }
       v.copy(p).project(camera)
@@ -131,7 +149,7 @@ export function AnchorProjector() {
       if (v.z > 1) {
         // Behind the free camera. A pinned bubble flips to the edge it's really past.
         if (!clamp) {
-          show(el, false)
+          show(id, el, false)
           continue
         }
         x = size.width - x
@@ -139,10 +157,10 @@ export function AnchorProjector() {
       }
       // Well off screen: nothing to show or to dodge (a big town has hundreds of these).
       if (!clamp && (x < -OFF || x > size.width + OFF || y < -OFF || y > size.height + OFF)) {
-        show(el, false)
+        show(id, el, false)
         continue
       }
-      show(el, true)
+      show(id, el, true)
       if (clamp) {
         const cx = Math.min(Math.max(x, 60), size.width - 60)
         const cy = Math.min(Math.max(y, 210), size.height - 110)
@@ -260,6 +278,9 @@ export function AnchorProjector() {
 export function anchorRef(id: string) {
   return (el: HTMLElement | null) => {
     if (el) anchorEls.set(id, el)
-    else anchorEls.delete(id)
+    else {
+      anchorEls.delete(id)
+      offscreen.delete(id)
+    }
   }
 }
