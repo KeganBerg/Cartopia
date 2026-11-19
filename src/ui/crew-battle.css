@@ -261,7 +261,8 @@
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .cb-dock { left: auto; right: calc(16px + var(--sar)); bottom: calc(16px + var(--sab)); transform: none; width: min(580px, 46vw); }
   .cb-roster, .cb-log { max-height: 240px; }
-  .cb-board { width: 640px; }
+  /* The score board centres over the cars, left of the dock, so a tall dock never covers it. */
+  .cb-board { --dockw: min(580px, 46vw); left: calc((100vw - var(--dockw) - 16px - var(--sar)) / 2); width: min(640px, calc(100vw - var(--dockw) - 48px - var(--sar))); }
   /* Desktop: a big war board, not a phone column */
   .wm { gap: 8px; padding: 10px; }
   .wm-goal > b { font-size: 19px; }
