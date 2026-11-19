@@ -138,6 +138,31 @@
   @keyframes prize-in-side { from { transform: translate(30px, 50%) scale(.92); opacity: 0; } }
 }
 
+/* Phones held sideways: too short for the picker under the crate, so it docks on the right,
+   compact, and the crate sits left of it (CrateScene's `wide` matches this query). */
+@media (max-height: 500px) and (min-aspect-ratio: 5/4) {
+  .crate-dock { left: auto; right: calc(8px + var(--sar)); bottom: calc(50% - 18px); transform: translateY(50%); width: min(300px, 40vw); gap: 4px; }
+  .crate-pick { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .crate-tab { flex-direction: row; justify-content: center; gap: 6px; padding: 4px; font-size: 12px; border-radius: 11px; }
+  .crate-tab.sel { transform: none; }
+  .crate-tab .crate-ico { width: 24px; height: 21px; flex: none; }
+  .crate-odds { padding: 3px; border-radius: 11px; }
+  .crate-odds .odd, .crate-odds .odd b { font-size: 11px; }
+  .crate-cars { max-height: 64px; }
+  .crate-open { font-size: 17px; padding: 5px 10px; border-width: 2px; border-radius: 13px; }
+  .crate-prize { left: auto; right: calc(8px + var(--sar)); bottom: calc(50% - 18px); transform: translateY(50%); width: min(320px, 42vw); padding: 7px 10px; gap: 4px 8px; animation-name: prize-in-side; }
+  .cp-text b { font-size: 18px; }
+  .crate-skip { left: 30%; }
+  .crate-sum { left: auto; right: calc(8px + var(--sar)); bottom: 50%; transform: translateY(50%); width: min(360px, 46vw); max-height: calc(100% - 16px); overflow-y: auto; padding: 7px 10px; animation-name: prize-in-side; }
+  .crate-sum-tile .cs-art, .crate-sum-tile .thumb3d { height: 40px; --th: 40px; }
+  .crate-ten-strip { left: 30%; }
+  .crate-ten-flash { left: 30%; }
+  .crate-cc-lift { left: 30%; top: 50%; }
+  .crate-cc-lift.in-sum { top: 50%; }
+  .crate-cc-big, .crate-cc-lift.in-sum .crate-cc-big { height: min(70vh, 300px); }
+  @keyframes prize-in-side { from { transform: translate(30px, 50%) scale(.92); opacity: 0; } }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .crate-tab.sel .crate-ico, .crate-skip, .crate-prize, .crate-ten-strip i, .crate-ten-flash, .crate-sum, .crate-sum-tile { animation: none; }
 }
