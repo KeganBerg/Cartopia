@@ -1,5 +1,5 @@
 import { BoxGeometry, CircleGeometry, CylinderGeometry, Euler, PlaneGeometry, Quaternion, SphereGeometry, TorusGeometry, Vector3 } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 import type { Kit, Part } from './CarModel'
 import type { RimStyle } from './carWheels'
 
@@ -105,7 +105,7 @@ const TRIMS: Record<string, Feature[]> = {
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 14) => new CircleGeometry(r, seg)
 const cyl = (rt: number, rb: number, h: number, seg = 10) => new CylinderGeometry(rt, rb, h, seg)

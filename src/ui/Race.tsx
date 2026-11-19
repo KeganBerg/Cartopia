@@ -9,12 +9,12 @@ import { bestCar, carPi, raceCarOf } from '../game/raceCar'
 import { carNear, fairNow, tourPayNow } from '../game/fairRace'
 import { buildPi, fairRivalPi } from '../game/fairPi'
 import { CARS, SKILLS, carDef, performance, RACE_FUEL, GP_SERIES, GP_ROUNDS, gpOpen, gpRivalPi, gpReward, CAMPAIGN, CAMPAIGN_RACES, campaignRaceId, campaignRivalPi, campaignShift, rookieRace, ROOKIE_SHIFT, campaignRivalSkills, campaignReward, campaignCleared, campaignOpen, campaignStarTotal, campaignStarsNeed, type CampaignChapter, skillBoost, skillDrag, liveSkillBoost, smoothShift, type Body, type GpSeries, type SkillId } from '../game/data'
-import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT } from '../game/race'
+import { TRACK, freshRacer, stepRacer, shiftQuality, shiftBand, launchRacer, revLaunch, shiftRacer, fireBoost, aiReaction, AI_BOOST_GEAR, TOP_GEAR, LAUNCH_BAND, AI_BAND, IDLE, REV_UP, REV_HOLD, REV_DOWN, RACE_DT, kmh } from '../game/race'
 import { CarThumb } from '../scene/BuildingPreview'
 import { CallCardArt, CallCardGround, callCardTier, callCardTip } from './CallCard'
 import { CallCardPopup } from './CallCardPicker'
 import { callCardDef } from '../game/callCards'
-import { serverCallCard } from '../lib/serverCar'
+import { bestCarSkins, serverCallCard } from '../lib/serverCar'
 import { supabase } from '../lib/supabase'
 import { Panel, openGarageTab } from './Menus'
 import { StageSlot, useStageReady, warmStage } from '../scene/Stage'
@@ -39,7 +39,8 @@ import { TrialTab, TrialResult, beginTrialRun, commitTrialRun, trialRunFor, type
 import { PlayerCardPopup } from './PlayerCard'
 import { claim as claimVisitor, leave as leaveVisitor, setRacing, type Visitor } from '../lib/visitors'
 import { RivalResult, type RivalMatch, type RivalBonus } from './Rivals'
-import { RaceBar, RaceHub, Rounds, campaignFocus } from './RaceHub'
+import { RaceBar, RaceHub, Rounds, campaignFocus, ghostNow } from './RaceHub'
+import { GHOST_FUEL } from '../lib/ghosts'
 import { takeRaceTab, takeStreetRace, type RaceTab } from './raceNav'
 import { artStyle } from './venueArt'
 import { PaintRivals, firstRowPick, rowChip, rowPrizeOf } from './PaintRivals'
@@ -60,7 +61,7 @@ import { look as kartLook } from './ArcadeBits'
 import { TOUR_RACES, TOUR_RANK_LEGS, tourLeg, tourLegOf, tourIsBoss, tourRivalPi, tourShift, tourSkills, tourRivalName, tourLegBonus, tourRank, tourRankOf, tourLegsToRank } from '../game/tour'
 import type { WeatherKind } from '../game/weather'
 import { WEEKLY_EVENTS, EVENT_RACES, eventBonus, eventFor, eventIsBoss, eventPrize, eventProgress, eventRivalPi, eventShift, nextEventWeek } from '../game/events'
-import { msToNextWeek, skinDef, SKIN_TIERS } from '../game/data'
+import { msToNextWeek, skinDef, SKIN_TIERS, type ModSkins } from '../game/data'
 import { DIST, raceCharacter, characterMul, tourDist, type RaceDist } from '../game/distance'
 import { playerName } from '../lib/profiles'
 import { LoadingScene } from './Loading'
@@ -82,7 +83,7 @@ import { usePrefs } from '../lib/prefs'
 
 // skill: the rival car's race skill. AI rivals use it; live players use theirs on their own device.
 // shift: how cleanly an AI rival shifts, 0 (sloppy) to 1 (always perfect, the default).
-type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skill?: SkillId; shift?: number; boss?: boolean; callCard?: string }
+type Rival = { id: string; town: string; level: number; carName: string; color: string; pi: number; online: boolean; body: Body; model?: string; mods?: string[]; skin?: string; modSkin?: ModSkins; skill?: SkillId; shift?: number; boss?: boolean; callCard?: string }
 
 const TOWNS = ['Transamsylvania', 'Gearville', 'Piston Peak', 'Nitro Bay', 'Chrome City', 'Rustbelt Row', 'Turbo Falls', 'Muffler Hills']
 const zero = { engine: 0, turbo: 0, tires: 0, weight: 0 }
@@ -183,7 +184,7 @@ function MyCardChip({ onOpen }: { onOpen: () => void }) {
 async function fetchOnlineRivals(): Promise<Rival[]> {
   if (!supabase) return []
   const { data: auth } = await supabase.auth.getUser()
-  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car, call_card:state->callCard, call_cards:state->callCards').order('updated_at', { ascending: false }).limit(12)
+  let q = supabase.from('game_saves').select('owner_id, town_name, level, best_car, cars:state->cars, call_card:state->callCard, call_cards:state->callCards').order('updated_at', { ascending: false }).limit(12)
   if (auth.user) q = q.neq('owner_id', auth.user.id)
   const { data, error } = await q
   if (error || !data) return []
@@ -202,6 +203,7 @@ async function fetchOnlineRivals(): Promise<Rival[]> {
       mods: Array.isArray(r.best_car.mods) ? r.best_car.mods : undefined,
       skill: CARS.find((c) => c.name === r.best_car.name)?.skill,
       callCard: serverCallCard(r),
+      ...bestCarSkins(r),
     }))
 }
 
@@ -818,6 +820,13 @@ export function RacePanel() {
                 <span className="rm-qc-body"><b>Race players live</b><span className="buy small alt">Sign in</span></span>
               </button>
             )}
+            {supabase && liveSignedIn && !livePlayers.some((p) => !mutedIds[p.id]) && (
+              <button className="rm-qc rm-qc-live rm-qc-ghost" onClick={() => void ghostNow()} title={`Nobody live: race a real player's best run · ⛽${GHOST_FUEL}`}>
+                <CallCardArt tint="#5b4bb7" />
+                <span className="rm-qc-top"><span className="rm-mi">👻</span><span className="tag live">GHOST</span></span>
+                <span className="rm-qc-body"><b>Race a ghost</b><span className="buy small alt">👻 ⛽{GHOST_FUEL}</span></span>
+              </button>
+            )}
             {supabase && livePlayers.filter((p) => !mutedIds[p.id] && !p.closed).length >= 2 && (
               <div className={`rm-qc rm-qc-live rm-qc-party${pick ? ' on' : ''}`}>
                 <CallCardArt id="ravelights" />
@@ -844,7 +853,7 @@ export function RacePanel() {
                   <button key={p.id} className={`rm-qc cc-stage rm-qc-live rm-qc-pick${callCardTier(p.callCard)}${on ? ' on' : ''}`} style={{ ['--qc' as string]: p.color }} disabled={full}
                     onClick={() => setPick(on ? pick.filter((x) => x !== p.id) : [...pick, p.id])} aria-pressed={on}>
                     <CardArt id={p.callCard} color={p.color} />
-                    <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
+                    <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} skin={p.skin} modSkin={p.modSkin} /><span className="rm-pick-tick">{on ? '✅' : '➕'}</span></span>
                     <span className="rm-qc-body">
                       <b><PlayerName id={p.uid} town={p.town} /></b>
                       <span className="rm-qc-chips"><span>Lv {p.level}</span><span className="rm-pi">PI {p.pi}</span></span>
@@ -856,7 +865,7 @@ export function RacePanel() {
               if (betFor === p.id) return (
                 <div key={p.id} className={`rm-qc cc-stage rm-qc-live rm-qc-bet${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
                   <CardArt id={p.callCard} color={p.color} />
-                  <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag bet">🪙 BET</span></span>
+                  <span className="rm-qc-top"><CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} skin={p.skin} modSkin={p.modSkin} /><span className="tag bet">🪙 BET</span></span>
                   <span className="rm-qc-body">
                     <b><PlayerName id={p.uid} town={p.town} /></b>
                     <span className="rm-bet-chips">
@@ -872,7 +881,7 @@ export function RacePanel() {
                 <div key={p.id} className={`rm-qc cc-stage rm-qc-live${callCardTier(p.callCard)}`} style={{ ['--qc' as string]: p.color }}>
                   <CardArt id={p.callCard} color={p.color} />
                   <span className="rm-qc-top">
-                    <CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} /><span className="tag live">LIVE</span>
+                    <CarThumb stand color={p.color} body={p.body} model={modelNamed(p.carName)} mods={p.mods} skin={p.skin} modSkin={p.modSkin} /><span className="tag live">LIVE</span>
                     {!p.closed && !wait && !outgoing && stakes.length > 0 && (
                       <button className="rm-bet-btn" onClick={() => setBetFor(p.id)} title="Wager match: bet coins, winner takes both" aria-label="Wager match">🪙</button>
                     )}
@@ -901,7 +910,7 @@ export function RacePanel() {
             {[...online.filter((r) => !livePlayers.some((p) => p.uid === r.id)), ...rivals.map(fair)].map((r) => (
               <div key={r.id} className={`rm-qc cc-stage${callCardTier(r.callCard)}`} style={{ ['--qc' as string]: r.color }}>
                 <CardArt id={r.callCard} color={r.color} />
-                <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} />{r.online && <span className="tag">PLAYER</span>}</span>
+                <span className="rm-qc-top"><CarThumb stand color={r.color} body={r.body} model={r.model} mods={r.mods} skin={r.skin} modSkin={r.modSkin} />{r.online && <span className="tag">PLAYER</span>}</span>
                 <span className="rm-qc-body">
                   <b>{r.online ? <PlayerName id={r.id} town={r.town} /> : r.town}</b>
                   <span className="rm-qc-chips"><span>Lv {r.level}</span><span className="rm-pi">PI {r.pi}</span>{r.skill && <SkillIcon sk={r.skill} className="" />}</span>
@@ -980,11 +989,11 @@ function GrandPrix({ onRace }: { onRace: (s: GpSeries, r: Rival, prize: number) 
               {locked ? (
                 level < GP_SERIES[0].unlockLevel || !prev
                   ? <button className="buy small locked-btn" onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Level {s.unlockLevel}</button>
-                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 {GP_CUP[si - 1] ?? '🏆'} ×1 · Lv{s.unlockLevel}</button>
+                  : <button className="buy small locked-btn" title={`Win the ${prev.name} once, or reach level ${s.unlockLevel}`} onClick={() => showNeed('level', s.unlockLevel, s.name)}>🔒 Lv {s.unlockLevel}</button>
               ) : need > myBest ? (
                 <button className="buy small locked-btn" onClick={() => openPanel('garage')}>🔒 Final needs PI {need}</button>
               ) : short ? (
-                <button className="buy small alt" onClick={() => openPanel('rescue')}>Need {s.minCars} cars ({carCount})</button>
+                <button className="buy small alt" title={`This cup needs ${s.minCars} cars in your garage`} onClick={() => openPanel('rescue')}>🚗 {carCount}/{s.minCars} cars</button>
               ) : (
                 <button className="buy small" onClick={() => onRace(s, rival, prize)}>🏁 ${prize.toLocaleString()}<small>⛽{RACE_FUEL}</small></button>
               )}
@@ -1941,7 +1950,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
   // its inputs, so it's built once rather than re-rendered sixty times a second.
   const mineLook = useMemo(() => ({ body: def.body, model: car.model, color: car.color, finish: car.finish, skin: car.skin, modSkin: car.modSkin, panels: car.panels, mods: car.mods, trim: car.trim, hat: car.hat }), [def.body, car.model, car.color, car.finish, car.skin, car.modSkin, car.panels, car.mods, car.trim, car.hat])
   const theirModel = rival.model ?? CARS.find((c) => c.name === rival.carName)?.id
-  const theirLook = useMemo(() => ({ body: rival.body, model: theirModel, color: rival.color, mods: rival.mods }), [rival.body, theirModel, rival.color, rival.mods])
+  const theirLook = useMemo(() => ({ body: rival.body, model: theirModel, color: rival.color, mods: rival.mods, skin: rival.skin, modSkin: rival.modSkin }), [rival.body, theirModel, rival.color, rival.mods, rival.skin, rival.modSkin])
   const photo = useRef(() => flash('PHOTO FINISH!', 2200))
   const scene = useMemo(
     () => <RaceScene track={track} me={me} them={them} mine={mineLook} theirs={theirLook} venue={venue} weather={weather} night={night} onPhoto={() => photo.current()} />,
@@ -2015,7 +2024,7 @@ export function DragRace({ car, rival: shownRival, onExit, live, prize, onFinish
         <div className="rf-bottom">
           <BoostButton r={me.current} onFire={boost} ready={countdown === 0} gain={gain} />
           <div className="rf-dial">
-            <div className="rf-speed">{Math.round(me.current.speed * 3.6)}<small> km/h</small></div>
+            <div className="rf-speed">{kmh(me.current.speed)}<small> km/h</small></div>
             <svg viewBox="0 0 120 120" className={`tach${light}`}>
               <circle cx="60" cy="60" r="56" fill="#1b1f24" fillOpacity="0.85" stroke="#cfd8dc" strokeWidth="3" />
               <path d={arcPath(60, 60, 46, -210 + band.lo * 240, -210 + band.hi * 240)} stroke={onLine ? '#ffd54f' : '#76ff03'} strokeWidth="10" fill="none" />
@@ -2110,7 +2119,7 @@ export function RaceResult({ won, myTime, theirTime, cash, xp, rival, note, noCo
           <div className="rr-stats">
             <span className={stats.launch.startsWith('PERFECT') ? 'good' : stats.launch.startsWith('Good') ? '' : 'bad'}><small>Launch</small>{stats.launch.startsWith('PERFECT') ? 'Perfect' : stats.launch.startsWith('Good') ? 'Good' : stats.launch.startsWith('WHEEL') ? 'Spin' : 'Bogged'}</span>
             <span className={stats.shifts > 0 && stats.perfect === stats.shifts ? 'good' : ''}><small>Perfect</small>{stats.perfect}/{Math.max(stats.shifts, 1)}</span>
-            <span><small>Top speed</small>{Math.round(stats.top * 3.6)}<i> km/h</i></span>
+            <span><small>Top speed</small>{kmh(stats.top)}<i> km/h</i></span>
           </div>
         )}
         {!won && !noContest && pi && pi.me < pi.them && (
@@ -2152,7 +2161,7 @@ export function LiveRaceOverlay() {
   if (race.mode === 'kart' && race.party) return <LiveKartParty key={race.raceId} live={race} car={car} onExit={endLiveRace} />
   if (race.mode === 'kart') return <LiveKart key={race.raceId} live={race} car={car} onExit={endLiveRace} />
   const o = race.opponent
-  const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods }
+  const rival: Rival = { id: `live:${o.id}`, town: playerName(o.uid, o.town), level: o.level, carName: o.carName, color: o.color, pi: o.pi, online: true, body: o.body, mods: o.mods, skin: o.skin, modSkin: o.modSkin }
   return <DragRace key={race.raceId} car={car} rival={rival} live={race} onExit={endLiveRace} />
 }
 
@@ -2175,7 +2184,7 @@ export function InvitesPanel() {
   return (
     <Panel title="Race challenges">
       {invites.length === 0 ? (
-        <p className="hint">No challenges right now.</p>
+        <div className="inv-empty" title="Friends can challenge you to a live race"><span className="empty-ico">🏁</span><div>No challenges yet</div></div>
       ) : (
         <>
           <div className="invites-car"><RaceBar cars={cars} car={car} onPick={setRaceCar} /></div>

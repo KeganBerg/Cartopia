@@ -26,6 +26,8 @@ function make(key: string, size: number, draw: (g: CanvasRenderingContext2D, s: 
   t.colorSpace = SRGBColorSpace
   t.wrapS = t.wrapT = RepeatWrapping
   t.anisotropy = 4
+  // Named for the Roblox export (scripts/roblox/models.tsx), which maps each image to a material.
+  t.userData.key = key
   base.set(key, t)
   return t
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useContext, useEffect, useState } from 'react'
 import { useGame, type Panel as PanelId, gateLevel } from '../game/store'
 import { BUILDINGS, CLAN_CAP, CLAN_COLORS, CLAN_COST, CLAN_EMBLEMS, garagePower } from '../game/data'
 import { supabase } from '../lib/supabase'
@@ -8,7 +8,7 @@ import {
   createClan, askJoin, cancelRequest, fetchMyRequests, leaveClan, updateClan, isOfficer, JOIN_MODES,
   type BoardRow, type Clan, type ClanBadge, type JoinMode, type Metric, type MyClan, type Period,
 } from '../lib/clans'
-import { Panel, SheetTabs } from './Menus'
+import { InShell, Panel, SheetTabs } from './Menus'
 import { isCleanName, NAME_REJECTED } from '../lib/names'
 import { refreshCrewGoal, useCrewGoal } from './CrewGoal'
 import { refreshChatRooms } from '../lib/chat'
@@ -26,6 +26,7 @@ import { openPlayerCard } from '../lib/playerCard'
 import { sfx } from '../lib/sound'
 import { hasCrewHouse } from '../game/unlocks'
 import { BuildingThumb } from '../scene/BuildingPreview'
+import { clearCrewInvite, crewInvite, crewLink, shareLink } from '../lib/invite'
 
 // The crew battle strip brings the battle screen's code; it loads when a battle shows.
 const CrewBattleCard = onDemand(() => import('./CrewBattle'), (m) => m.CrewBattleCard)
@@ -46,15 +47,19 @@ export function useUserId() {
 // The Social menu: Friends, Crew, Meet and Leaderboards share one window with tabs across the top.
 export const SOCIAL_TITLE = 'Social'
 export function SocialTabs({ current }: { current: PanelId }) {
+  // In SocialPanel the window's own tab row stays put; the tab's copy steps aside.
+  const shelled = useContext(InShell)
   const openPanel = useGame((s) => s.swapPanel)
   const chests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const warLeft = useCrewBattle((b) => (b.battle?.current && !b.battle.current.result ? b.battle.attacksLeft ?? 0 : 0))
   const locked = useGame((s) => !hasCrewHouse(s) && !s.clanBadge)
   const tabs: { id: PanelId; label: React.ReactNode }[] = [
     { id: 'friends', label: '👫 Friends' },
-    { id: 'clan', label: <>{locked ? '🔒' : '🛡️'} Crew{chests > 0 && <span className="tab-dot">{chests}</span>}</> },
+    { id: 'clan', label: <>{locked ? '🔒' : '🛡️'} Crew{chests > 0 ? <span className="tab-dot">{chests}</span> : warLeft > 0 && <span className="tab-dot war" title={`War races left today: ${warLeft}`}>⚔️{warLeft}</span>}</> },
     { id: 'meet', label: '🚗 Meet' },
     { id: 'leaders', label: '🏅 Leaderboards' },
   ]
+  if (shelled) return null
   return <SheetTabs items={tabs as { id: Exclude<PanelId, null>; label: React.ReactNode }[]} value={current ?? 'friends'} onChange={(id) => openPanel(id)} />
 }
 
@@ -389,6 +394,7 @@ function ClanHome({ data, uid, onChange, demo = false }: { data: MyClan; uid: st
       <CrewMembers data={data} uid={uid} onChange={onChange} demo={demo} requests={{ asks, setAsks, reload: () => setReloadAsks((k) => k + 1) }} />
 
       <div className="clan-actions">
+        {!demo && <button className="buy small" title="Invite: a link that opens your crew" onClick={() => void shareLink(`Join my crew ${clan.name} [${clan.tag}] in Cartopia 🛡️`, crewLink(clan.tag))}>🔗 Invite</button>}
         {isOfficer(role) && !editing && <button className="buy small alt" onClick={() => setEditing(true)}>⚙️ Crew settings</button>}
         {!confirmLeave ? (
           <button className="sell" onClick={() => setConfirmLeave(true)}>Leave crew</button>
@@ -474,7 +480,8 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
   const showNeed = useGame((s) => s.showNeed)
   const [clans, setClans] = useState<Clan[] | null>(null)
   const [asked, setAsked] = useState<Set<string>>(new Set())
-  const [search, setSearch] = useState('')
+  // A crew link (?join=TAG) opens the list on that crew.
+  const [search, setSearch] = useState(() => crewInvite() ?? '')
   const [creating, setCreating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ name: '', tag: '', emblem: CLAN_EMBLEMS[0], color: CLAN_COLORS[0], description: '', minLevel: 1 })
@@ -501,6 +508,7 @@ function ClanBrowser({ onJoined }: { onJoined: () => void }) {
       }
       sfx.unlock()
       toast(`Welcome to ${c.name}!`)
+      clearCrewInvite()
       onJoined()
     } catch (e) {
       toast((e as Error).message)

@@ -1,4 +1,4 @@
-import { HalfFloatType, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three'
+import { HalfFloatType, PCFShadowMap, PCFSoftShadowMap, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three'
 
 // The live game skips three's check after each shader compile: it asks the driver for the
 // compile logs, which makes the page wait for that compile to finish there and then. Our
@@ -15,6 +15,9 @@ export function quietShaders(gl: WebGLRenderer) {
 // scene is drawn into a post effects buffer, which changes its shaders (no tone
 // mapping), so compile for that.
 export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, offscreen: boolean): Promise<unknown> {
+  // three swaps PCFSoft (r3f's default with shadows on) for PCF at the first shadow draw, which
+  // would throw away everything compiled here; compile for what it will draw with.
+  if (gl.shadowMap.type === PCFSoftShadowMap) gl.shadowMap.type = PCFShadowMap
   const hidden: Object3D[] = []
   scene.traverse((o) => {
     // Pieces Batch has merged stay hidden: the merged mesh is what draws.
@@ -34,7 +37,12 @@ export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, 
     target?.dispose()
     for (const o of hidden) o.visible = false
   }
-  return done
+  // Without background compiling, a phone finishes a shader only when it's first used, so one
+  // compiled here but first drawn later (the crate depot's walk back out) froze the view then.
+  // Using each one now finishes them all while the view is still getting ready.
+  return done.then(() => {
+    for (const p of (gl.info.programs ?? []) as unknown as { getUniforms(): unknown }[]) p.getUniforms()
+  })
 }
 
 // Three frees a shader program once no material uses it, so a scene that remounts (each

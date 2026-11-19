@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useGame } from '../game/store'
 import { supabase } from '../lib/supabase'
-import { MAX_CHAT, canDelete, deleteChat, firstRoom, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type Room } from '../lib/chat'
+import { MAX_CHAT, REPORT_REASONS, canDelete, deleteChat, firstRoom, reportChat, sendChat, senderName, setMuted, useChat, viewRoom, type ChatMsg, type ReportReason, type Room } from '../lib/chat'
 import { useNames } from '../lib/profiles'
 import { mentions } from '../lib/mentions'
 import { MentionInput, MentionText } from './MentionInput'
@@ -10,6 +10,9 @@ import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
 import { sfx } from '../lib/sound'
+import { fetchTownNews, type NewsItem } from '../lib/townNews'
+import { openPlayerCard } from '../lib/playerCard'
+import { PlayerName } from './Username'
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60000)
@@ -90,7 +93,9 @@ function ChatRoom({ room }: { room: Room }) {
   const [menu, setMenuId] = useState<number | null>(null)
   // The message whose Delete was tapped once: the next tap deletes it.
   const [sure, setSure] = useState<number | null>(null)
-  const setMenu = (id: number | null) => { setMenuId(id); setSure(null) }
+  // The message whose Report was tapped: the menu shows the reasons to pick from.
+  const [reporting, setReporting] = useState<number | null>(null)
+  const setMenu = (id: number | null) => { setMenuId(id); setSure(null); setReporting(null) }
   const press = useRef<number>(0)
   const log = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
@@ -138,8 +143,15 @@ function ChatRoom({ room }: { room: Room }) {
     if (err) toast(err)
   }
 
+  const report = async (m: ChatMsg, reason: ReportReason) => {
+    setMenu(null)
+    const err = await reportChat(m.id, reason)
+    toast(err ?? '🚩 Reported. Thanks!')
+  }
+
   return (
     <>
+      {room === 'global' && <TownNews />}
       <div
         className="chat-log"
         ref={log}
@@ -159,7 +171,7 @@ function ChatRoom({ room }: { room: Room }) {
               {first && !mine && (
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
-                  <b>{senderName(m)}</b>
+                  <b data-no-i18n>{senderName(m)}</b>
                   {m.mod && <span className="chat-mod" title="Cartopia team" aria-label="Cartopia team">✔</span>}
                   <small>Lv {m.level} · {ago(m.at)}</small>
                 </button>
@@ -168,6 +180,10 @@ function ChatRoom({ room }: { room: Room }) {
                 <div className="chat-menu">
                   {!mine && <button onClick={() => { setMenu(null); void go(m.owner) }}>🏘️ Visit town</button>}
                   {!mine && <button onClick={() => { setMenu(null); setMuted(m.owner, senderName(m)); toast(`Muted ${senderName(m)}`) }}>🔇 Mute</button>}
+                  {!mine && reporting !== m.id && <button onClick={() => setReporting(m.id)}>🚩 Report</button>}
+                  {!mine && reporting === m.id && REPORT_REASONS.map((r) => (
+                    <button key={r.id} className="chat-why" onClick={() => void report(m, r.id)}>{r.label}</button>
+                  ))}
                   {del && (
                     <button className={`chat-del${sure === m.id ? ' sure' : ''}`} onClick={() => void remove(m)}>
                       🗑️ {sure === m.id ? 'Delete?' : 'Delete'}
@@ -177,7 +193,7 @@ function ChatRoom({ room }: { room: Room }) {
                 </div>
               )}
               <div className="chat-line">
-                <p className="chat-bubble" {...holdProps(m, has)}><MentionText text={m.body} me={myName} />{mine && first && <small>{ago(m.at)}</small>}</p>
+                <p className="chat-bubble" {...holdProps(m, has)}><span data-no-i18n><MentionText text={m.body} me={myName} /></span>{mine && first && <small>{ago(m.at)}</small>}</p>
                 {has && menu !== m.id && (
                   <button className="chat-more" aria-label="Message options" onClick={() => setMenu(m.id)}>⋯</button>
                 )}
@@ -203,5 +219,28 @@ function ChatRoom({ room }: { room: Room }) {
         <button className="buy" disabled={busy || !text.trim()} aria-label="Send">➤</button>
       </form>
     </>
+  )
+}
+
+// This week's board leaders, one tap from their player card.
+function TownNews() {
+  const [items, setItems] = useState<NewsItem[]>([])
+  useEffect(() => {
+    let on = true
+    void fetchTownNews().then((n) => on && setItems(n))
+    return () => { on = false }
+  }, [])
+  if (!items.length) return null
+  return (
+    <div className="chat-news" aria-label="This week">
+      <span className="chat-news-tag" title="This week's leaders">📰</span>
+      {items.map((it) => (
+        <button key={it.metric} className="chat-news-chip" title={it.tip} onClick={() => openPlayerCard(it.row.ownerId, it.row.townName)}>
+          <i>{it.icon}</i>
+          <b><PlayerName id={it.row.ownerId} town={it.row.townName} /></b>
+          <span>{it.n}</span>
+        </button>
+      ))}
+    </div>
   )
 }

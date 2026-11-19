@@ -1,6 +1,6 @@
 import { mergeCandidates } from '../game/merge'
 import { CallCardPicker } from './CallCardPicker'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Activity, createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useGame, hasRusty, buildPrice, gateLevel, type OwnedCar, type PlacedBuilding } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { stackCars, stackFace } from '../game/garageStacks'
@@ -10,6 +10,7 @@ import { compact } from './format'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DOOR_FLY, depotWalk, doorTrip } from '../scene/doorTrip'
 import { usePauseTownUnder } from '../scene/renderGate'
+import { startCruise } from '../scene/cruise'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -18,6 +19,7 @@ import { rotateCurrent } from '../game/placement'
 import { TRAFFIC, TRAFFIC_MIN, roadShare, roadsShort, trafficLevel } from '../game/traffic'
 import { BuildingThumb, CarThumb } from '../scene/BuildingPreview'
 import { ShopUpgrades } from './Upgrade'
+import { KeepTabs } from './KeepTabs'
 import { ModShop, withMod } from './Mods'
 import { CollectionBook, useFindCar } from './Collection'
 import { PaintShop, jobOf } from './Paint'
@@ -57,7 +59,14 @@ export function BottomBar() {
   const visiting = useGame((s) => !!s.visiting)
   const setsReady = useGame((s) => readySets(s).length)
   // Same count as the Crew tab's dot, and the button opens that tab while a chest waits.
-  const crewChests = useCrewGoal((g) => g.ready) + useCrewBattle((b) => b.ready)
+  const goalChest = useCrewGoal((g) => g.ready)
+  const warChest = useCrewBattle((b) => b.ready)
+  const crewChests = goalChest + warChest
+  // War races left today: the button shows them and goes straight to the war map.
+  const warLeft = useCrewBattle((b) => (b.battle?.current && !b.battle.current.result ? b.battle.attacksLeft ?? 0 : 0))
+  // The button goes where its badge points: a war chest or war races to the war, the goal chest to the Crew tab.
+  const toWar = warChest > 0 || (crewChests === 0 && warLeft > 0)
+  const socialTo = toWar ? 'battle' : goalChest > 0 ? 'clan' : 'friends'
   const crewChat = useChat((c) => c.unread.crew)
   const globalChat = useChat((c) => c.unread.global > 0)
   const chatPing = useChat((c) => c.pinged.global + c.pinged.crew > 0)
@@ -79,7 +88,7 @@ export function BottomBar() {
       <div className="bottom-bar">
         {shop.on && <button className={`icon-btn${pulse('shop')}${freshClass(shop.fresh)}`} onClick={() => openPanel('shop')}><span className="i i-shop"><Icon name="shop" /></span>SHOP</button>}
         {cars.on && <button className={`icon-btn${pulse('cars')}${freshClass(cars.fresh)}`} onClick={() => openCars(setsReady > 0)}><span className="i i-showroom"><Icon name="car" />{setsReady > 0 && <span className="btn-dot">{setsReady}</span>}</span>CARS</button>}
-        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('friends')}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 && <span className="btn-dot">{crewChests}</span>}</span>SOCIAL</button>}
+        {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel(socialTo)}><span className="i i-friends"><Icon name="friends" />{crewChests > 0 ? <span className="btn-dot">{crewChests}</span> : toWar && <span className="btn-dot war" title={`War races left today: ${warLeft}`}>⚔️{warLeft}</span>}</span>SOCIAL</button>}
         {social.on && <button className={`icon-btn${freshClass(social.fresh)}`} onClick={() => openPanel('chat')}><span className="i i-chat"><Icon name="chat" />{chatPing ? <span className="btn-dot" title="You were mentioned">@</span> : crewChat > 0 ? <span className="btn-dot">{crewChat > 9 ? '9+' : crewChat}</span> : globalChat && <span className="btn-dot new" />}</span>CHAT</button>}
         {edit.on && <button className={`icon-btn${freshClass(edit.fresh)}`} onClick={() => setMode(useGame.getState().tutorial >= 99 ? 'road' : 'move')}><span className="i i-edit"><Icon name="cone" /></span>EDIT</button>}
         {race.on && <button className={`big-btn race-btn${pulse('race')}${freshClass(race.fresh)}`} onClick={() => openPanel('race')}><span className="i"><Icon name="flag" />{rival && <span className="btn-dot" title="Your rival is in town">!</span>}</span>RACE</button>}
@@ -147,6 +156,8 @@ function EditBar() {
   })
   const storedCount = useGame((s) => s.stored?.length ?? 0)
   const tutDone = useGame((s) => tutTarget(s) === 'done')
+  // Placing Rusty's in the tutorial, a green Done read as the next tap and left without building.
+  const tutPlacing = useGame((s) => s.tutorial === 3 && s.mode === 'place' && s.placing === 'rescue')
   const tutCard = useGame(tutorialShowing)
   // During the tutorial the bar keeps to placing and moving; roads, land and the rest come after.
   const all = useGame((s) => s.tutorial >= 99)
@@ -180,7 +191,7 @@ function EditBar() {
         {mode === 'move' && again && <button className="tool" onClick={() => setMode('place', again)}><Icon name="plus" size={22} /><span>Again</span></button>}
         {all && <button className="tool" onClick={() => openPanel('inventory')}><Icon name="box" size={22} /><span>Inventory</span>{storedCount > 0 && <b className="tool-count">{storedCount}</b>}</button>}
         {all && <button className="tool" onClick={() => openPanel('shop')}><Icon name="shop" size={22} /><span>Shop</span></button>}
-        <button className={tutDone ? 'tool done tut-pulse' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
+        <button className={tutDone ? 'tool done tut-pulse' : tutPlacing ? 'tool done tut-quiet' : 'tool done'} onClick={() => setMode('play')}><Icon name="check" size={22} /><span>Done</span></button>
       </div>
     </div>
   )
@@ -191,10 +202,19 @@ function EditBar() {
 let panelsUp = 0
 let panelGoneAt = -Infinity
 
-// onBack: shows a back button before the title (a sub-screen of the panel).
+// Inside a menu that keeps its window while its tabs swap (Social), a tab's own Panel is just
+// its contents: a whole new window for each tab made the sheet and its tab row jump.
+export const InShell = createContext(false)
+
+// onBack: shows a back button before the title (a sub-screen of the panel). Without it, a menu
+// opened from another menu still gets one, back to that menu; the X closes to the town.
 // head: extra bits in the title bar, before the close button.
 export function Panel({ title, children, wide, onClose, onBack, head, className }: { title: string; children: React.ReactNode; wide?: boolean; onClose?: () => void; onBack?: () => void; head?: React.ReactNode; className?: string }) {
+  const shelled = useContext(InShell)
   const closePanel = useGame((s) => s.closePanel)
+  const closeMenus = useGame((s) => s.closeMenus)
+  const trail = useGame((s) => s.panelBack.length > 0)
+  const back = onBack ?? (!onClose && trail ? closePanel : undefined)
   // Slides away before it unmounts; the timer dies with the panel, so a panel
   // swapped in meanwhile is never closed by it.
   const [closing, setClosing] = useState(false)
@@ -202,31 +222,42 @@ export function Panel({ title, children, wide, onClose, onBack, head, className 
   useEffect(() => () => clearTimeout(timer.current), [])
   const box = useRef<HTMLDivElement>(null)
   usePauseTownUnder(box)
-  const [still] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  const [still, setStill] = useState(() => panelsUp > 0 || Date.now() - panelGoneAt < 250)
+  // A menu kept out of sight (Kept) and shown again: no slide-out left over from closing it, and
+  // it slides in again only when it opens over the town.
+  const shown = useRef(false)
   useLayoutEffect(() => {
+    if (shown.current) {
+      setClosing(false)
+      setStill(panelsUp > 0 || Date.now() - panelGoneAt < 250)
+    }
+    shown.current = true
     panelsUp++
     return () => {
       panelsUp--
       panelGoneAt = Date.now()
     }
   }, [])
-  const close = (_: null) => {
-    const done = () => (onClose ? onClose() : closePanel())
-    // Going back to the previous menu: swap straight to it rather than slide away and back.
-    if (reducedMotion() || (!onClose && useGame.getState().panelBack.length > 0)) return done()
+  // The X: slides away to the town.
+  const close = () => {
+    const done = () => (onClose ? onClose() : closeMenus())
+    if (reducedMotion()) return done()
     if (closing) return
     setClosing(true)
     timer.current = window.setTimeout(done, 170)
   }
+  // A tap beside the menu steps back like the back button: straight to the previous menu, no slide.
+  const tapOut = () => (!onClose && trail ? closePanel() : close())
+  if (shelled) return <>{children}</>
   return (
-    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={() => close(null)}>
+    <div className={closing ? 'overlay closing' : still ? 'overlay still' : 'overlay'} onClick={tapOut}>
       <div ref={box} className={`${wide ? 'panel wide' : 'panel'}${className ? ` ${className}` : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="panel-head">
-          {onBack && <button className="panel-back" aria-label="Back" onClick={onBack}><Icon name="back" size={18} /></button>}
+          {back && <button className="panel-back" aria-label="Back" onClick={back}><Icon name="back" size={18} /></button>}
           {/* long titles (a garage with its stats) step down a size so they don't cut off */}
           <h2 className={title.length > 14 ? 'long' : undefined} title={title}>{title}</h2>
           {head}
-          <button className="close" aria-label="Close" onClick={() => close(null)}><Icon name="close" size={16} /></button>
+          <button className="close" aria-label="Close" onClick={close}><Icon name="close" size={16} /></button>
         </div>
         <div className="panel-body">{children}</div>
       </div>
@@ -266,21 +297,26 @@ export function SheetTabs<T extends string>({ items, value, onChange }: { items:
     const el = row.current
     if (!el) return
     const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
-    check()
     el.addEventListener('scroll', check, { passive: true })
+    // The observer's first report comes once the row is laid out. Measuring here instead made
+    // the page lay out on the spot each time a kept menu showed again (on a slow phone, a freeze).
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check)
-    ro?.observe(el)
+    if (ro) ro.observe(el)
+    else check()
     return () => {
       el.removeEventListener('scroll', check)
       ro?.disconnect()
     }
   }, [items.length])
   // Bring the picked tab into view by scrolling only the row: scrollIntoView would also
-  // scroll the page while a menu slides in, pushing its header off the top.
+  // scroll the page while a menu slides in, pushing its header off the top. Not again when a
+  // kept menu shows again on the same tab: it's already in view, and measuring costs a layout.
+  const placed = useRef<T | null>(null)
   useEffect(() => {
     const el = row.current
     const sel = el?.querySelector<HTMLElement>('.sel')
-    if (!el || !sel) return
+    if (!el || !sel || placed.current === value) return
+    placed.current = value
     const r = el.getBoundingClientRect()
     const t = sel.getBoundingClientRect()
     // Keep it clear of the › strip too, which covers the row's right edge.
@@ -307,7 +343,7 @@ const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; f
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service && !b.rec && !b.event && !CAR_CARE.has(b.id) },
   { id: 'homes', label: '🏠 Homes', filter: (b) => b.kind === 'house' },
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
+  { id: 'rec', label: <>🎡 <span className="tab-short">Rec</span><span className="tab-long">Recreation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
@@ -357,11 +393,7 @@ export function ShopPanel() {
   // A search looks through every tab at once.
   const [find, setFind] = useState('')
   const term = find.trim().toLowerCase()
-  const group = term ? null : SHOP_GROUPS.find((g) => g.id === tab)
-  const shown = term
-    ? BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))
-    : group ? BUILDINGS.filter((b) => b.unlockLevel < 99 && group.filter(b)) : []
-  const rows = shown.map((b) => {
+  const rowsOf = (shown: BuildingDef[]) => shown.map((b) => {
     const locked = gate < b.unlockLevel
     const sale = buildPrice({ deals, level }, b.id)
     // Gem decor (the statue, the arch) is short on gems, not coins.
@@ -372,6 +404,44 @@ export function ShopPanel() {
     const rank = owned ? 3 : locked ? 2 : broke ? 1 : 0
     return { b, locked, sale, brokeGems, broke, owned, rank }
   }).sort((x, y) => (y.rank < 2 ? featureRank(y.b) : 0) - (x.rank < 2 ? featureRank(x.b) : 0) || x.rank - y.rank || x.b.unlockLevel - y.b.unlockLevel || x.b.price - y.b.price)
+  const found = term ? rowsOf(BUILDINGS.filter((b) => b.unlockLevel < 99 && b.name.toLowerCase().includes(term) && SHOP_GROUPS.some((g) => (g.id !== 'event' || ev) && g.filter(b)))) : []
+  const grid = (rows: ReturnType<typeof rowsOf>) => (
+    <div className="shop-grid">
+      {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
+        const highlight = b.id === 'rescue' && !rusty
+        const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
+        const focused = b.id === focus
+        const every = b.jobSeconds ? (b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`) : null
+        return (
+          <button
+            key={b.id}
+            ref={focused ? focusRef : undefined}
+            className={`card shop-card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
+            disabled={owned}
+            title={FEATURES[b.id] ? FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1) : undefined}
+            onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
+          >
+            {highlight && <span className="ribbon">START HERE</span>}
+            {feature && <span className="ribbon feature">★ NEW</span>}
+            {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
+            {b.event && <span className="ribbon spooky">LIMITED</span>}
+            <BuildingThumb def={b} />
+            <div className="card-name">{b.name}</div>
+            {/* What it makes, as icons and numbers: coins (and parts) per job, how often, the fuel each job takes. */}
+            <div className="shop-chips">
+              {!!b.jobSeconds && <span className="c-coin">${compact(b.payout ?? 0)}{b.partsPayout ? <em>+{b.partsPayout}⚙</em> : null}</span>}
+              {every && <span title="Every job">⏱{every}</span>}
+              {!!b.jobSeconds && <span className="c-fuel" title="Fuel per job">⛽{b.fuelCost}</span>}
+              {b.nightOnly && <span title="Open at night only">🌙</span>}
+              {b.fuelCap && <span className="c-cap" title="Max fuel">⛽+{b.fuelCap}</span>}
+            </div>
+            {(highlight || feature) && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
+            {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Lv {b.unlockLevel}</span> : price(b, sale.deal && sale)}
+          </button>
+        )
+      })}
+    </div>
+  )
   return (
     <Panel title="Shop" wide>
       <SheetTabs items={tabs} value={tab} onChange={(t) => { setFind(''); setTab(t) }} />
@@ -380,45 +450,11 @@ export function ShopPanel() {
         <input type="search" value={find} placeholder={tab === 'upgrades' ? 'Find your building' : 'Find a building'} aria-label="Find a building" onChange={(e) => setFind(e.target.value)} />
         {find && <button aria-label="Clear" onClick={() => setFind('')}>✕</button>}
       </label>
-      {tab === 'upgrades' && <ShopUpgrades find={term} />}
-      {term && tab !== 'upgrades' && !rows.length && <p className="shop-none">🔍 No match</p>}
-      {(group || (term && tab !== 'upgrades')) && (
-          <div className="shop-grid">
-            {rows.map(({ b, locked, sale, brokeGems, broke, owned }) => {
-              const highlight = b.id === 'rescue' && !rusty
-              const feature = !highlight && !locked && !!FEATURES[b.id] && !buildings.some((o) => o.def === b.id)
-              const focused = b.id === focus
-              const every = b.jobSeconds ? (b.jobSeconds >= 60 ? `${b.jobSeconds / 60}m` : `${b.jobSeconds}s`) : null
-              return (
-                <button
-                  key={b.id}
-                  ref={focused ? focusRef : undefined}
-                  className={`card shop-card ${locked ? 'locked' : ''} ${broke && !locked ? 'broke' : ''} ${highlight ? 'start-here' : ''} ${focused ? 'focus' : ''}`}
-                  disabled={owned}
-                  title={FEATURES[b.id] ? FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1) : undefined}
-                  onClick={() => (locked ? showNeed('level', b.unlockLevel, b.name) : brokeGems ? showNeed('bucks', sale.bucks - bucks, b.name) : broke ? showNeed('coins', sale.coins - coins, b.name) : setMode('place', b.id))}
-                >
-                  {highlight && <span className="ribbon">START HERE</span>}
-                  {feature && <span className="ribbon feature">★ NEW</span>}
-                  {sale.deal && !locked && <span className="ribbon deal">DEAL</span>}
-                  {b.event && <span className="ribbon spooky">LIMITED</span>}
-                  <BuildingThumb def={b} />
-                  <div className="card-name">{b.name}</div>
-                  {/* What it makes, as icons and numbers: coins (and parts) per job, how often, the fuel each job takes. */}
-                  <div className="shop-chips">
-                    {!!b.jobSeconds && <span className="c-coin">${compact(b.payout ?? 0)}{b.partsPayout ? <em>+{b.partsPayout}⚙</em> : null}</span>}
-                    {every && <span title="Every job">⏱{every}</span>}
-                    {!!b.jobSeconds && <span className="c-fuel" title="Fuel per job">⛽{b.fuelCost}</span>}
-                    {b.nightOnly && <span title="Open at night only">🌙</span>}
-                    {b.fuelCap && <span className="c-cap" title="Max fuel">⛽+{b.fuelCap}</span>}
-                  </div>
-                  {(highlight || feature) && <div className="card-stat feature-line">✨ {FEATURES[b.id][0].toUpperCase() + FEATURES[b.id].slice(1)}</div>}
-                  {owned ? <span className="price">✔ Built</span> : locked ? <span className="price">🔒 Lv {b.unlockLevel}</span> : price(b, sale.deal && sale)}
-                </button>
-              )
-            })}
-          </div>
-      )}
+      {term && (tab === 'upgrades' ? <ShopUpgrades find={term} /> : <>{!found.length && <p className="shop-none">🔍 No match</p>}{grid(found)}</>)}
+      {/* Each tab's grid is kept once seen (KeepTabs), and kept out of sight during a search. */}
+      <Activity mode={term ? 'hidden' : 'visible'}>
+        <KeepTabs tab={tab} render={(t) => (t === 'upgrades' ? <ShopUpgrades find="" /> : grid(rowsOf(BUILDINGS.filter((b) => b.unlockLevel < 99 && SHOP_GROUPS.find((g) => g.id === t)!.filter(b)))))} />
+      </Activity>
     </Panel>
   )
 }
@@ -727,6 +763,22 @@ function RaceCarToggle({ car }: { car: string }) {
   )
 }
 
+// Takes the car out for a drive round town by hand (scene/cruise.ts). A car on a flat
+// or out of fuel stays put until it's fixed.
+function DriveToggle({ car }: { car: OwnedCar }) {
+  const stuck = !!(car.flat || car.lowFuel)
+  const go = () => {
+    const s = useGame.getState()
+    s.closePanel()
+    if (!startCruise(car.uid)) s.toast('No road to drive on yet')
+  }
+  return (
+    <button className="showcase-toggle drive-toggle" onClick={go} disabled={stuck} title={stuck ? 'Fix it up first' : 'Drive it round town'}>
+      {stuck ? '🔧 Drive' : '🚗 Drive'}
+    </button>
+  )
+}
+
 // My Cars list filter and sort, kept while the game is open. Default: top PI first.
 type CarSort = 'pi' | 'pi-low' | 'name' | 'new'
 const CAR_SORTS: { id: CarSort; label: string }[] = [
@@ -939,6 +991,7 @@ function GarageSection() {
             <div className="car-toggles">
               <RaceCarToggle car={car.uid} />
               <ShowcaseToggle car={car.uid} />
+              <DriveToggle car={car} />
             </div>
           </div>
           <div className="garage-tabs" role="tablist">
@@ -990,6 +1043,9 @@ let lastRoom: Room = 'garage'
 // How long the depot takes to fade in over the room, or out of it (ms; garage-env.css too).
 const DEPOT_FADE = 420
 
+// The section showing: the others the page has kept (KeepTabs) are out of sight.
+const shownGarage = () => [...document.querySelectorAll<HTMLElement>('.cars-page div.garage')].find((e) => e.offsetParent !== null)
+
 export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.ReactNode }) {
   const panel = useGame((s) => s.panel)
   const cars = useGame((s) => s.cars)
@@ -1022,7 +1078,7 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
       doorTrip.on = (e) => { if (e === 'there') setFlown(true) }
       depotWalk.go = 'hold'
       depotWalk.p = 0
-      document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+      shownGarage()?.scrollTo({ top: 0, behavior: 'smooth' })
       // No room view to walk (a car looked at full screen): go anyway.
       const t = setTimeout(() => setFlown(true), 5000)
       return () => clearTimeout(t)
@@ -1065,7 +1121,19 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
     const t = setTimeout(() => setDepotReady(true), 15000)
     return () => clearTimeout(t)
   }, [trip])
-  useEffect(() => () => { doorTrip.go = null; doorTrip.on = undefined; depotWalk.go = null }, [])
+  useEffect(() => () => {
+    doorTrip.go = null
+    doorTrip.on = undefined
+    depotWalk.go = null
+    // Kept out of sight (Kept): it comes back in a room, not part way to or in the depot.
+    depotOn.current = false
+    setDepot(false)
+    setTrip(null)
+    setFlown(false)
+  }, [])
+  // Shown again: on the tab it was asked for (a ready set opens the Collection).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => setShowTab(focus ? 'shop' : lastShowroomTab), [])
   const onDepotReady = useCallback(() => setDepotReady(true), [])
   // The depot sits under the tabs, over the room.
   const [tabsH, setTabsH] = useState(0)
@@ -1089,14 +1157,11 @@ export function CarsPage({ crates }: { crates?: (onReady: () => void) => React.R
     toShowroom('shop')
   })
   // Phones: a car picked from the grid goes up on the turntable, so scroll back up to it.
-  const top = () => document.querySelector('.cars-page div.garage')?.scrollTo({ top: 0, behavior: 'smooth' })
+  const top = () => shownGarage()?.scrollTo({ top: 0, behavior: 'smooth' })
   return (
     <Panel title="Cars" wide className={`garage-env cars-page sec-${room ?? 'crates'}${trip ? ` trip-${trip}` : ''}`} head={<><span className="cars-power" title="Garage power">⚡{garagePower(cars)}</span><AutoJobsButton /></>}>
       <CarsTabs current={section} onShowroom={toShowroom} />
-      {room === 'garage' && <GarageSection />}
-      {room === 'shop' && <SaleSection onPick={top} />}
-      {room === 'book' && <BookSection onFind={find} />}
-      {room === 'cards' && <CardsSection onCrates={() => swap('crates')} />}
+      <KeepTabs tab={room} render={(r) => (r === 'garage' ? <GarageSection /> : r === 'shop' ? <SaleSection onPick={top} /> : r === 'book' ? <BookSection onFind={find} /> : <CardsSection onCrates={() => swap('crates')} />)} />
       {depot && <div className="cars-crates" style={{ top: tabsH }} aria-hidden={trip === 'out' || trip === 'wait' || trip === 'back' || undefined}>{crates?.(onDepotReady)}</div>}
     </Panel>
   )

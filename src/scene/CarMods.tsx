@@ -189,6 +189,30 @@ function tankArmour(f: Frame, p: Parts, plates: number) {
     for (const dy of [-1, 1]) for (const dz of [-1, 1]) p.chrome.push(box(0.006, 0.012, 0.012, sd * (sillX(f) + t + 0.002), y + dy * (h / 2 - 0.014), z + dz * (seg / 2 - 0.016)))
   }
 }
+// Bodies drawn in curves, whose fenders hug the wheels and fall away: square box flares stand
+// off them like tables, so their flares follow each wheel instead (see curvedFlares).
+const CURVED: Body[] = ['scissor', 'horseshoe', 'teardrop', 'pontoon', 'midship', 'longtail', 'prototype', 'bubble']
+// Box flares on a curved body: a faceted arch of square section round each tyre, bolted on with
+// chrome bolts, joined by a skirt. Same reach out from the car as the arches in withRoom.
+function curvedFlares(f: Frame, p: Parts) {
+  const ax = Math.max(f.wx + 0.05, sillX(f) + 0.03) + 0.01
+  const R = f.wheel * 1.22
+  const n = 7
+  const seg = 2 * R * Math.sin(Math.PI / (2 * n)) + 0.006
+  // Each facet reaches in under the body's side, which narrows toward a tapering nose.
+  const inner = Math.min(ax - 0.035, f.side - 0.06)
+  for (const sd of [-1, 1]) {
+    for (const zz of [f.wz, -f.wz]) for (let i = 0; i < n; i++) {
+      // Facet i spans the angle from i/n to (i+1)/n of the half circle over the tyre.
+      const t = ((i + 0.5) / n) * Math.PI
+      const y = f.wheel + Math.sin(t) * R
+      const z = zz + Math.cos(t) * R
+      p.paint.push(box(ax + 0.035 - inner, 0.034, seg, sd * (ax + 0.035 + inner) / 2, y, z, Math.PI / 2 - t))
+      if (i % 2 === 1) p.chrome.push(new CylinderGeometry(0.007, 0.007, 0.01, 6).rotateZ(Math.PI / 2).translate(sd * (ax + 0.035), y, z))
+    }
+    if (f.body !== 'tank') p.paint.push(box(0.05, 0.04, f.wz * 2 - R * 2 - 0.02, sd * (sillX(f) + 0.015), sillY(f) + 0.034, 0))
+  }
+}
 function withRoom(f: Frame, all: string[]): Frame & { room: Room } {
   // How far a kit's wheel arches reach along the car from each axle.
   const arch = all.includes('boxflares') ? f.wheel * 1.28 : all.includes('widebody') ? f.wheel * 1.2 + 0.035 : 0
@@ -495,6 +519,7 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     for (const [a, b] of aroundTips(f, -f.bodyW * 0.24, f.bodyW * 0.24)) p.carbon.push(box(b - a, 0.05, 0.04, (a + b) / 2, rearLift(f) + 0.029, f.rear - 0.012))
   },
   boxflares: (f, p) => {
+    if (CURVED.includes(f.body)) return curvedFlares(f, p)
     // Square bolt-on flares over each wheel, joined by skirts, with a chrome bolt at each corner.
     // Each flare runs from inside the body side out past the tyre.
     const x0 = f.side - 0.02
@@ -630,8 +655,9 @@ const BUILD: Record<string, (f: Frame, p: Parts) => void> = {
     // Neon tubes round the underside (the light they throw on the road is drawn on its own).
     // Tall enough to reach up into a body whose floor sits a little higher.
     const y = f.lift - 0.003
-    // Under the body itself, inside anything that stands out along the sills.
-    const x = Math.min(f.side - 0.04, f.bodyW / 2 - 0.02)
+    // Well under the body, inside anything that stands out along the sills and inside sides that
+    // curve in toward the floor: from the side only their glow on the road shows, not a bar.
+    const x = Math.min(f.side - 0.07, f.bodyW * 0.36)
     for (const sd of [-1, 1]) p.neon.push(box(0.012, 0.022, f.len * 0.62, sd * x, y, 0))
     for (const zz of [f.len * 0.33, -f.len * 0.33]) p.neon.push(box(f.bodyW * 0.62, 0.022, 0.012, 0, y, zz))
   },

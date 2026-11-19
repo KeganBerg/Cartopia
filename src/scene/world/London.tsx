@@ -1562,7 +1562,7 @@ export default function London({ len, race }: WorldProps) {
   const mid = len / 2 + 5
   return (
     <>
-      <Batch version={`london-d3:${len}`} cell={24}>
+      <Batch version={`london-d3:${len}`} cell={24} freeze prune>
         <mesh rotation-x={-Math.PI / 2} position={[EDGE + 0.95, 0.012, mid]}>
           <planeGeometry args={[1.9, L]} />
           <meshStandardMaterial color="#8c8d8a" />

@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { hideSplash } from './lib/splash'
+import { reportError } from './lib/errorReport'
 
 // Catches render crashes so players get a way back instead of a blank screen.
 // Their save lives in this browser (and the cloud), so a reload restores it.
@@ -12,6 +13,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
 
   componentDidCatch(error: Error) {
     console.error('Cartopia crashed:', error)
+    reportError({ kind: 'crash', message: error.message, stack: error.stack })
     hideSplash()
   }
 

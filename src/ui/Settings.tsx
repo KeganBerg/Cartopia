@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { useGame } from '../game/store'
 import { AmbienceControl, EffectsControl, MusicControl, SoundControl } from './MuteButton'
 import { AlertsMenu } from './Alerts'
 import { useLive, setClosed, unmute } from '../lib/live'
 import { setPrefs, usePrefs, reduceMotionOn, type Graphics, type Steer } from '../lib/prefs'
-import { deleteAccount, exportData, resetAccount, resetLocal } from '../lib/cloud'
+import { deleteAccount, exportData, flushSave, resetAccount, resetLocal } from '../lib/cloud'
+import { supabase } from '../lib/supabase'
 import { BuckIcon, CoinIcon } from './Icon'
 import { compact } from './format'
 import { useNames } from '../lib/profiles'
@@ -13,6 +14,8 @@ import { LEGAL, DRAFT_NOTE, type LegalDoc } from '../legal/legal'
 import { setCalmFlashing, useCalmFlashing } from '../game/flashing'
 import { showFlashWarning } from './FlashWarning'
 import { useTouchDevice } from './DriveControls'
+import { DISCORD_INVITE, inviteLink, shareLink } from '../lib/invite'
+import { LANGS, setLang, useLang } from '../i18n/lang'
 
 // The Windows app (desktop/) opens the live game, so this download never needs replacing for a deploy.
 export const DESKTOP_DOWNLOAD = 'https://github.com/KeganBerg/Cartopia/releases/latest/download/Cartopia-Setup.exe'
@@ -20,6 +23,7 @@ const showDesktopApp = () => typeof navigator !== 'undefined' && /Windows/.test(
 
 // Contact address for the Help tab. Empty hides the row until the owner sets one.
 export const SUPPORT_EMAIL = 'support@cartopia.lol'
+export const INVITE_TEXT = 'Build a town and race me in Cartopia 🏁'
 
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (on: boolean) => void; label: string; disabled?: boolean }) {
   return (
@@ -60,6 +64,18 @@ const STEER: { id: Steer; label: string }[] = [
   { id: 'buttons', label: '◀ ▶ Buttons' },
 ]
 
+// Each language is named in itself, so a player who can't read the current one still finds theirs.
+function LangPicker() {
+  const lang = useLang((l) => l.lang)
+  return (
+    <div className="seg set-seg" role="radiogroup" aria-label="Language" data-no-i18n>
+      {LANGS.map((l) => (
+        <button key={l.id} role="radio" aria-checked={lang === l.id} className={lang === l.id ? 'sel' : ''} onClick={() => setLang(l.id)}>{l.label}</button>
+      ))}
+    </div>
+  )
+}
+
 export function SettingsTab({ user }: { user: User | null }) {
   const prefs = usePrefs()
   const touch = useTouchDevice()
@@ -68,6 +84,9 @@ export function SettingsTab({ user }: { user: User | null }) {
   const calmFlash = useCalmFlashing()
   return (
     <>
+      <Group icon="🌐" title="Language">
+        <LangPicker />
+      </Group>
       <Group icon="🔊" title="Sound">
         <SoundControl />
         <MusicControl />
@@ -128,6 +147,7 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Row>
         {user && <ChallengeSettings />}
       </Group>
+      {user && <RobloxLink />}
       {!touch && showDesktopApp() && (
         <Group icon="🖥️" title="Desktop app">
           <Row label="Cartopia for Windows" sub="Updates itself with the game">
@@ -136,6 +156,62 @@ export function SettingsTab({ user }: { user: User | null }) {
         </Group>
       )}
     </>
+  )
+}
+
+// A one-time code that carries this town's earned progress into Cartopia on Roblox (typed in its
+// Settings). Paid packs stay on the web: Roblox's rules don't let them unlock anything there, so the
+// Roblox game takes them out (supabase/migrations/0119_roblox_link.sql).
+function RobloxLink() {
+  const [code, setCode] = useState<string | null>(null)
+  const [linked, setLinked] = useState(false)
+  const [sure, setSure] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    let live = true
+    supabase?.rpc('roblox_link_status').then(({ data }) => { if (live && data) setLinked(!!data.linked) })
+    return () => { live = false }
+  }, [])
+  const make = async () => {
+    if (!supabase) return
+    setBusy(true)
+    setErr('')
+    // The code carries the town as saved, so save what's just been earned first.
+    await flushSave()
+    const { data, error } = await supabase.rpc('roblox_link_code')
+    setBusy(false)
+    if (error || !data?.code) return setErr('Could not make a code. Try again soon.')
+    setCode(data.code as string)
+    setLinked(!!data.linked)
+  }
+  const unlink = async () => {
+    if (!supabase) return
+    setBusy(true)
+    setErr('')
+    const { data, error } = await supabase.rpc('roblox_unlink')
+    setBusy(false)
+    setSure(false)
+    if (error || !data) return setErr('Could not unlink. Try again soon.')
+    setLinked(false)
+    setCode(null)
+  }
+  return (
+    <Group icon="🟥" title="Play on Roblox">
+      {linked && (
+        <Row label="✅ Linked" sub="Your Roblox account plays this town">
+          {sure
+            ? <button className="sell small" disabled={busy} title="Unlink Roblox" onClick={unlink}>Sure?</button>
+            : <button className="buy small alt" disabled={busy} title="Unlink Roblox" onClick={() => setSure(true)}>Unlink</button>}
+        </Row>
+      )}
+      <Row label="Roblox code" sub="Earned progress only. Paid packs stay here.">
+        <button className="buy small alt" disabled={busy} title="Roblox code: type it in Cartopia on Roblox, Menu, Settings. Works once, for 15 minutes." onClick={make}>{code ? 'New' : 'Get'}</button>
+      </Row>
+      {code && <p className="rbx-code" aria-label="Roblox code">{code}</p>}
+      {code && <small className="set-note">Roblox: Menu ⚙️ Settings. Works once, 15 minutes.</small>}
+      {err && <small className="set-note">{err}</small>}
+    </Group>
   )
 }
 
@@ -297,6 +373,8 @@ export function HelpTab({ openLegal }: { openLegal: (id: LegalDoc['id']) => void
         {SUPPORT_EMAIL && <a className="set-link" href={`mailto:${SUPPORT_EMAIL}?subject=Cartopia%20help%20(${__BUILD_ID__})`}><span>✉️ Contact us</span><b>›</b></a>}
         <button className="set-link" onClick={showFlashWarning}><span>⚡ Photosensitivity warning</span><b>›</b></button>
         <button className="set-link" onClick={() => openPanel('chat')}><span>🗨️ Ask other players in chat</span><b>›</b></button>
+        {DISCORD_INVITE && <a className="set-link" href={DISCORD_INVITE} target="_blank" rel="noreferrer"><span>🎮 Join our Discord</span><b>›</b></a>}
+        <button className="set-link" onClick={() => void shareLink(INVITE_TEXT, inviteLink(useNames.getState().mine?.username))}><span>🔗 Invite friends</span><b>›</b></button>
         <Row label="Version"><code className="set-ver">{__BUILD_ID__.slice(0, 7)}</code></Row>
       </Group>
       <Group icon="⚖️" title="Legal">

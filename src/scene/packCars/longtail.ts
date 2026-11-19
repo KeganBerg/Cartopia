@@ -135,7 +135,8 @@ export function longtailGeo(k: Kit, fit: ExoticFit, h: ExoticHelpers) {
       const [z1, y1] = pts[i]
       h.bar(k, 'paint', [sd * (S.side(z0 - 0.08) + 0.006), y0, z0 - 0.08 + 0.0], [sd * (S.side(z1 - 0.08) + 0.006), y1, z1 - 0.08], 0.014)
     }
-    for (const dz of [-0.07, 0.0, 0.07]) S.wall('dark', box(0.006, 0.06, 0.008), sd, iz + dz, 0.16 - dz * 0.1, 0.008, 0.25)
+    // Body-colour fins standing in the mouth, kept inside its black so none pokes past the edge.
+    for (const dz of [-0.07, 0.0, 0.07]) S.wall('paint', box(0.008, 0.048, 0.01), sd, iz + dz, 0.173 - dz * 0.06, 0.006, 0.25)
     k.add('black', rbox(0.03, 0.03, wz * 2 - r * 2.6, 0.01), [sd * (S.side(0) - 0.004), 0.08, 0])
     S.wall('dark', plane(0.006, 0.12), sd, 0.24, 0.17, 0.005, -0.3)
     S.wall('dark', box(wz * 2 - r * 2.9, 0.005, 0.004), sd, 0, 0.11, 0.002)

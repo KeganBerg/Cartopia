@@ -3,6 +3,7 @@ import { useGame } from '../game/store'
 import { REP_TITLES } from '../game/reputation'
 import { recapShare } from '../game/recap'
 import { sfx } from '../lib/sound'
+import { gameLink } from '../lib/invite'
 
 // The season recap card (game/recap.ts), shown once when a new season starts.
 export function RecapPopup() {
@@ -17,7 +18,7 @@ export function RecapPopup() {
   if (!r) return null
   const from = REP_TITLES[r.repFrom], to = REP_TITLES[r.repTo]
   const share = async () => {
-    const text = recapShare(r)
+    const text = `${recapShare(r)}\n${gameLink('recap')}`
     try {
       if (navigator.share) await navigator.share({ text })
       else {

@@ -3,6 +3,7 @@ import { useGame } from '../game/store'
 import { raceCarOf } from '../game/raceCar'
 import { dayPhase, nightAmount } from '../game/clock'
 import { SEASON } from '../scene/season'
+import { runSkinPaint } from '../lib/skinPaint'
 import './loading.css'
 import type React from 'react'
 
@@ -22,26 +23,35 @@ function timeOfDay() {
 
 function usePlayerCar() {
   const car = useGame((s) => raceCarOf(s.cars, s.raceCar))
-  return { model: car?.model ?? 'hotshot', color: car?.color ?? '#d32f2f' }
+  return { model: car?.model ?? 'hotshot', color: car?.color ?? '#d32f2f', skin: car?.skin }
 }
 
-// The car render tinted with the player's paint through its paint mask. A car
+// The car render tinted with the player's paint through its paint mask, or
+// wearing their animated skin (lib/skinPaint.ts) when the car has one. A car
 // with no render yet (a brand-new model) falls back to the Hot Shot.
-function PaintedCar({ kind, model, color }: { kind: 'car' | 'hero'; model: string; color: string }) {
+export function PaintedCar({ kind, model, color, skin }: { kind: 'car' | 'hero'; model: string; color: string; skin?: string | null }) {
   const [missing, setMissing] = useState<string | null>(null)
   const id = missing === model ? 'hotshot' : model
   const mask = `url(/splash/${kind}-${id}-mask.webp)`
+  const canvas = useRef<HTMLCanvasElement>(null)
+  const [skinOn, setSkinOn] = useState(false)
+  useEffect(() => {
+    const stop = skin && canvas.current ? runSkinPaint(canvas.current, skin, color) : null
+    setSkinOn(!!stop)
+    return () => stop?.()
+  }, [skin, color])
   return (
     <div className="pc-body">
       <img src={`/splash/${kind}-${id}.webp`} alt="" draggable={false} onError={() => setMissing(model)} />
-      <div className="pc-paint" style={{ background: color, WebkitMaskImage: mask, maskImage: mask }} />
+      {skin && <canvas ref={canvas} className="pc-paint pc-skin" data-skin={skin} style={{ WebkitMaskImage: mask, maskImage: mask, opacity: skinOn ? 1 : 0 }} />}
+      {!skinOn && <div className="pc-paint" style={{ background: color, WebkitMaskImage: mask, maskImage: mask }} />}
     </div>
   )
 }
 
 // A little Main Street with the player's car cruising down it, for panels.
 export function LoadingBand({ label = 'Loading' }: { label?: string }) {
-  const { model, color } = usePlayerCar()
+  const { model, color, skin } = usePlayerCar()
   const tod = timeOfDay()
   const street = `/splash/street-${SEASON}-${tod === 'night' ? 'night' : 'day'}.webp`
   return (
@@ -49,7 +59,7 @@ export function LoadingBand({ label = 'Loading' }: { label?: string }) {
       <div className="lb-scene" aria-hidden="true">
         <div className="lb-street"><img src={street} alt="" /><img src={street} alt="" /></div>
         <div className="lb-road" />
-        <div className="lb-car"><PaintedCar kind="car" model={model} color={color} /></div>
+        <div className="lb-car"><PaintedCar kind="car" model={model} color={color} skin={skin} /></div>
       </div>
       <span className="lb-label"><span className="lb-tire" />{label}…</span>
     </div>
@@ -64,7 +74,7 @@ const stop = (e: React.SyntheticEvent) => e.stopPropagation()
 // (the first one compiles every shader, which is what leaves a blank screen).
 // Never stays longer than `max` ms; `onReady` says when it starts to lift.
 export function LoadingScene({ ready, label, max = 6000, onReady, onClose }: { ready?: boolean; label: string; max?: number; onReady?: () => void; onClose?: () => void }) {
-  const { model, color } = usePlayerCar()
+  const { model, color, skin } = usePlayerCar()
   const [tod] = useState(timeOfDay)
   const el = useRef<HTMLDivElement>(null)
   const [drawn, setDrawn] = useState(false)
@@ -105,7 +115,7 @@ export function LoadingScene({ ready, label, max = 6000, onReady, onClose }: { r
       onPointerDown={stop} onPointerUp={stop} onClick={stop}>
       <div className="ls-town" style={{ backgroundImage: `url(/splash/town-${SEASON}-${tod}${townCrop()}.webp)` }} />
       <div className="ls-sun" />
-      <div className="ls-car"><PaintedCar kind="hero" model={model} color={color} /></div>
+      <div className="ls-car"><PaintedCar kind="hero" model={model} color={color} skin={skin} /></div>
       <span className="ls-pill"><span className="lb-tire" />{label}…</span>
       {onClose && <button className="close ls-close" onClick={onClose} aria-label="Close">✕</button>}
     </div>

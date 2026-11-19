@@ -13,6 +13,7 @@ import { DECOR_PROPS } from './decorProps'
 import { glowMats } from './dayNight'
 import { PAL, SEASON } from './season'
 import { shade } from './flora'
+import { useDoorTag } from './HomeBlock'
 import { grassTex, gravelTex, paverTex, shingleTex, sidingTex, waterTex } from './textures'
 
 // Grand homes: the Painted Lady, the Hillcrest Villa and the Goldcrest Mansion
@@ -234,28 +235,36 @@ const ironFence = (len: number, h: number, tip: 'gold' | 'iron' | 'none') => pro
   for (let i = 0; i < n - 1; i += 2) k.torus(IRON, 0.022, 0.005, [(-0.5 + (i + 1) / n) * len, h - 0.1, 0], [0, 0, 0], Math.PI * 2, 10, 3)
 })
 
-// A pair of iron gates `w` wide, the bars rising to an arch in the middle,
-// and a crest where the leaves meet.
-const gates = (w: number, h: number, crest: boolean) => prop(`gh-gates|${w}|${h}|${crest}`, (k) => {
-  const n = Math.round(w / 0.06)
+// One leaf of a pair of iron gates w wide: hinged at x 0, reaching to x w/2
+// where the pair meets, its bars rising in an arc towards that end, with
+// scrolls along the middle rail and (crest) a gilt medallion.
+const gateLeaf = (w: number, h: number, crest: boolean) => prop(`gh-leaf|${w}|${h}|${crest}`, (k) => {
+  const L = w / 2
+  const n = Math.round(L / 0.06)
   for (let i = 0; i < n; i++) {
-    const f = (i + 0.5) / n
-    const x = (f - 0.5) * w
-    const top = h + Math.sin(f * Math.PI) * 0.14
+    const x = ((i + 0.5) / n) * L
+    const top = h + Math.sin((x / w) * Math.PI) * 0.14
     k.box(IRON, [0.016, top, 0.016], [x, top / 2, 0])
     k.cone(crest ? GILT : IRON, 0.02, 0.06, [x, top + 0.03, 0], undefined, 4)
   }
-  for (const y of [0.06, h * 0.55]) k.box(IRON, [w, 0.03, 0.024], [0, y, 0])
-  k.box(IRON, [0.03, h, 0.03], [0, h / 2, 0.005])
-  // Scrolls along the middle rail.
-  for (let i = 0; i < 4; i++) k.torus(crest ? GILT : IRON, 0.04, 0.007, [(-0.375 + i * 0.25) * w, h * 0.55 + 0.05, 0], [0, 0, 0], Math.PI * 2, 12, 3)
+  for (const y of [0.06, h * 0.55]) k.box(IRON, [L, 0.03, 0.024], [L / 2, y, 0])
+  k.box(IRON, [0.03, h, 0.03], [L - 0.015, h / 2, 0.005])
+  for (const f of [0.25, 0.75]) k.torus(crest ? GILT : IRON, 0.04, 0.007, [f * L, h * 0.55 + 0.05, 0], [0, 0, 0], Math.PI * 2, 12, 3)
   if (crest) {
-    k.cyl(GILT, 0.08, 0.08, 0.02, [0, h * 0.78, 0.014], [Math.PI / 2, 0, 0], 16)
-    k.cone(GILT, 0.03, 0.08, [-0.04, h * 0.78 + 0.1, 0.014], undefined, 4)
-    k.cone(GILT, 0.035, 0.1, [0, h * 0.78 + 0.11, 0.014], undefined, 4)
-    k.cone(GILT, 0.03, 0.08, [0.04, h * 0.78 + 0.1, 0.014], undefined, 4)
+    k.cyl(GILT, 0.06, 0.06, 0.02, [L * 0.55, h * 0.78, 0.014], [Math.PI / 2, 0, 0], 16)
+    k.cone(GILT, 0.03, 0.08, [L * 0.55, h * 0.78 + 0.09, 0.014], undefined, 4)
   }
 })
+
+// A pair of gates w wide standing open: hinged at the piers, both leaves swung
+// in towards the house so the way through is clear.
+function OpenGates({ at, w, h, crest }: { at: V3; w: number; h: number; crest: boolean }) {
+  return (
+    <group position={at}>
+      {[-1, 1].map((sd) => <Prop key={sd} parts={gateLeaf(w, h, crest)} at={[sd * w / 2, 0, 0]} ry={Math.PI / 2 - sd * 0.2} />)}
+    </group>
+  )
+}
 
 // Italian cypress: a short trunk under a tall dark green spire.
 const cypress = () => prop(`gh-cypress|${SEASON}`, (k) => {
@@ -311,24 +320,36 @@ const mailbox = () => prop('gh-mailbox', (k) => {
   k.box(look('#e53935', 0.6), [0.012, 0.08, 0.03], [0.056, 0.45, -0.04])
 })
 
-// A rose arch over a garden gate, `w` wide.
-const roseArch = (w: number) => prop(`gh-arch|${w}|${SEASON}`, (k) => {
-  const wh = look('#fafafa', 0.6)
-  for (const sd of [-1, 1]) k.box(cast(wh), [0.04, 0.6, 0.04], [sd * w / 2, 0.3, 0])
-  k.torus(cast(wh), w / 2, 0.02, [0, 0.6, 0], [0, 0, 0], Math.PI, 14, 4)
-  const leaf = ['#2e7d32', '#388e3c']
-  const rose = SEASON === 'fall' ? '#c62828' : '#ec407a'
-  for (let i = 0; i <= 8; i++) {
-    const a = (i / 8) * Math.PI
-    const p: V3 = [Math.cos(a) * w / 2, 0.6 + Math.sin(a) * w / 2, 0]
-    k.ico(look(leaf[i % 2], 0.85), 0.055, p, [1, 1, 0.8], 0)
-    if (i % 2 === 0) k.ico(look(rose, 0.6), 0.03, [p[0], p[1] + 0.03, 0.04], [1, 1, 1], 0)
-  }
-  for (const sd of [-1, 1]) for (const y of [0.15, 0.32, 0.48]) {
-    k.ico(look(leaf[0], 0.85), 0.045, [sd * w / 2, y, 0.02], [1, 1, 0.8], 0)
-    k.ico(look(rose, 0.6), 0.025, [sd * w / 2 + 0.02, y + 0.04, 0.04], [1, 1, 1], 0)
+// A rose arch over the garden gate, w across, in three pieces so the way
+// through stays clear: a post with its climbing roses (+x side; turned for the
+// other), and the arch over the top, clear above people's heads.
+const ROSE = SEASON === 'fall' ? '#c62828' : '#ec407a'
+const ROSE_LEAF = ['#2e7d32', '#388e3c']
+const ARCH_H = 0.66
+const roseArchPost = (w: number) => prop(`gh-archpost|${w}|${SEASON}`, (k) => {
+  k.box(cast(look('#fafafa', 0.6)), [0.04, ARCH_H, 0.04], [w / 2, ARCH_H / 2, 0])
+  for (const y of [0.15, 0.32, 0.48, 0.62]) {
+    k.ico(look(ROSE_LEAF[0], 0.85), 0.045, [w / 2, y, 0.02], [1, 1, 0.8], 0)
+    k.ico(look(ROSE, 0.6), 0.025, [w / 2 + 0.02, y + 0.04, 0.04], [1, 1, 1], 0)
   }
 })
+const roseArchTop = (w: number) => prop(`gh-archtop|${w}|${SEASON}`, (k) => {
+  k.torus(cast(look('#fafafa', 0.6)), w / 2, 0.02, [0, ARCH_H, 0], [0, 0, 0], Math.PI, 14, 4)
+  for (let i = 1; i < 8; i++) {
+    const a = (i / 8) * Math.PI
+    const p: V3 = [Math.cos(a) * w / 2, ARCH_H + Math.sin(a) * w / 2, 0]
+    k.ico(look(ROSE_LEAF[i % 2], 0.85), 0.055, p, [1, 1, 0.8], 0)
+    if (i % 2 === 0) k.ico(look(ROSE, 0.6), 0.03, [p[0], p[1] + 0.03, 0.04], [1, 1, 1], 0)
+  }
+})
+function RoseArch({ at, w }: { at: V3; w: number }) {
+  return (
+    <group position={at}>
+      {[0, Math.PI].map((ry) => <Prop key={ry} parts={roseArchPost(w)} at={[0, 0, 0]} ry={ry} />)}
+      <Prop parts={roseArchTop(w)} at={[0, 0, 0]} />
+    </group>
+  )
+}
 
 // Iron cresting along a roof ridge `len` long.
 const cresting = (len: number) => prop(`gh-crest|${len}`, (k) => {
@@ -580,15 +601,17 @@ function Wins({ k, list, frame = '#fafafa', sill = true, hood = false, arch = fa
 const doorFrame = (w: number, h: number, frame: string, fan: boolean) => prop(`gh-door|${w}|${h}|${frame}|${fan}`, (k) => {
   k.box(look(frame, 0.6), [w + 0.08, h + 0.04, 0.02], [0, h / 2 + 0.02, 0.012])
   if (fan) k.box(look(frame, 0.6), [w + 0.08, w / 2 + 0.04, 0.02], [0, h + w / 4 + 0.04, 0.012])
-  k.box(GILT, [0.03, 0.03, 0.014], [w * 0.3, h * 0.45, 0.034])
+  k.box(GILT, [0.03, 0.03, 0.008], [w * 0.3, h * 0.45, 0.03])
 })
 
-// A panelled front door (at: the middle of its bottom edge on the wall face).
-function Door({ k, at, w, h, c, frame = '#fafafa', ry = 0, fan }: { k: Kit; at: V3; w: number; h: number; c: string; frame?: string; ry?: number; fan?: boolean }) {
+// A panelled front door (at: the middle of its bottom edge on the wall face);
+// `side`: not the way in from the street, so not offered to townspeople.
+function Door({ k, at, w, h, c, frame = '#fafafa', ry = 0, fan, side }: { k: Kit; at: V3; w: number; h: number; c: string; frame?: string; ry?: number; fan?: boolean; side?: boolean }) {
+  const tag = useDoorTag()
   return (
     <group position={at} rotation-y={ry}>
       <PropMesh parts={doorFrame(w, h, frame, !!fan)} />
-      <mesh position={[0, h / 2, 0.026]}><planeGeometry args={[w, h - 0.02]} />{k.m(c)}</mesh>
+      <mesh position={[0, h / 2, 0.026]} userData={side ? undefined : tag}><planeGeometry args={[w, h - 0.02]} />{k.m(c)}</mesh>
       <mesh position={[0, h * 0.72, 0.03]}><planeGeometry args={[w * 0.55, h * 0.26]} />{k.win}</mesh>
       {fan && <mesh position={[0, h + 0.03, 0.026]}><circleGeometry args={[w / 2, 12, 0, Math.PI]} />{k.win}</mesh>}
     </group>
@@ -619,7 +642,7 @@ function GasLamp({ k, at, ry = 0 }: { k: Kit; at: V3; ry?: number }) {
   return (
     <group position={at}>
       <group rotation-y={Math.PI + ry} scale={0.55}><PropMesh parts={DECOR_PROPS.lamp()} /></group>
-      {!k.ghost && <Pool r={0.45} x={-Math.cos(ry) * 0.22} z={Math.sin(ry) * 0.22} />}
+      {!k.ghost && <Pool r={0.45} x={-Math.cos(ry) * 0.22} z={Math.sin(ry) * 0.22} y={0.03} />}
     </group>
   )
 }
@@ -709,8 +732,8 @@ function PaintedLady({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number })
       <Box m={m} at={[bx, 0.06, zf + bp / 2 + 0.01]} s={[bw + 0.03, 0.12, bp + 0.02]} c={VIC.found} shadow={false} />
       <Box m={m} at={[bx, bh + 0.025, zf + bp / 2 + 0.015]} s={[bw + 0.07, 0.05, bp + 0.06]} c={roof} />
       <Box m={m} at={[bx, F, zf + bp / 2 + 0.005]} s={[bw + 0.02, 0.04, bp + 0.01]} c={VIC.trim} shadow={false} />
+      <Panes k={k} list={[0.44, F + 0.4].flatMap((y) => [-1, 1].map((sd): WSpec => [bx + sd * (bw / 2 + 0.006), y, zf + bp / 2, (sd * Math.PI) / 2, 0.1, 0.36]))} />
       <Panes k={k} list={[
-        ...[0.44, F + 0.4].flatMap((y) => [-1, 1].map((sd): WSpec => [bx + sd * (bw / 2 + 0.006), y, zf + bp / 2, (sd * Math.PI) / 2, 0.1, 0.36])),
         ...ys.flatMap((y) => [-0.5, -0.1].map((z): WSpec => [xl - 0.006, y, z, -Math.PI / 2, 0.2, 0.36])),
         ...ys.flatMap((y) => [-0.45, 0.15].map((x): WSpec => [x, y, zb - 0.006, Math.PI, 0.22, 0.36])),
       ]} />
@@ -718,12 +741,13 @@ function PaintedLady({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number })
 
       {/* Front door, the window over it, and the third floor. */}
       <Door k={k} at={[doorX, 0.12, zf]} w={0.26} h={0.58} c={roof} frame={VIC.trim} />
+      {/* (Three sets of frames, so the way up to the door stays clear between them.) */}
+      <Wins k={k} frame={VIC.trim} list={[[bx, 0.44, zf + bp, 0, 0.3, 0.38], [bx, F + 0.4, zf + bp, 0, 0.3, 0.38]]} />
       <Wins k={k} frame={VIC.trim} list={[
-        [bx, 0.44, zf + bp, 0, 0.3, 0.38], [bx, F + 0.4, zf + bp, 0, 0.3, 0.38],
         [doorX, F + 0.42, zf, 0, 0.22, 0.4],
         ...(floors === 3 ? [bx, doorX].map((x): WSpec => [x, ys[2], zf, 0, 0.22, 0.32]) : []),
-        ...ys.flatMap((y) => [-0.6, -0.32].map((z): WSpec => [xr, y, cz + z + 0.32, Math.PI / 2, 0.2, y > 2 * F ? 0.3 : 0.38])),
       ]} />
+      <Wins k={k} frame={VIC.trim} list={ys.flatMap((y) => [-0.6, -0.32].map((z): WSpec => [xr, y, cz + z + 0.32, Math.PI / 2, 0.2, y > 2 * F ? 0.3 : 0.38]))} />
       {/* Side windows (the right side shows), plain panes round the back. */}
       {st === 2 && lvl >= 5 && <Dormer k={k} at={[cx + 0.38, H, cz - 0.15]} roof={roof} wall={wall} />}
 
@@ -752,8 +776,10 @@ function Porch({ k, lvl, st, zf, xr, roof, F }: { k: Kit; lvl: number; st: numbe
   const x0 = -0.15, x1 = 0.88, z1 = 0.55, zs = -0.62
   const deck = 0.12
   const top = F
-  const posts: [number, number][] = [[x0 + 0.03, z1 - 0.03], [0.2, z1 - 0.03], [x1 - 0.03, z1 - 0.03], [x1 - 0.03, (z1 + zs) / 2 - 0.05], [x1 - 0.03, zs + 0.03]]
-  const fl = x1 - 0.03 - 0.2
+  // The front posts stand clear either side of the steps up to the door.
+  const px = 0.22
+  const posts: [number, number][] = [[x0 + 0.01, z1 - 0.03], [px, z1 - 0.03], [x1 - 0.03, z1 - 0.03], [x1 - 0.03, (z1 + zs) / 2 - 0.05], [x1 - 0.03, zs + 0.03]]
+  const fl = x1 - 0.03 - px
   const sl = z1 - zs - 0.06
   return (
     <group>
@@ -772,10 +798,10 @@ function Porch({ k, lvl, st, zf, xr, roof, F }: { k: Kit; lvl: number; st: numbe
       <Box m={m} at={[(xr + x1) / 2 + 0.015, top + 0.051, (zs + zf) / 2 - 0.01]} rot={[0, 0, -0.1]} s={[x1 - xr + 0.03, 0.05, zf - zs + 0.06]} c={roof} t={shingleTex(1, 2)} />
       <group position={[(x0 + x1) / 2, top - 0.02, z1 - 0.03]}><PropMesh parts={frieze(x1 - x0 - 0.06, VIC.trim)} /></group>
       <group position={[x1 - 0.03, top - 0.02, (z1 + zs) / 2]} rotation-y={Math.PI / 2}><PropMesh parts={frieze(sl, VIC.trim)} /></group>
-      <group position={[0.2 + fl / 2, deck, z1 - 0.03]}><PropMesh parts={spindleRail(fl - 0.05, VIC.trim)} /></group>
+      <group position={[px + fl / 2, deck, z1 - 0.03]}><PropMesh parts={spindleRail(fl - 0.05, VIC.trim)} /></group>
       <group position={[x1 - 0.03, deck, (z1 + zs) / 2]} rotation-y={Math.PI / 2}><PropMesh parts={spindleRail(sl - 0.05, VIC.trim)} /></group>
       {/* Porch light by the door and a lantern hung from the ceiling. */}
-      <mesh position={[-0.12, 0.52, zf + 0.03]}><boxGeometry args={[0.06, 0.09, 0.05]} />{bulb}</mesh>
+      <mesh position={[-0.13, 0.52, zf + 0.03]}><boxGeometry args={[0.06, 0.09, 0.05]} />{bulb}</mesh>
       <mesh position={[0.62, top - 0.08, 0.34]}><sphereGeometry args={[0.04, 8, 6]} />{bulb}</mesh>
       <Cyl m={m} at={[0.62, top - 0.025, 0.34]} r={0.006} h={0.05} c="#263238" seg={4} />
       {!ghost && <Pool r={0.55} x={0.3} z={0.75} />}
@@ -806,7 +832,7 @@ function VicYard({ k, lvl, st, zf, doorX, bx }: { k: Kit; lvl: number; st: numbe
       ) : (
         <group>
           {[-1, 1].map((sd) => {
-            const a = gx + sd * 0.19
+            const a = gx + sd * 0.23
             const b = sd * 0.93
             const len = Math.abs(b - a) - 0.08
             return (
@@ -819,13 +845,13 @@ function VicYard({ k, lvl, st, zf, doorX, bx }: { k: Kit; lvl: number; st: numbe
           })}
           {[-1, 1].map((sd) => (
             <group key={sd}>
-              <mesh position={[gx + sd * 0.19, 0.53, 0.9]}><boxGeometry args={[0.07, 0.1, 0.07]} />{k.bulb}</mesh>
-              <mesh position={[gx + sd * 0.19, 0.615, 0.9]}><coneGeometry args={[0.065, 0.07, 4]} />{m(lvl >= 6 ? GOLD : '#263238')}</mesh>
+              <mesh position={[gx + sd * 0.23, 0.53, 0.9]}><boxGeometry args={[0.07, 0.1, 0.07]} />{k.bulb}</mesh>
+              <mesh position={[gx + sd * 0.23, 0.615, 0.9]}><coneGeometry args={[0.065, 0.07, 4]} />{m(lvl >= 6 ? GOLD : '#263238')}</mesh>
             </group>
           ))}
         </group>
       )}
-      {lvl >= 3 && <Prop parts={roseArch(0.34)} at={[gx, 0.04, 0.9]} />}
+      {lvl >= 3 && <RoseArch at={[gx, 0.04, 0.9]} w={0.42} />}
       <Prop parts={mailbox()} at={[gx + 0.3, 0.04, 0.8]} ry={0} human />
       <GasLamp k={k} at={[-0.46, 0.04, 0.78]} ry={Math.PI} />
       <Prop parts={tree()} at={[-0.68, 0.04, 0.6]} />
@@ -856,7 +882,7 @@ function RowHouse({ k, x, lvl, wall, roof, trim, acc, door, end }: { k: Kit; x: 
   const F = 0.7
   const H = 3 * F + 0.05 * (lvl - 7)
   const rise = 0.44
-  const bx = -0.1, bw = 0.3, bp = 0.15
+  const bx = -0.13, bw = 0.24, bp = 0.15
   const dx = 0.17
   const fy = [0.48, F + 0.4, 2 * F + 0.36]
   return (
@@ -871,20 +897,19 @@ function RowHouse({ k, x, lvl, wall, roof, trim, acc, door, end }: { k: Kit; x: 
       <mesh position={[0, H + 0.12, zf + 0.024]}><circleGeometry args={[0.06, 14]} />{k.win}</mesh>
       {lvl >= 9 && <Ball m={m} at={[0, H + rise + 0.1, zf + 0.04]} r={0.035} c={GOLD} />}
       {lvl >= 9 && <Cyl m={m} at={[0, H + rise + 0.05, zf + 0.04]} r={0.01} h={0.08} c={GOLD} seg={5} />}
-      {/* Two-storey bay on the left, a stoop up to the door on the right. */}
+      {/* Two-storey bay on the left, the door up one step on the right. */}
       <Box m={m} at={[bx, F, zf + bp / 2]} s={[bw, 2 * F, bp]} c={wall} t={sidingTex(0.4, 2 * F * 1.6)} />
       <Box m={m} at={[bx, 2 * F - 0.02, zf + bp / 2 + 0.006]} s={[bw + 0.03, 0.05, bp + 0.02]} c={trim} shadow={false} />
       <Box m={m} at={[bx, 2 * F + 0.02, zf + bp / 2 + 0.012]} s={[bw + 0.05, 0.04, bp + 0.04]} c={roof} />
       <Box m={m} at={[bx, F, zf + bp / 2 + 0.004]} s={[bw + 0.02, 0.03, bp + 0.01]} c={acc} shadow={false} />
+      <Wins k={k} frame={trim} sill={false} list={[[bx, fy[0], zf + bp, 0, 0.16, 0.36], [bx, fy[1], zf + bp, 0, 0.16, 0.36]]} />
       <Wins k={k} frame={trim} sill={false} list={[
-        [bx, fy[0], zf + bp, 0, 0.2, 0.36], [bx, fy[1], zf + bp, 0, 0.2, 0.36], [dx, fy[1], zf, 0, 0.16, 0.36],
+        [dx, fy[1], zf, 0, 0.16, 0.36],
         ...[-0.13, 0.14].map((wx): WSpec => [wx, fy[2], zf, 0, 0.16, 0.32]),
         ...(end !== 0 ? fy.map((y): WSpec => [(end * W) / 2, y, cz - 0.1, (end * Math.PI) / 2, 0.18, 0.3]) : []),
       ]} />
-      <Box m={m} at={[dx, 0.12, zf + 0.06]} s={[0.24, 0.24, 0.12]} c={STONE} shadow={false} />
-      <Box m={m} at={[dx, 0.08, zf + 0.17]} s={[0.24, 0.16, 0.1]} c={STONE} shadow={false} />
-      <Box m={m} at={[dx, 0.04, zf + 0.27]} s={[0.24, 0.08, 0.1]} c={STONE} shadow={false} />
-      <Door k={k} at={[dx, 0.24, zf]} w={0.18} h={0.44} c={door} frame={trim} />
+      <Box m={m} at={[dx, 0.04, zf + 0.06]} s={[0.24, 0.08, 0.12]} c={STONE} shadow={false} />
+      <Door k={k} at={[dx, 0.08, zf]} w={0.17} h={0.6} c={door} frame={trim} />
       <Box m={m} at={[dx, 0.75, zf + 0.06]} s={[0.26, 0.03, 0.12]} c={acc} />
       <mesh position={[dx + 0.12, 0.55, zf + 0.025]}><boxGeometry args={[0.04, 0.06, 0.04]} />{bulb}</mesh>
       <Panes k={k} list={fy.map((y): WSpec => [0, y, cz - D / 2 - 0.006, Math.PI, 0.2, 0.32])} />
@@ -909,16 +934,16 @@ function Terrace({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
       ))}
       {!ghost && (
         <group>
-          {/* A brick sidewalk along the front, a path to each stoop, little front gardens. */}
+          {/* A brick sidewalk along the front, a path to each door, little front gardens. */}
           <Pave m={m} x={0} z={0.82} w={1.9} d={0.26} t={paverTex(2.4, 0.3)} />
           {xs.map((x) => <Pave key={x} m={m} x={x + 0.17} z={0.53} w={0.2} d={0.32} t={paverTex(0.3, 0.4)} />)}
           {xs.map((x) => <Prop key={x} parts={shrub()} at={[x - 0.12, 0.04, 0.42]} s={0.8} />)}
-          {lvl >= 8 && [-0.31, 0.31].map((x) => <GasLamp key={x} k={k} at={[x, 0.06, 0.82]} ry={x < 0 ? 0 : Math.PI} />)}
+          {lvl >= 8 && [-0.14, 0.48].map((x) => <GasLamp key={x} k={k} at={[x, 0.06, 0.82]} ry={-Math.PI / 2} />)}
           {lvl >= 9 && xs.map((x) => <Prop key={x} parts={flowerBed(0.22)} at={[x - 0.1, 0.04, 0.6]} />)}
           {lvl >= 10 && xs.map((x) => (
-            <Prop key={x} parts={ironFence(0.34, 0.16, 'gold')} at={[x - 0.12, 0.04, 0.68]} />
+            <Prop key={x} parts={ironFence(0.3, 0.16, 'gold')} at={[x - 0.135, 0.04, 0.68]} />
           ))}
-          {lvl >= 10 && <Bulbs from={[-0.93, 0.95, 0.66]} to={[0.93, 0.95, 0.66]} n={8} sag={0.06} posts={0.91} />}
+          {lvl >= 10 && <Bulbs from={[-0.96, 0.95, 0.66]} to={[0.96, 0.95, 0.66]} n={8} sag={0.06} posts={0.91} />}
         </group>
       )}
     </group>
@@ -956,9 +981,10 @@ function VillaLot({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
   const H = floors * F
   const W = 2.2, D = 1.3, cx = -0.65, cz = -1.25
   const zf = cz + D / 2, xr = cx + W / 2
-  // The loggia across the front of the ground floor.
-  const lz = zf + 0.42, lx0 = -1.6, lx1 = 0.3, llen = lx1 - lx0, lcx = (lx0 + lx1) / 2
-  const bays = 4, bay = llen / bays
+  // The front door at the head of the drive, then the loggia across the rest of the ground floor.
+  const doorX = -1.5
+  const lz = zf + 0.42, lx0 = -1.17, lx1 = 0.3, llen = lx1 - lx0, lcx = (lx0 + lx1) / 2
+  const bays = 3, bay = llen / bays
   const bayX = Array.from({ length: bays }, (_, i) => lx0 + bay * (i + 0.5))
   const upX = [-1.38, -0.88, -0.4, 0.08]
   const winY = (f: number) => f * F + 0.36
@@ -991,9 +1017,13 @@ function VillaLot({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
         ...Array.from({ length: floors }, (_, f) => [-1.4, -0.7, 0.0].map((x): WSpec => [x, winY(f), cz - D / 2 - 0.006, Math.PI, 0.2, 0.36])).flat(),
         ...Array.from({ length: floors }, (_, f): WSpec => [cx - W / 2 - 0.006, winY(f), cz + 0.2, -Math.PI / 2, 0.2, 0.36]),
       ]} />
-      {bayX.slice(0, 3).map((x, i) => (
+      {bayX.slice(0, -1).map((x, i) => (
         <mesh key={i} position={[x + bay / 2, 0.62, lz + 0.03]}><boxGeometry args={[0.05, 0.08, 0.05]} />{bulb}</mesh>
       ))}
+      {/* Front door on a stone step, a lamp beside it. */}
+      <Box m={m} at={[doorX, 0.03, zf + 0.06]} s={[0.36, 0.06, 0.12]} c={VIL.court} shadow={false} />
+      <Door k={k} at={[doorX, 0.06, zf]} w={0.26} h={0.56} c="#6d4c41" frame={VIL.trim} fan />
+      <mesh position={[doorX + 0.22, 0.6, zf + 0.03]}><boxGeometry args={[0.05, 0.08, 0.05]} />{bulb}</mesh>
       {/* Upstairs: French windows to the terrace with green shutters, and the floor above. */}
       <Wins k={k} arch sill={false} frame={VIL.trim} shutters={VIL.shutter} list={[
         ...upX.map((x): WSpec => [x, winY(1) - 0.04, zf, 0, 0.2, 0.36]),
@@ -1024,7 +1054,7 @@ function VillaLot({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
           <Box m={m} at={[0, wingH / 2, 0]} s={[1.1, wingH, 0.8]} c={wall} />
           <Box m={m} at={[0, wingH + 0.03, 0]} s={[1.18, 0.06, 0.88]} c={VIL.trim} />
           <Hip m={m} at={[0, wingH + 0.06, 0]} w={1.26} d={0.96} h={0.34} c={roof} t={shingleTex(2, 2)} />
-          <Door k={k} at={[-0.22, 0, 0.4]} w={0.24} h={0.5} c="#6d4c41" frame={VIL.trim} fan />
+          <Door k={k} at={[-0.22, 0, 0.4]} w={0.24} h={0.5} c="#6d4c41" frame={VIL.trim} fan side />
           <Wins k={k} arch sill={false} frame={VIL.trim} shutters={VIL.shutter} list={[[0.22, 0.36, 0.4, 0, 0.2, 0.32], ...(st === 3 ? [-0.22, 0.22].map((x): WSpec => [x, F + 0.32, 0.4, 0, 0.2, 0.3]) : [])]} />
           <mesh position={[-0.22, 0.6, 0.43]}><boxGeometry args={[0.05, 0.08, 0.05]} />{bulb}</mesh>
         </group>
@@ -1063,7 +1093,7 @@ function VillaLot({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
           <Box m={m} at={[x, 0.77, 1.86]} s={[0.11, 0.03, 0.11]} c="#263238" shadow={false} />
         </group>
       ))}
-      {!ghost && <Prop parts={gates(0.6, 0.4, false)} at={[-1.5, 0.04, 1.86]} />}
+      {!ghost && <OpenGates w={0.6} h={0.4} crest={false} at={[-1.5, 0.04, 1.86]} />}
       {!ghost && <Pool r={0.5} x={-1.5} z={1.6} />}
     </group>
   )
@@ -1073,8 +1103,9 @@ function VillaYard({ k, lvl, st, px, pz, pw, pd }: { k: Kit; lvl: number; st: nu
   const lx = px - pw / 2 - 0.22
   return (
     <group>
-      <Prop parts={fountain(st === 3 && lvl >= 10 ? 3 : 2, false)} at={[-0.3, 0.06, 0.5]} />
-      <Car at={[-1.5, 0.06, 0.48]} ry={Math.PI} body={st === 3 ? 'luxury' : 'sedan'} color={st === 1 ? '#f5f5f5' : '#455a64'} />
+      <Prop parts={fountain(st === 3 && lvl >= 10 ? 3 : 2, false)} at={[0, 0.06, 0.5]} />
+      {/* The car parks on the court beside the drive, leaving the way to the door clear. */}
+      <Car at={[-0.92, 0.06, 0.64]} ry={Math.PI} body={st === 3 ? 'luxury' : 'sedan'} color={st === 1 ? '#f5f5f5' : '#455a64'} />
       {/* Loungers and an umbrella down the pool side. */}
       <Prop parts={lounger('#4fc3f7')} at={[lx, 0.06, pz - 0.45]} human />
       <Prop parts={lounger('#4fc3f7')} at={[lx, 0.06, pz + 0.35]} human />
@@ -1085,10 +1116,10 @@ function VillaYard({ k, lvl, st, px, pz, pw, pd }: { k: Kit; lvl: number; st: nu
       {[-0.75, -0.15, 0.45, 1.05].map((z) => <Prop key={z} parts={cypress()} at={[1.83, 0.06, z]} />)}
       {[-1.0, -0.5].map((x) => <Prop key={x} parts={cypress()} at={[x, 0.04, 1.62]} />)}
       {lvl >= 3 && [0.0, 0.5].map((x) => <Prop key={x} parts={cypress()} at={[x, 0.04, 1.62]} />)}
-      {lvl >= 2 && [-1.25, 0.15].map((x) => <Prop key={x} parts={lemonPot()} at={[x, 0.06, -0.08]} />)}
-      {lvl >= 3 && <Prop parts={flowerBed(0.9)} at={[-0.3, 0.06, 1.2]} />}
-      {lvl >= 6 && [-0.78, 0.2].map((x) => <Bulbs key={x} from={[x, 0.84, -0.14]} to={[x, 0.42, 1.8]} n={6} sag={0.12} />)}
-      {lvl >= 6 && [-0.95, 0.4].map((x) => <Prop key={x} parts={lemonPot()} at={[x, 0.06, 1.15]} />)}
+      {lvl >= 2 && [-1.8, 0.15].map((x) => <Prop key={x} parts={lemonPot()} at={[x, 0.06, -0.08]} />)}
+      {lvl >= 3 && <Prop parts={flowerBed(0.5)} at={[0.12, 0.06, 1.2]} />}
+      {lvl >= 6 && [-0.46, 0.3].map((x) => <Bulbs key={x} from={[x, 0.84, -0.14]} to={[x, 0.42, 1.8]} n={6} sag={0.12} />)}
+      {lvl >= 6 && [-0.3, 0.55].map((x) => <Prop key={x} parts={lemonPot()} at={[x, 0.06, 1.15]} />)}
       {st === 3 && <Prop parts={umbrella('#26a69a')} at={[px, 0.06, pz + pd / 2 + 0.28]} human />}
       {lvl >= 9 && (
         <group position={[px + 0.25, 0.06, -0.78]}>
@@ -1097,7 +1128,7 @@ function VillaYard({ k, lvl, st, px, pz, pw, pd }: { k: Kit; lvl: number; st: nu
           <Cyl m={k.m} at={[0, 0.125, 0]} r={0.17} h={0.012} c={WATER} seg={18} />
         </group>
       )}
-      {lvl >= 10 && [-1.82, -1.18].map((x) => <GasLamp key={x} k={k} at={[x, 0.06, 1.55]} ry={x < -1.5 ? Math.PI : 0} />)}
+      {lvl >= 10 && [-1.82, -1.18].map((x) => <GasLamp key={x} k={k} at={[x, 0.06, 1.55]} ry={-Math.PI / 2} />)}
     </group>
   )
 }
@@ -1124,15 +1155,14 @@ const colonnade = (xs: number[], ch: number) => prop(`gh-cols|${xs.join(',')}|${
   }
 })
 
-// The gate piers either side of the drive, each with a lantern and a gold cap.
-const piers = () => prop('gh-piers', (k) => {
-  for (const sd of [-1, 1]) {
-    k.box(cast(look(MAN.stone, 0.9)), [0.16, 0.72, 0.16], [sd * 0.4, 0.4, 0])
-    k.box(look(MAN.trim, 0.8), [0.2, 0.04, 0.2], [sd * 0.4, 0.78, 0])
-    k.box({ c: '#fff', glow: true }, [0.09, 0.12, 0.09], [sd * 0.4, 0.86, 0])
-    k.cone(GILT, 0.08, 0.08, [sd * 0.4, 0.96, 0], [0, Math.PI / 4, 0], 4)
-    k.box(look(MAN.stone, 0.9), [0.1, 0.46, 0.1], [sd * 1.9, 0.27, 0])
-  }
+// A gate pier beside the drive, with a lantern and a gold cap, and the stone
+// post at the end of the railings 1.5 further out (+x; turned for the left side).
+const pier = () => prop('gh-pier', (k) => {
+  k.box(cast(look(MAN.stone, 0.9)), [0.16, 0.72, 0.16], [0, 0.4, 0])
+  k.box(look(MAN.trim, 0.8), [0.2, 0.04, 0.2], [0, 0.78, 0])
+  k.box({ c: '#fff', glow: true }, [0.09, 0.12, 0.09], [0, 0.86, 0])
+  k.cone(GILT, 0.08, 0.08, [0, 0.96, 0], [0, Math.PI / 4, 0], 4)
+  k.box(look(MAN.stone, 0.9), [0.1, 0.46, 0.1], [1.5, 0.27, 0])
 })
 
 // A flag on a pole: a big banner in the roof colour with the gold crest on it
@@ -1229,11 +1259,12 @@ function Mansion({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
       )}
       {lvl >= 9 && !ghost && <group position={[0, H + 0.1, zf + 0.05]}><PropMesh parts={balustrade(W - 0.1, GOLD)} /></group>}
 
-      {/* Windows with pediment hoods; a gold-handled door under a fanlight. */}
+      {/* Windows with pediment hoods; a gold-handled door under a fanlight in a stone surround. */}
       <Wins k={k} hood list={Array.from({ length: floors }, (_, f) => winXs.map((x): WSpec => [x, winY(f), zf, 0, 0.2, f === 0 ? 0.42 : 0.36])).flat()} />
       <Wins k={k} list={Array.from({ length: floors - 1 }, (_, f) => [-0.33, 0.33].map((x): WSpec => [x, winY(f + 1), zf, 0, 0.2, 0.36])).flat()} />
-      <Door k={k} at={[0, 0.16, zf]} w={0.36} h={0.6} c={MAN.door} fan />
-      <mesh position={[-0.09, 0.46, zf + 0.034]}><boxGeometry args={[0.03, 0.03, 0.014]} />{m(GOLD)}</mesh>
+      <Box m={m} at={[0, 0.56, zf + 0.025]} s={[0.56, 0.88, 0.05]} c={MAN.stone} shadow={false} />
+      <Door k={k} at={[0, 0.12, zf + 0.05]} w={0.36} h={0.6} c={MAN.door} fan />
+      <mesh position={[-0.09, 0.42, zf + 0.08]}><boxGeometry args={[0.03, 0.03, 0.008]} />{m(GOLD)}</mesh>
       <Panes k={k} list={[
         ...Array.from({ length: floors }, (_, f) => [-0.9, -0.3, 0.3, 0.9].map((x): WSpec => [x, winY(f), cz - D / 2 - 0.006, Math.PI, 0.2, 0.36])).flat(),
         ...Array.from({ length: floors }, (_, f) => [-1, 1].map((sd): WSpec => [sd * (W / 2 + 0.008), winY(f), cz, (sd * Math.PI) / 2, 0.2, 0.36])).flat(),
@@ -1261,8 +1292,8 @@ function Mansion({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
           {!ghost && <Prop parts={ironFence(1.4, 0.42, 'gold')} at={[sd * 1.18, 0.04, 1.9]} />}
         </group>
       ))}
-      <Prop parts={piers()} at={[0, 0, 1.9]} />
-      {!ghost && <Prop parts={gates(0.64, 0.5, true)} at={[0, 0.04, 1.9]} />}
+      {[-1, 1].map((sd) => <Prop key={sd} parts={pier()} at={[sd * 0.4, 0, 1.9]} ry={sd > 0 ? 0 : Math.PI} />)}
+      {!ghost && <OpenGates w={0.64} h={0.5} crest at={[0, 0.04, 1.9]} />}
       {lvl >= 10 && !ghost && <Prop parts={overthrow()} at={[0, 0.8, 1.9]} />}
       {!ghost && <Pool r={0.6} x={0} z={1.65} />}
     </group>
@@ -1273,23 +1304,24 @@ function Mansion({ k, def, lvl }: { k: Kit; def: BuildingDef; lvl: number }) {
 // Columned portico on a podium with steps, a pediment with the gold crest.
 function Portico({ k, zf, H, roof }: { k: Kit; zf: number; H: number; roof: string }) {
   const { m, bulb, ghost } = k
-  const pz = zf + 0.3, pw = 1.24
-  const cols = [-0.5, -0.18, 0.18, 0.5]
+  const pz = zf + 0.3, pw = 1.24, P = 0.12 // the podium, one easy step up
+  // Two pairs of columns, -0.5 -0.26 | 0.26 0.5, the way in clear between them.
+  const cols = [-0.12, 0.12]
   const ch = Math.min(H, 1.9) - 0.12
   return (
     <group>
-      <Box m={m} at={[0, 0.08, pz]} s={[pw, 0.16, 0.6]} c={MAN.stone} />
-      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.0275 * (3 - i), pz + 0.36 + i * 0.1]} s={[pw - 0.1 - i * 0.04, 0.055 * (3 - i), 0.12]} c={MAN.stone} shadow={false} />)}
-      <group position={[0, 0.16, pz + 0.18]}><PropMesh parts={colonnade(cols, ch)} /></group>
-      <Box m={m} at={[0, 0.16 + ch + 0.07, pz]} s={[pw + 0.06, 0.14, 0.62]} c={MAN.trim} />
-      <Box m={m} at={[0, 0.16 + ch + 0.03, pz + 0.313]} s={[pw + 0.07, 0.025, 0.01]} c={GOLD} shadow={false} />
-      <Gable m={m} at={[0, 0.16 + ch + 0.14, pz]} w={pw + 0.06} d={0.62} h={0.36} wall={MAN.trim} roof={shade(roof, 0.12)} over={0.06} side={0.04} />
-      <group position={[0, 0.16 + ch + 0.26, pz + 0.316]}>
+      <Box m={m} at={[0, P / 2, pz]} s={[pw, P, 0.6]} c={MAN.stone} />
+      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.01 + 0.015 * (3 - i), pz + 0.36 + i * 0.1]} s={[pw - 0.1 - i * 0.04, 0.02 + 0.03 * (3 - i), 0.12]} c={MAN.stone} shadow={false} />)}
+      {[-0.38, 0.38].map((x) => <group key={x} position={[x, P, pz + 0.18]}><PropMesh parts={colonnade(cols, ch)} /></group>)}
+      <Box m={m} at={[0, P + ch + 0.07, pz]} s={[pw + 0.06, 0.14, 0.62]} c={MAN.trim} />
+      <Box m={m} at={[0, P + ch + 0.03, pz + 0.313]} s={[pw + 0.07, 0.025, 0.01]} c={GOLD} shadow={false} />
+      <Gable m={m} at={[0, P + ch + 0.14, pz]} w={pw + 0.06} d={0.62} h={0.36} wall={MAN.trim} roof={shade(roof, 0.12)} over={0.06} side={0.04} />
+      <group position={[0, P + ch + 0.26, pz + 0.316]}>
         <Cyl m={m} at={[0, 0, 0]} r={0.09} h={0.02} c={GOLD} seg={16} rot={[Math.PI / 2, 0, 0]} />
         <Crest at={[0, 0.05, 0.01]} />
       </group>
-      <mesh position={[0, 0.16 + ch - 0.04, pz]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
-      <Cyl m={m} at={[0, 0.16 + ch + 0.0, pz]} r={0.006} h={0.06} c="#263238" seg={4} />
+      <mesh position={[0, P + ch - 0.04, pz]}><sphereGeometry args={[0.05, 8, 6]} />{bulb}</mesh>
+      <Cyl m={m} at={[0, P + ch + 0.0, pz]} r={0.006} h={0.06} c="#263238" seg={4} />
       {!ghost && <Pool r={0.7} x={0} z={pz + 0.5} />}
     </group>
   )
@@ -1309,13 +1341,18 @@ function MansionGrounds({ k, lvl, st, ringZ }: { k: Kit; lvl: number; st: number
   const { m } = k
   return (
     <group>
-      {/* Circular gravel drive round a lawn with the fountain, out to the gates. */}
+      {/* Round gravel forecourt out to the gates, the way up the middle to the steps
+          between two fountains, each in a lawn ringed by a clipped hedge. */}
       <mesh position={[0, 0.05, ringZ]} receiveShadow><cylinderGeometry args={[1.0, 1.0, 0.02, 40]} />{m(MAN.gravel, gravelTex(2, 2))}</mesh>
-      <mesh position={[0, 0.07, ringZ]} receiveShadow><cylinderGeometry args={[0.44, 0.44, 0.02, 32]} />{m('#ffffff', grassTex(0.45, 0.45))}</mesh>
-      <Prop parts={ringHedge(0.42)} at={[0, 0.08, ringZ]} />
       <Pave m={m} x={0} z={1.86} w={0.66} d={0.2} c={MAN.gravel} t={gravelTex(1, 0.3)} y={0.006} />
       <Pave m={m} x={0} z={0.08} w={0.9} d={0.3} c={MAN.gravel} t={gravelTex(1, 0.4)} y={0.006} />
-      <Prop parts={fountain(st >= 2 && lvl >= 6 ? 3 : 2, st === 3)} at={[0, 0.08, ringZ]} s={0.85} />
+      {[-0.6, 0.6].map((x) => (
+        <group key={x} position={[x, 0, ringZ]}>
+          <mesh position={[0, 0.07, 0]} receiveShadow><cylinderGeometry args={[0.31, 0.31, 0.02, 28]} />{m('#ffffff', grassTex(0.32, 0.32))}</mesh>
+          <Prop parts={ringHedge(0.3)} at={[0, 0.08, 0]} />
+          <Prop parts={fountain(st >= 2 && lvl >= 6 ? 3 : 2, st === 3)} at={[0, 0.08, 0]} s={0.6} />
+        </group>
+      ))}
       {/* A gravel forecourt either side of the steps, each with a parking bay. */}
       {[-1, 1].filter((sd) => sd > 0 || lvl >= 5).map((sd) => <Pave key={sd} m={m} x={sd * 1.31} z={0.005} w={1.22} d={1.55} c={MAN.gravel} t={gravelTex(1.5, 2)} y={0.006} />)}
       <Car at={[1.5, 0.066, 0.0]} ry={0} body="luxury" color={lvl >= 7 ? '#212121' : '#eceff1'} />

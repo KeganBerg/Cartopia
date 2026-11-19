@@ -2,7 +2,7 @@
 import './testCanvas'
 import { describe, expect, it } from 'vitest'
 import ReactThreeTestRenderer from '@react-three/test-renderer'
-import type { InstancedMesh, Object3D } from 'three'
+import type { BatchedMesh, Object3D } from 'three'
 import { StreetShops, streetPieces, type Slot } from './StreetShops'
 
 // A mile on Main Street: hundreds of spots, but only a handful of models to build.
@@ -34,10 +34,12 @@ describe('StreetShops', () => {
     const r = await ReactThreeTestRenderer.create(<StreetShops slots={slots} />)
     const all: Object3D[] = []
     r.scene.instance.traverse((o) => void all.push(o))
-    const many = all.filter((o) => (o as InstancedMesh).isInstancedMesh) as InstancedMesh[]
+    const many = all.filter((o) => (o as BatchedMesh).isBatchedMesh) as BatchedMesh[]
     expect(many.length).toBeGreaterThan(0)
-    const parts = new Set(many.map((m) => m.geometry.uuid))
-    expect(parts.size).toBeGreaterThan(4)
+    // Every shop and tree in the street, each drawn in place, in a few draws.
+    const copies = many.reduce((n, m) => n + m.instanceCount, 0)
+    expect(copies).toBeGreaterThan(slots.length * 2)
+    expect(many.length).toBeLessThan(copies)
     const pattern = all.find((o) => o.children.some((c) => c.name === 'shop:pizza'))!
     expect(pattern.visible).toBe(false)
     await r.unmount()

@@ -10,12 +10,16 @@ import { liveTraffic, crossingSignal } from './traffic/live'
 import { useThought, placeChip } from '../game/thoughts'
 import { SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
-import { dogGeo, dogMaterial, headGeo, leashGeo, legGeo, torsoGeo, PERSON } from './peopleGeo'
+import { dogGeo, dogMaterial, leashGeo, legGeo, PERSON } from './peopleGeo'
+import { HELD, ITEM_SHAPES, headCarryGeo, itemMaterial, itemsGeo, poseDepth, poseMaterial, torsoCarryGeo } from './carryGeo'
 import { dayPhase, nightAmount } from './dayNight'
 import { isNight } from '../game/clock'
 import { CLUB } from './clubLayout'
 import { clubDoors, door } from './clubDoor'
 import { storeDoors, STORE_DEFS } from '../game/storeDoors'
+import { mergeGroups } from '../game/merge'
+import { GATE, doorNear, holdOpen, type DoorSpot } from './doors'
+import { DoorLeaves } from './DoorLeaves'
 
 const LEG_SIDES = [-1, 1]
 
@@ -35,8 +39,19 @@ const extraPeople = (level: number) => Math.min(10, Math.floor(level / 2))
 const LEG = PERSON.leg
 // Figures are modelled at race-crowd proportions and drawn a little bigger so they read from the town camera.
 const SCALE = PERSON.scale
-const TORSO = torsoGeo()
-const HEAD = headGeo()
+const TORSO = torsoCarryGeo()
+const HEAD = headCarryGeo()
+// Arms out front holding something (1) or hanging (0), per person; the body and the hands share it.
+const CARRY = new InstancedBufferAttribute(new Float32Array(MAX_PEOPLE), 1)
+TORSO.setAttribute('carry', CARRY)
+HEAD.setAttribute('carry', CARRY)
+const BODY_MAT = poseMaterial()
+const BODY_DEPTH = poseDepth()
+// Which item each person carries (see carryGeo).
+const ITEM_GEO = itemsGeo()
+const PICK = new InstancedBufferAttribute(new Float32Array(MAX_PEOPLE), 1)
+ITEM_GEO.setAttribute('pick', PICK)
+const ITEM_MAT = itemMaterial()
 const LEGS = legGeo(LEG)
 const DOG = dogGeo(SCALE)
 const DOG_MAT = dogMaterial(SCALE)
@@ -56,23 +71,23 @@ const NAMES = ['Alex', 'Sam', 'Jordan', 'Riley', 'Casey', 'Morgan', 'Taylor', 'J
 const DOGS = ['Biscuit', 'Rocket', 'Pepper', 'Daisy', 'Turbo', 'Maple', 'Nugget', 'Scout']
 const DOG_COATS = ['#8d6e63', '#f5f5f5', '#5d4037', '#d4a056', '#a1887f', '#3a3a3a']
 
-// What people carry out of each shop: size and colour of a little box in their
-// hands, and how a thought bubble describes taking it home.
-const ITEMS: Record<string, { size: [number, number, number]; color: string; emoji: string; thing: string }> = {
-  pizza: { size: [0.22, 0.04, 0.22], color: '#fff3e0', emoji: '🍕', thing: 'a pizza' },
-  donut: { size: [0.18, 0.07, 0.13], color: '#f8bbd0', emoji: '🍩', thing: 'a box of donuts' },
-  burger: { size: [0.12, 0.15, 0.08], color: '#c8a165', emoji: '🍔', thing: 'burgers' },
-  icecream: { size: [0.06, 0.15, 0.06], color: '#f48fb1', emoji: '🍦', thing: 'an ice cream' },
-  diner: { size: [0.15, 0.09, 0.11], color: '#eceff1', emoji: '🥡', thing: 'takeout' },
-  gas: { size: [0.06, 0.12, 0.06], color: '#29b6f6', emoji: '🥤', thing: 'a cold drink' },
-  cinema: { size: [0.09, 0.13, 0.09], color: '#e53935', emoji: '🍿', thing: 'leftover popcorn' },
-  bowling: { size: [0.11, 0.11, 0.11], color: '#6a1b9a', emoji: '🎳', thing: 'their bowling ball' },
-  motel: { size: [0.17, 0.13, 0.06], color: '#795548', emoji: '🧳', thing: 'their suitcase' },
-  coffee: { size: [0.06, 0.1, 0.06], color: '#fafafa', emoji: '☕', thing: 'a coffee' },
-  tacos: { size: [0.14, 0.05, 0.1], color: '#ffca28', emoji: '🌮', thing: 'tacos' },
-  market: { size: [0.16, 0.14, 0.1], color: '#d7a86e', emoji: '🛒', thing: 'groceries' },
-  hotdog: { size: [0.12, 0.04, 0.05], color: '#e0a052', emoji: '🌭', thing: 'a hot dog' },
-  offices: { size: [0.16, 0.12, 0.04], color: '#4e342e', emoji: '💼', thing: 'their briefcase' },
+// What people carry out of each shop (modelled in carryGeo), and how a thought
+// bubble describes taking it home.
+const ITEMS: Record<string, { emoji: string; thing: string }> = {
+  pizza: { emoji: '🍕', thing: 'a pizza' },
+  donut: { emoji: '🍩', thing: 'a box of donuts' },
+  burger: { emoji: '🍔', thing: 'burgers' },
+  icecream: { emoji: '🍦', thing: 'an ice cream' },
+  diner: { emoji: '🥡', thing: 'takeout' },
+  gas: { emoji: '🥤', thing: 'a cold drink' },
+  cinema: { emoji: '🍿', thing: 'leftover popcorn' },
+  bowling: { emoji: '🎳', thing: 'their bowling ball' },
+  motel: { emoji: '🧳', thing: 'their suitcase' },
+  coffee: { emoji: '☕', thing: 'a coffee' },
+  tacos: { emoji: '🌮', thing: 'tacos' },
+  market: { emoji: '🛒', thing: 'groceries' },
+  hotdog: { emoji: '🌭', thing: 'a hot dog' },
+  offices: { emoji: '💼', thing: 'their briefcase' },
 }
 
 // Thought bubbles: what someone is off to do, and what they're doing when they get there.
@@ -155,6 +170,9 @@ const FRONT_DOOR = new Set(['busstop', 'gazebo'])
 const doorOf = (n: Extract<WalkNode, { kind: 't' }>): Pt => [n.center[0] + SIDES[n.turn][0] * 0.95, n.center[1] + SIDES[n.turn][1] * 0.95]
 
 type Kind = 'shop' | 'browse' | 'friend' | 'park' | 'home' | 'jog' | 'club' | 'door'
+// A leg of a walk that goes through a doorway: the walker waits for the door to
+// swing open, then holds it while stepping through.
+type Leg = Step & { door?: DoorSpot }
 type Dest = { kind: Kind; key: string; def: string }
 type Person = {
   id: string
@@ -176,8 +194,10 @@ type Person = {
   sit: boolean
   timer: number
   waited: number
-  steps: Step[]
+  steps: Leg[]
   si: number
+  passing: boolean // stepping through a doorway right now
+  gate: DoorSpot | null // the venue gate they walked in through, to leave by
   crossing: string | null
   dest: Dest | null
   outings: number // stops on this trip out
@@ -204,7 +224,7 @@ function person(id: string, home: string, pos: Pt): Person {
     home, at: `b${home}`, pos: [...pos], heading: 0, face: null,
     speed: type === 'jogger' ? rand(1.5, 1.8) : rand(0.65, 0.9), stride: rand(0, 6),
     state: 'inside', sit: false, timer: rand(0.5, 10), waited: 0,
-    steps: [], si: 0, crossing: null, dest: null, outings: 0, item: null, queue: null,
+    steps: [], si: 0, passing: false, gate: null, crossing: null, dest: null, outings: 0, item: null, queue: null,
     colors: {
       shirt: SHIRTS[h % SHIRTS.length], pants: PANTS[(h >> 3) % PANTS.length],
       skin: SKIN[(h >> 6) % SKIN.length], hair: (SEASON === 'winter' ? BEANIES : HAIR)[(h >> 9) % 5],
@@ -216,7 +236,7 @@ function person(id: string, home: string, pos: Pt): Person {
 type Places = ReturnType<typeof destinations>
 type Club = { dest: Dest; center: Pt; turn: number }
 // `stores`: the walk in to a big store's doors, by building key (see storeDoors).
-type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number>; stores: Map<string, Pt[]> }
+type Ctx = { graph: WalkGraph; places: Places; dirty: { current: boolean }; queues: Map<string, Person[]>; gates: Map<string, number>; stores: Map<string, Pt[]>; owner: Map<string, string> }
 
 // Places worth walking to, sorted by what kind of outing they make.
 function destinations(g: WalkGraph) {
@@ -270,8 +290,29 @@ export function Townspeople() {
     const s = useGame.getState()
     return storeDoors((s.visiting ?? s).buildings, new Set(roadsList))
   }, [storeKey, roadsList])
+  // A merged block is drawn (and its doors found) under its first building's uid.
+  const mergeKey = useGame((s) => (s.visiting ?? s).buildings.filter((b) => b.merge != null).map((b) => `${b.uid}:${b.def}:${b.x},${b.z}:${b.merge}:${buildingLevel(b)}`).join('|'))
+  const owner = useMemo(() => {
+    void mergeKey
+    void footprint
+    const s = useGame.getState()
+    return mergeGroups((s.visiting ?? s).buildings).owner
+  }, [mergeKey, footprint])
   const people = useRef<Person[]>([])
-  if (import.meta.env.DEV) (window as unknown as { __people?: unknown }).__people = people
+  const lastCtx = useRef<Ctx | null>(null)
+  if (import.meta.env.DEV) {
+    const w = window as unknown as { __people?: unknown; __visit?: unknown }
+    w.__people = people
+    // Screenshot scripts: send person `i` off to a building now (`kind` as in Dest).
+    w.__visit = (i: number, uid: string, kind: Kind = 'shop') => {
+      const p = people.current[i]
+      const ctx = lastCtx.current
+      const b = (useGame.getState().visiting ?? useGame.getState()).buildings.find((o) => o.uid === uid)
+      if (!p || !ctx || !b) return false
+      setOff(ctx, p, false, { kind, key: `b${uid}`, def: b.def })
+      return p.dest?.key === `b${uid}`
+    }
+  }
   const colorsDirty = useRef(true)
   const queues = useRef(new Map<string, Person[]>())
   const gates = useRef(new Map<string, number>())
@@ -375,7 +416,8 @@ export function Townspeople() {
     const dt = Math.min(rawDt, 0.1)
     const list = people.current
     const night = nightAmount(dayPhase()) > 0.5
-    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current, stores }
+    const ctx: Ctx = { graph, places, dirty: colorsDirty, queues: queues.current, gates: gates.current, stores, owner }
+    lastCtx.current = ctx
     const t = torso.current
     const hd = head.current
     const hr = hair.current
@@ -394,13 +436,12 @@ export function Townspeople() {
         hr.setColorAt(i, color.set(p.colors.hair))
         lg.setColorAt(i * 2, color.set(p.colors.pants))
         lg.setColorAt(i * 2 + 1, color)
-        it.setColorAt(i, color.set(p.item ? ITEMS[p.item].color : '#ffffff'))
         db.setColorAt(i, color.set(p.colors.dog))
         color.set(LEASHES[(p.name.length * 3 + p.dogName.length) % LEASHES.length])
         ls.setColorAt(i * 2, color)
         ls.setColorAt(i * 2 + 1, color)
       })
-      for (const m of [t, hd, hr, lg, it, db, ls]) if (m.instanceColor) m.instanceColor.needsUpdate = true
+      for (const m of [t, hd, hr, lg, db, ls]) if (m.instanceColor) m.instanceColor.needsUpdate = true
     }
 
     const ones = [t, hd, hr, it, db, hit]
@@ -417,6 +458,8 @@ export function Townspeople() {
     lg.instanceMatrix.needsUpdate = true
     ls.instanceMatrix.needsUpdate = true
     GAIT.needsUpdate = true
+    CARRY.needsUpdate = true
+    PICK.needsUpdate = true
     followThought(list)
 
     function draw(p: Person, i: number) {
@@ -439,8 +482,8 @@ export function Townspeople() {
       const x = p.pos[0] / SCALE
       const z = p.pos[1] / SCALE
       // Body, head and hair stack up from the hips.
-      const part = (m: InstancedMesh, y: number, fwd: number, sx: number, sy: number, sz: number) => {
-        dummy.position.set(x + sin * fwd, hip + y, z + cos * fwd)
+      const part = (m: InstancedMesh, y: number, fwd: number, sx: number, sy: number, sz: number, lat = 0) => {
+        dummy.position.set(x + sin * fwd + cos * lat, hip + y, z + cos * fwd - sin * lat)
         dummy.rotation.set(0, h, 0)
         dummy.scale.set(sx, sy, sz)
         dummy.updateMatrix()
@@ -450,9 +493,14 @@ export function Townspeople() {
       part(hd!, 0.36, 0, 1, 1, 1)
       if (SEASON === 'winter') part(hr!, 0.4, -0.005, 1.05, 0.75, 1.05) // beanie
       else part(hr!, 0.385, -0.02, 1, 0.8, 1)
-      if (p.item) {
-        const [sx, sy, sz] = ITEMS[p.item].size
-        part(it!, 0.1, 0.13, sx, sy, sz)
+      // Held out in front in both hands, or hung from the left hand at the side.
+      const held = p.item ? ITEM_SHAPES[p.item] : undefined
+      const front = !!held && !held.side
+      CARRY.setX(i, front ? 1 : 0)
+      if (held) {
+        PICK.setX(i, held.id)
+        if (front) part(it!, 0.15 + HELD.y, HELD.z, 1, 1, 1)
+        else part(it!, 0.075, 0.005, 1, 1, 1, -0.118)
       } else it!.setMatrixAt(i, hidden)
       // An invisible, roomier box around each person makes them easy to tap on a phone.
       dummy.position.set(x, 0.45, z)
@@ -479,7 +527,8 @@ export function Townspeople() {
         const ds = Math.sin(p.dogHeading)
         const dc = Math.cos(p.dogHeading)
         const cy = trot + (COLLAR_Y + (still ? 0.03 : 0)) * k
-        hand.set(x + cos * 0.118 + sin * 0.005, hip + 0.075, z - sin * 0.118 + cos * 0.005)
+        if (front) hand.set(x + cos * HELD.x + sin * HELD.z, hip + 0.15 + HELD.y, z - sin * HELD.x + cos * HELD.z)
+        else hand.set(x + cos * 0.118 + sin * 0.005, hip + 0.075, z - sin * 0.118 + cos * 0.005)
         tmp.set(dx + ds * COLLAR_Z * k, cy, dz + dc * COLLAR_Z * k)
         mid.lerpVectors(hand, tmp, 0.5)
         mid.y -= Math.min(0.12, hand.distanceTo(tmp) * (still ? 0.3 : 0.12))
@@ -515,15 +564,11 @@ export function Townspeople() {
   })
 
   return (
+    <>
+    <DoorLeaves />
     <group scale={SCALE}>
-      <instancedMesh ref={torso} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false} castShadow={!SMALL}>
-        <primitive object={TORSO} attach="geometry" />
-        <meshStandardMaterial vertexColors />
-      </instancedMesh>
-      <instancedMesh ref={head} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <primitive object={HEAD} attach="geometry" />
-        <meshStandardMaterial vertexColors />
-      </instancedMesh>
+      <instancedMesh ref={torso} args={[TORSO, BODY_MAT, MAX_PEOPLE]} frustumCulled={false} castShadow={!SMALL} customDepthMaterial={BODY_DEPTH} />
+      <instancedMesh ref={head} args={[HEAD, BODY_MAT, MAX_PEOPLE]} frustumCulled={false} />
       <instancedMesh ref={hair} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <sphereGeometry args={[0.085, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial />
@@ -532,10 +577,7 @@ export function Townspeople() {
         <primitive object={LEGS} attach="geometry" />
         <meshStandardMaterial vertexColors />
       </instancedMesh>
-      <instancedMesh ref={items} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial />
-      </instancedMesh>
+      <instancedMesh ref={items} args={[ITEM_GEO, ITEM_MAT, MAX_PEOPLE]} frustumCulled={false} />
       <instancedMesh ref={dogBody} args={[undefined, undefined, MAX_PEOPLE]} frustumCulled={false}>
         <primitive object={DOG} attach="geometry" />
         <primitive object={DOG_MAT} attach="material" />
@@ -549,6 +591,7 @@ export function Townspeople() {
         <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
       </instancedMesh>
     </group>
+    </>
   )
 }
 
@@ -564,6 +607,20 @@ function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
   // Walking.
   const step = p.steps[p.si]
   if (!step) return arrive(ctx, p, night)
+  if (step.door) {
+    // Wait for the door to swing open, then hold it while stepping through.
+    const open = holdOpen(step.door)
+    if (!p.passing && open < 0.8) {
+      turnTo(p, Math.atan2(step.p[0] - p.pos[0], step.p[1] - p.pos[1]), dt)
+      walkDog(p, dt)
+      return
+    }
+    p.passing = true
+  } else {
+    // Open it as they come up to it, so nobody stands about.
+    const next = p.steps[p.si + 1]
+    if (next?.door && Math.hypot(step.p[0] - p.pos[0], step.p[1] - p.pos[1]) < 0.7) holdOpen(next.door)
+  }
   if (step.cross && p.crossing !== step.cross.id) {
     // At lights, wait for the walk signal (and still mind cars turning across);
     // elsewhere look both ways and wait while a car is close to the crossing.
@@ -587,6 +644,7 @@ function update(ctx: Ctx, p: Person, dt: number, night: boolean) {
     p.pos[0] = step.p[0]
     p.pos[1] = step.p[1]
     if (step.cross) leaveCrossing(p)
+    p.passing = false
     p.si++
   } else {
     p.pos[0] += (dx / len) * move
@@ -618,8 +676,36 @@ function walkDog(p: Person, dt: number) {
   p.dogHeading += diff * Math.min(1, dt * 8)
 }
 
+// How far inside a door people vanish, and how far out they wait for it to open.
+const INSIDE = 0.25
+const through = (d: DoorSpot, k: number): Pt => [d.x + d.nx * k, d.z + d.nz * k]
+// Clear of a swinging leaf (it sweeps out as far as it is wide).
+const waitAt = (d: DoorSpot) => (d.kind === 'swing' ? Math.max(0.3, d.w * 0.95) : 0.3)
+
+// From the lot's edge (`edge`, where the walk reached it) up to a door and in:
+// along the edge to straight out in front, up to it, and through when it opens.
+// Through a venue's gate, on in to stand and look around.
+function doorIn(d: DoorSpot, edge: Pt): Leg[] {
+  const out = (edge[0] - d.x) * d.nx + (edge[1] - d.z) * d.nz
+  const legs: Leg[] = []
+  const front = through(d, out)
+  if (Math.hypot(front[0] - edge[0], front[1] - edge[1]) > 0.05) legs.push({ p: front })
+  if (out > waitAt(d) + 0.1) legs.push({ p: through(d, waitAt(d)) })
+  if (d.kind === 'gate') legs.push({ p: through(d, 0.02), door: d }, { p: through(d, -GATE), door: d })
+  else legs.push({ p: through(d, -INSIDE), door: d })
+  return legs
+}
+// And back out to the lot's edge, from just inside the door (or a gate's venue).
+function doorOut(d: DoorSpot, edge: Pt): Leg[] {
+  const out = (edge[0] - d.x) * d.nx + (edge[1] - d.z) * d.nz
+  const legs: Leg[] = [{ p: through(d, Math.min(out, d.kind === 'gate' ? 0.05 : waitAt(d))), door: d }]
+  const front = through(d, out)
+  if (Math.hypot(front[0] - edge[0], front[1] - edge[1]) > 0.05) legs.push({ p: front })
+  return legs
+}
+
 // Done with the current stop (or time to leave home): work out the next one.
-function setOff(ctx: Ctx, p: Person, night: boolean) {
+function setOff(ctx: Ctx, p: Person, night: boolean, force?: Dest) {
   const g = ctx.graph
   p.sit = false
   p.face = null
@@ -627,11 +713,11 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
   // After dark the nightclub is the place to be (not for joggers or dog walkers).
   const clubs = night && p.type === 'walker' ? ctx.places.clubs.filter((c) => c.dest.key !== p.at) : []
   const club = clubs.length && Math.random() < (atHome ? 0.6 : 0.4) ? pick(clubs).dest : null
-  if (atHome && night && !club && Math.random() < 0.85) {
+  if (atHome && night && !club && !force && Math.random() < 0.85) {
     p.timer = rand(20, 45) // most people stay in after dark
     return
   }
-  let dest: Dest | null = club
+  let dest: Dest | null = force ?? club
   if (!dest && !atHome && (p.outings >= 3 || Math.random() < 0.4 || night)) dest = { kind: 'home', key: `b${p.home}`, def: 'house' }
   const start = g.byKey.get(p.at) ?? nearestNode(g, p.pos)
   for (let tries = 0; tries < 4; tries++) {
@@ -652,11 +738,27 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
     p.si = 0
     const last = g.nodes[goal!]
     if (last.kind === 't') settle(p, last)
-    // Across the forecourt and in at a big store's doors (and back out the same way).
-    for (const q of ctx.stores.get(d.key) ?? []) p.steps.push({ p: [...q] })
-    const out = p.state === 'inside' ? ctx.stores.get(p.at) : undefined
-    if (out) p.steps.unshift(...[...out].reverse().map((q): Step => ({ p: [...q] })))
-    if (p.state === 'inside') {
+    // Up to the front door and in (the club has its own line and bouncer).
+    const end = p.steps[p.steps.length - 1]?.p
+    const inDoor = last.kind === 'b' && end && d.kind !== 'club' ? doorNear(ctx.owner.get(last.uid) ?? last.uid, end[0], end[1]) : null
+    if (inDoor) p.steps.push(...doorIn(inDoor, end!))
+    // Without one, across the forecourt and in at a big store's doors.
+    else for (const q of ctx.stores.get(d.key) ?? []) p.steps.push({ p: [...q] })
+    // Out the way they came in: through the door from just inside, or back out of a venue's gate.
+    const first = p.steps[0]?.p
+    const outDoor = here.kind === 'b' && first && (p.state === 'inside' || p.gate) ? p.gate ?? doorNear(ctx.owner.get(here.uid) ?? here.uid, first[0], first[1]) : null
+    p.gate = null
+    if (outDoor) {
+      p.steps.unshift(...doorOut(outDoor, first!))
+      if (p.state === 'inside') {
+        p.pos = through(outDoor, -INSIDE)
+        p.heading = Math.atan2(outDoor.nx, outDoor.nz)
+        p.dogPos = [...p.pos]
+        p.dogHeading = p.heading
+      }
+    } else if (p.state === 'inside') {
+      const out = ctx.stores.get(p.at)
+      if (out) p.steps.unshift(...[...out].reverse().map((q): Step => ({ p: [...q] })))
       // Step out of the front door.
       const first = p.steps[0]
       if (first) {
@@ -667,6 +769,7 @@ function setOff(ctx: Ctx, p: Person, night: boolean) {
       p.dogPos = [...p.pos]
       p.dogHeading = p.heading
     }
+    p.passing = false
     p.state = 'walk'
     p.outings++
     return
@@ -731,6 +834,8 @@ function settle(p: Person, n: Extract<WalkNode, { kind: 't' }>) {
 function arrive(ctx: Ctx, p: Person, night: boolean) {
   leaveCrossing(p)
   const d = p.dest
+  const via = p.steps[p.steps.length - 1]?.door
+  const gate = via?.kind === 'gate' ? via : null
   p.steps = []
   p.si = 0
   if (!d) {
@@ -779,6 +884,16 @@ function arrive(ctx: Ctx, p: Person, night: boolean) {
       // Watching the ducks.
       p.face = Math.atan2(node.center[0] - p.pos[0], node.center[1] - p.pos[1])
     }
+    return
+  }
+  // Through a venue's gate: stay a while in sight, looking round, then leave the same way.
+  if (gate) {
+    p.state = 'linger'
+    p.gate = gate
+    p.face = Math.atan2(-gate.nx, -gate.nz)
+    p.timer = rand(8, 16)
+    if (d.kind === 'shop' && ITEMS[d.def]) p.item = d.def
+    ctx.dirty.current = true
     return
   }
   p.state = 'inside'

@@ -6,12 +6,14 @@ import type { HatFit } from '../game/hats'
 import { CarModel, carSize, wheelRig } from './CarModel'
 import { wheelPool } from './carBatch'
 import { signTexture } from './signTexture'
-import { skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
+import { checkerTex, skyTex, asphaltTex, paverTex, glowTex, sandTex, grassTex, beachSandTex, snowTex, concreteTex } from './textures'
 import { LightPool } from './BuildingModel'
 import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
+import { NightCosmos } from './NightCosmos'
+import { skyClear } from '../game/skyExtras'
 import { holdTown } from './renderGate'
 import { PAL, SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
@@ -291,8 +293,9 @@ function StartLights() {
 }
 
 // Tyre smoke off the line, and a flag waving at the finish.
-const smokeGeo = new IcosahedronGeometry(0.5, 1)
-const smokeMat = new MeshStandardMaterial({ color: '#eceff1', roughness: 1, flatShading: true, emissive: '#555555' })
+// Soft, see-through and smooth-shaded: faceted opaque puffs read as rocks on the road.
+const smokeGeo = new IcosahedronGeometry(0.5, 2)
+const smokeMat = new MeshStandardMaterial({ color: '#eceff1', roughness: 1, emissive: '#666666', transparent: true, opacity: 0.55, depthWrite: false })
 type Puff = { x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number }
 const SMOKE_MAX = 90
 const pt = new Object3D()
@@ -334,15 +337,16 @@ function LaunchSmoke({ me, them, len }: { me: RefObject<RacerView>; them: RefObj
     }
     list.length = n
     m.count = n
-    m.visible = n > 0
     m.instanceMatrix.needsUpdate = true
   })
-  return <instancedMesh ref={mesh} args={[smokeGeo, smokeMat, SMOKE_MAX]} frustumCulled={false} visible={false} />
+  // Kept visible with no puffs, so the race warm-up compiles its shader before the lights go green.
+  return <instancedMesh ref={mesh} args={[smokeGeo, smokeMat, SMOKE_MAX]} count={0} frustumCulled={false} />
 }
 
 function FinishFlag({ len, me, them }: { len: number; me: RefObject<RacerView>; them: RefObject<RacerView> }) {
   const flag = useRef<Group>(null)
-  const tex = useMemo(() => signTexture('▚▚▚', '#ffffff', '#111111'), [])
+  // Real chequers: the ▚ glyph rendered as a scribble on some fonts.
+  const tex = useMemo(() => checkerTex(1.5), [])
   useFrame(() => {
     const g = flag.current
     if (!g) return
@@ -483,6 +487,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   // The race screen passes the one it races on, so the grip matches the sky.
   const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
+  // Stars, the Milky Way and planets on clear nights; clouds and storms hide them.
+  const cosmos = night * skyClear(weather)
   // Same lights and colour grade as the town at this time of day.
   const look = useMemo(() => weatherLook(lookFor(night, midnight ? 0 : duskAmount(dayPhase()), undefined, undefined, 'race'), weather), [night, midnight, weather])
   // The race fills the screen, so stop drawing the town underneath while racing.
@@ -767,6 +773,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <fog attach="fog" args={[tint(venue.fog, '#1d2740'), venue.fogNear, venue.fogFar]} />
       <color attach="background" args={[sky]} />
       <SkyDome tint={tint(overcast('#ffffff'), '#2a3560')} />
+      {cosmos > 0.02 && <NightCosmos vis={cosmos} small={Math.min(size.width, size.height) < 700} />}
       <hemisphereLight args={[look.sky, look.ground, look.hemiIntensity * 1.15]} />
       <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
       <SkyEnv />
@@ -791,7 +798,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       </mesh>
       {/* The street is static, so it's merged into a few draws like the town, in stretches so the camera skips what it has passed.
           Re-merged when the race length changes, or the road and finish line stay where the last race's were. */}
-      <Batch version={city ? slots : `${venue.id}:${len}`} cell={24}>
+      <Batch version={city ? slots : `${venue.id}:${len}`} cell={24} freeze>
         {[-1, 1].map((sd) => (
           <mesh key={sd} position={[sd * (ROAD + WALK / 2), 0.04, far / 2 + 5]}>
             <boxGeometry args={[WALK, 0.08, far + 50]} />
@@ -822,7 +829,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position={[0, LAYER.lot, len]}>
           <planeGeometry args={[ROAD * 2, 0.5]} />
-          <meshBasicMaterial map={signTexture('▚▚▚▚▚▚▚▚', '#ffffff', '#111111')} {...decal(2)} />
+          <meshBasicMaterial map={checkerTex((ROAD * 2) / 0.5)} {...decal(2)} />
         </mesh>
         <Banner z={-0.8} text="START" bg="#2e7d32" />
         <Banner z={len} text="FINISH" bg="#c62828" />

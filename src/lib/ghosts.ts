@@ -35,7 +35,8 @@ export const receivedTaunt = (id: number, muted: boolean) => (muted ? MUTED_TAUN
 export const tauntsFor = (won: boolean) => TAUNTS.filter((t) => won || !t.brag)
 
 // The ghost being raced. par: the friend has no time yet, so it runs a par for their car.
-export type Ghost = { owner: string; town: string; target: number; par: boolean; car: string; pi: number; body: Body; color: string; real: boolean }
+// war: a crew war race against this rival (lib/warMap.ts), posted to the war instead of the ghost board.
+export type Ghost = { owner: string; town: string; target: number; par: boolean; car: string; pi: number; body: Body; color: string; real: boolean; war?: { target: string; tag: string } }
 export type Taunt = { id: number; from: string; town: string; taunt: number; won: boolean; t: number; their: number | null; at: string }
 export type GhostResult = { kept: number; their: number | null; won: boolean; best: number | null }
 
@@ -51,7 +52,7 @@ type GhostState = {
 }
 export const useGhost = create<GhostState>(() => ({ ghost: null, n: 0, started: Promise.resolve(false), inbox: [], shown: false }))
 
-const isBody = (b: unknown): b is Body => typeof b === 'string' && CARS.some((c) => c.body === b)
+export const isBody = (b: unknown): b is Body => typeof b === 'string' && CARS.some((c) => c.body === b)
 // A par time for a car: a clean run, not a perfect one (the time trial uses the same).
 export const parTime = (piVal: number) => Math.round(raceFloor(piVal) * 1.3 * 100) / 100
 
@@ -97,11 +98,34 @@ export function runGhost(g: Ghost) {
   return true
 }
 
+// A crew war race, already started on the server (or a demo one). Fuel is paid by the caller.
+export function runWarGhost(g: Ghost, started: Promise<boolean>) {
+  useGhost.setState((st) => ({ ghost: g, n: st.n + 1, started }))
+  useGame.getState().openPanel('ghost')
+}
+
 // Visits a town (if needed) and races its ghost.
 export async function raceTown(town: { ownerId: string; townName: string; cars: OwnedCar[] }) {
   const g = await ghostFor(town)
   if (!g) return useGame.getState().toast("Their garage is empty. Nothing to race yet!")
   runGhost(g)
+}
+
+// Nobody in the live lobby: race the ghost of a real player instead, the one whose best car is
+// closest to yours among the most recently played towns. False when there's nobody to race.
+export async function racePlayerGhost(): Promise<boolean> {
+  if (!supabase) return false
+  const me = signedInUser()
+  let q = supabase.from('game_saves').select('owner_id, town_name, best_car, cars:state->cars').order('updated_at', { ascending: false }).limit(12)
+  if (me) q = q.neq('owner_id', me)
+  const { data, error } = await q
+  const towns = (error ? [] : data ?? []).filter((r) => typeof r.best_car?.pi === 'number' && Array.isArray(r.cars))
+  if (!towns.length) return false
+  const mine = bestOf(useGame.getState().cars)?.pi ?? 0
+  const near = towns.sort((a, b) => Math.abs(a.best_car.pi - mine) - Math.abs(b.best_car.pi - mine)).slice(0, 3)
+  const pick = near[Math.floor(Math.random() * near.length)]
+  await raceTown({ ownerId: pick.owner_id, townName: pick.town_name ?? 'Town', cars: pick.cars as OwnedCar[] })
+  return true
 }
 
 async function startRun(vs: string): Promise<boolean> {

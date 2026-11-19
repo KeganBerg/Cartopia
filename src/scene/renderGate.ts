@@ -76,6 +76,9 @@ export function coversScreen(w: number, h: number, vw: number, vh: number): bool
 export function coversHalf(w: number, h: number, vw: number, vh: number): boolean {
   return vw > 0 && vh > 0 && (w * h) / (vw * vh) >= HALF
 }
+// How long the town holds after a menu opens (its slide-in) and after its last scroll.
+export const OPEN_MS = 350
+export const BUSY_MS = 250
 export function usePauseTownUnder(ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     const el = ref.current
@@ -101,9 +104,27 @@ export function usePauseTownUnder(ref: RefObject<HTMLElement | null>) {
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(sync)
     ro?.observe(el)
     window.addEventListener('resize', sync)
+    // While the menu slides in and while it scrolls, the town holds its last frame even when the
+    // menu covers less (a narrow desktop window): those are the frames the menu needs smooth.
+    let busy: (() => void) | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const hold = (ms: number) => {
+      busy ??= pauseTownDraw()
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        busy?.()
+        busy = undefined
+      }, ms)
+    }
+    const onScroll = () => hold(BUSY_MS)
+    hold(OPEN_MS)
+    el.addEventListener('scroll', onScroll, { capture: true, passive: true })
     return () => {
       ro?.disconnect()
       window.removeEventListener('resize', sync)
+      el.removeEventListener('scroll', onScroll, { capture: true })
+      clearTimeout(timer)
+      busy?.()
       release?.()
       unslow?.()
     }

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { SharedShapes } from './sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { PerspectiveCamera, Vector3, type Group, type Mesh } from 'three'
 import type { Body, BuildingDef, Finish, SkinnedSlot, Panels } from '../game/data'
 import { BuildingModel } from './BuildingModel'
+import { Batch } from './Batch'
 import { Tint } from './CityTint'
 import type { ColorTheme } from '../game/cityLook'
 import { Grounded } from './ServiceVehicles'
@@ -14,7 +15,7 @@ import { SEASON } from './season'
 import { frame, seat, type Bounds } from './fit'
 import { reduceMotionOn } from '../lib/prefs'
 import { quietShaders } from './warm'
-import { chooseFocus, copyThumbs, pickThumbs, type Slot } from './thumbCopy'
+import { chooseFocus, copyThumbs, costEach, nextMounts, pickThumbs, spinsFor, type Slot } from './thumbCopy'
 import type { Trim } from '../game/trim'
 
 // Shop, showroom and garage thumbnails are live 3D renders. One hidden WebGL
@@ -23,14 +24,18 @@ import type { Trim } from '../game/trim'
 // pictures, so they scroll without lag, and the spin is a real rotation rather
 // than baked frames.
 const SPIN_MS = 8000
-// The arcade cards' own animations draw at this rate. The one turning thumbnail (see Slot in
-// thumbCopy.ts) draws at up to SPIN_FPS: at 24 a big car's turn looked choppy.
+// The arcade cards' own animations draw at this rate. Turning thumbnails (see Slot in
+// thumbCopy.ts) draw at up to SPIN_FPS each (at 24 a big car's turn looked choppy), sharing
+// BUDGET_MS of drawing a frame, so a page of them stays smooth on a phone.
 const FPS = 24
 const SPIN_FPS = 60
+const BUDGET_MS = 6
 // The turn a held floating model shows.
 const REST = 0.12
 // With reduced motion they stand still, so they're redrawn only when something changes.
 let dirty = true
+// Thumbnails came, went, resized or scrolled in or out: where they sit is looked at again (see the hero).
+let moved = true
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
@@ -48,7 +53,9 @@ export type SceneView = { dir: [number, number, number]; at: [number, number, nu
 function buildingItem(def: BuildingDef, level?: number, theme?: ColorTheme | null): Item {
   return {
     key: `b|${def.id}|${level ?? 1}|${SEASON}|${theme?.id ?? ''}`,
-    model: () => <Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider>,
+    // Merged like the town (Batch): a detailed building is dozens of small meshes, and a page of
+    // them turning drew thousands of pieces a second, enough to make the Build grid lag.
+    model: () => <Batch version={1}><Grounded.Provider value><Tint theme={theme ?? null}><BuildingModel def={def} level={level} /></Tint></Grounded.Provider></Batch>,
   }
 }
 
@@ -66,14 +73,16 @@ function carItem(c: CarLook, stand?: boolean): Item {
 const slots = new Set<Slot>()
 const models = new Map<string, { item: Item; uses: number }>()
 // Models stay mounted after their thumbnail goes, so reopening the Shop reuses
-// compiled shaders and geometry; past this many unused ones, the oldest go.
-const KEEP_IDLE = 80
+// compiled shaders and geometry; past this many unused ones, the oldest go. Enough for every
+// Shop tab: with fewer, going back to a tab rebuilt its pictures (a stall per picture).
+const KEEP_IDLE = 300
 const listeners = new Set<() => void>()
 const subscribe = (fn: () => void) => (listeners.add(fn), () => listeners.delete(fn))
 let version = 0
 const changed = () => {
   version++
   dirty = true
+  moved = true
   listeners.forEach((fn) => fn())
 }
 
@@ -93,6 +102,7 @@ function fit(slot: Slot, w: number, h: number) {
   slot.canvas.height = ph
   slot.fresh = true
   dirty = true
+  moved = true
 }
 
 function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
@@ -100,7 +110,7 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   // observer doesn't always report a target that's unobserved and observed again, so it keeps
   // whether it was on screen; otherwise the new car never draws and the box stays blank.
   // Held, a standing car shows its front three quarters, a floating model the three quarters view.
-  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, scene: !!item.view, angle: item.stand ? 0 : REST, fresh: true }
+  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, scene: !!item.view, angle: item.stand ? 0 : REST, at: -Infinity, fresh: true }
   slots.add(slot)
   byCanvas.set(canvas, slot)
   const m = models.get(item.key)
@@ -114,6 +124,7 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
           if (!s || s.seen === e.isIntersecting) continue
           s.seen = e.isIntersecting
           dirty = true
+          moved = true
         }
       },
       { rootMargin: '40px' },
@@ -127,9 +138,11 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
         if (s) fit(s, e.contentRect.width, e.contentRect.height)
       }
     })
+    // Its size comes with the observer's first report, after the page lays out. Reading it here
+    // made the browser lay the page out again for every thumbnail as a grid of them went in
+    // (Shop > Upgrades froze for over a second on a slow phone).
     sizer.observe(canvas)
-  }
-  fit(slot, canvas.clientWidth, canvas.clientHeight)
+  } else fit(slot, canvas.clientWidth, canvas.clientHeight)
   changed()
   return () => {
     wasSeen.set(canvas, slot.seen)
@@ -137,17 +150,47 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
     byCanvas.delete(canvas)
     watcher?.unobserve(canvas)
     sizer?.unobserve(canvas)
+    // A page kept for later (a menu tab out of sight) holds no pictures meanwhile; it's redrawn
+    // when it shows again. A thumb that only swapped model has its canvas back by then: it keeps
+    // the last car until the next one draws, instead of blinking blank on every swap.
+    queueMicrotask(() => {
+      if (byCanvas.has(canvas)) return
+      canvas.width = 0
+      canvas.height = 0
+    })
     const n = models.get(item.key)
     if (n) n.uses--
     // Scenes animate every frame while mounted, so they go as soon as nothing shows them.
     if (n && n.uses <= 0 && n.item.view) models.delete(item.key)
-    const idle = [...models].filter(([, v]) => v.uses <= 0)
-    for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
+    trimSoon()
     changed()
   }
 }
 
-// The thumbnail under the mouse (desktop) turns instead, and holds where it got to when the mouse leaves.
+// Unused models past KEEP_IDLE go, the oldest first, a few a frame: looked at once after a page's
+// thumbnails have all gone, not once per thumbnail (a big page closing went through the whole
+// list hundreds of times), and taken down over a few frames, not all in the frame the page closes.
+const TRIM_PER_FRAME = 4
+let trimming = false
+function trimSoon() {
+  if (trimming) return
+  trimming = true
+  const go = () => {
+    const idle = [...models].filter(([, v]) => v.uses <= 0)
+    const over = idle.slice(0, Math.min(TRIM_PER_FRAME, Math.max(0, idle.length - KEEP_IDLE)))
+    for (const [k] of over) models.delete(k)
+    if (over.length) changed()
+    trimming = idle.length - over.length > KEEP_IDLE
+    if (trimming) requestAnimationFrame(go)
+  }
+  if (typeof requestAnimationFrame === 'undefined') {
+    trimming = false
+    const idle = [...models].filter(([, v]) => v.uses <= 0)
+    for (const [k] of idle.slice(0, Math.max(0, idle.length - KEEP_IDLE))) models.delete(k)
+  } else requestAnimationFrame(go)
+}
+
+// A held thumbnail (Shop > Upgrades) turns while the mouse is over it, and holds where it got to.
 let hover: Slot | null = null
 export function spinThumb(canvas: Element | null | undefined, on: boolean) {
   const s = canvas && byCanvas.get(canvas)
@@ -187,9 +230,21 @@ function aimScene(c: PerspectiveCamera, v: SceneView) {
   c.projectionMatrixInverse.copy(c.projectionMatrix).invert()
 }
 
+// The models in the scene so far (see nextMounts).
+const inScene = new Set<string>()
+
+// Each model renders once when it goes in, not again every time a thumbnail comes or goes.
+const Model = memo(function Model({ item }: { item: Item }) {
+  return <group>{item.model()}</group>
+})
+
 function Renderer() {
   const { gl, scene } = useThree()
   const groups = useRef(new Map<string, Group>())
+  const building = useRef<string | null>(null)
+  const [, mounted] = useState(0)
+  // A rebuilt canvas (the phone dropped the old one) starts with an empty scene.
+  useEffect(() => () => inScene.clear(), [])
   // Each model's size, measured the first time it's drawn.
   const sizes = useRef(new WeakMap<Group, Bounds>())
   const shadow = useRef<Mesh>(null)
@@ -199,32 +254,61 @@ function Renderer() {
   const last = useRef(-Infinity)
   const lastScene = useRef(-Infinity)
   const focus = useRef<{ slot: Slot | null; at: number }>({ slot: null, at: -Infinity })
+  // What one turning thumbnail has been costing to draw (ms), to size the next frame's share.
+  const cost = useRef(2)
+  const readUsual = useRef(Infinity)
+  const rank = (n: { spin: boolean; slots: Slot[] }) => (n.slots.includes(focus.current.slot!) ? 0 : n.spin ? 1 : 2)
   // Priority 1 takes over rendering from the default loop.
   useFrame(() => {
+    for (const k of inScene) if (!models.has(k)) inScene.delete(k)
+    // The next model goes in only once the last one is built: on a slow phone the frames can
+    // come faster than the builds, and the ones piled up were all built in one go (a page of
+    // new cars froze for a second).
+    const w = building.current
+    if (!w || !models.has(w) || !inScene.has(w) || groups.current.has(w)) {
+      const add = nextMounts(slots, (k) => models.has(k), inScene)
+      building.current = add.at(-1) ?? null
+      if (add.length) {
+        for (const k of add) inScene.add(k)
+        mounted((v) => v + 1)
+      }
+    }
     const now = performance.now()
     const still = reduceMotionOn()
-    // Which thumbnail turns, looked at a few times a second (it reads their places on the page).
+    const over = hover && slots.has(hover) ? hover : null
+    // The hero, drawn every frame, looked for a few times a second (it reads places on the page),
+    // not every frame something is waiting its turn.
     const f = focus.current
     if (still) f.slot = null
-    else if (hover && slots.has(hover)) f.slot = hover
-    else if (dirty || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
+    else if (moved || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
       f.at = now
+      moved = false
       const cands: { slot: Slot; box: DOMRect }[] = []
-      for (const s of slots) if (s.seen && !s.still && !s.scene) cands.push({ slot: s, box: s.canvas.getBoundingClientRect() })
+      for (const s of slots) {
+        // Faded right out (the Car Packs showcase keeps its other cars mounted, see-through): it
+        // neither turns nor takes the hero's place until it shows, and draws as soon as it does.
+        const hidden = s.seen && typeof s.canvas.checkVisibility === 'function' && !s.canvas.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+        if (hidden !== !!s.hidden) {
+          s.hidden = hidden
+          if (!hidden) s.fresh = true
+        }
+        if (s.seen && !s.hidden && !s.still && !s.scene) cands.push({ slot: s, box: s.canvas.getBoundingClientRect() })
+      }
       f.slot = chooseFocus(cands, window.innerWidth, window.innerHeight)
     }
-    const turning = f.slot && f.slot.seen ? f.slot : null
+    let turning = false
+    if (!still) for (const s of slots) if (s.seen && !s.hidden && !s.scene && (!s.still || s === over)) { turning = true; break }
     const scenes = !still && now - lastScene.current >= 1000 / FPS - 4
-    const due = !!turning && now - last.current >= 1000 / SPIN_FPS - 4
+    const due = turning && now - last.current >= 1000 / SPIN_FPS - 4
     if (!dirty && !due && !scenes) return
-    // The turning one goes round at the same speed whatever the frame rate.
-    if (turning) turning.angle = (turning.angle + Math.min(now - last.current, 100) / SPIN_MS) % 1
     last.current = now
     if (scenes) lastScene.current = now
     dirty = false
-    const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k), { focus: turning, scenes })
+    const { need, waiting } = pickThumbs(slots, (k) => groups.current.has(k), { focus: f.slot, hover: over, scenes, still, now, gap: 1000 / SPIN_FPS - 4, spins: spinsFor(BUDGET_MS, cost.current) })
     if (waiting) dirty = true
     if (!need.size) return
+    let spun = 0
+    const t0 = performance.now()
 
     // Lay the models out in rows across the atlas.
     let x = 0
@@ -252,8 +336,25 @@ function Renderer() {
     for (const g of groups.current.values()) g.visible = false
     gl.setScissorTest(true)
     gl.setClearColor(0x000000, 0)
-    for (const n of need.values()) {
+    // The hero first, then the turning ones, then the held ones, for as long as the frame's
+    // BUDGET_MS lasts (one at least): the rest wait for the next frame. A page of new thumbnails
+    // drew them all in one frame and held the menu up while it opened.
+    const order = [...need.values()].sort((a, b) => rank(a) - rank(b))
+    const drawn: typeof order = []
+    for (const n of order) {
+      if (drawn.length && performance.now() - t0 > BUDGET_MS) {
+        dirty = true
+        break
+      }
+      drawn.push(n)
       const { key } = n
+      // Each turning one goes round with the clock, however long since it last drew (a long wait, a
+      // page that has only just shown it, moves it no more than a quarter second's worth).
+      if (n.spin && !models.get(key)?.item.view) {
+        spun++
+        for (const s of n.slots) s.angle = (s.angle + (Number.isFinite(s.at) ? Math.min(now - s.at, 250) : 0) / SPIN_MS) % 1
+        n.angle = n.slots[0].angle
+      }
       const g = groups.current.get(key)!
       const c = cam.current
       c.aspect = n.w / n.h
@@ -291,8 +392,14 @@ function Renderer() {
     gl.setScissorTest(false)
 
     // Copy in the same frame, before the browser discards the drawing buffer.
-    copyThumbs(src, width, height, need.values())
-    for (const n of need.values()) for (const s of n.slots) s.fresh = false
+    const read = copyThumbs(src, width, height, drawn)
+    // The usual read back: the quickest lately, creeping up so one quick read doesn't set it for good.
+    readUsual.current = Math.min(read, readUsual.current + 0.05)
+    if (spun) cost.current = cost.current * 0.8 + costEach(performance.now() - t0, read, readUsual.current, drawn.length) * 0.2
+    for (const n of drawn) for (const s of n.slots) {
+      s.fresh = false
+      s.at = now
+    }
   }, 1)
 
   return (
@@ -303,7 +410,7 @@ function Renderer() {
         <circleGeometry args={[1, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.16} depthWrite={false} />
       </mesh>
-      {[...models.values()].map(({ item }) => (
+      {[...models.values()].filter(({ item }) => inScene.has(item.key)).map(({ item }) => (
         <group
           key={item.key}
           visible={false}
@@ -312,7 +419,7 @@ function Renderer() {
             else groups.current.delete(item.key)
           }}
         >
-          <group>{item.model()}</group>
+          <Model item={item} />
         </group>
       ))}
     </>

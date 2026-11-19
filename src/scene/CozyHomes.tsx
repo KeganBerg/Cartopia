@@ -8,6 +8,7 @@ import { PEOPLE_SIZED } from './keepShape'
 import { CarModel } from './CarModel'
 import { PAL, SEASON } from './season'
 import { shade } from './flora'
+import { useDoorTag } from './HomeBlock'
 import { brickTex, grassTex, gravelTex, paverTex, shingleTex, sidingTex } from './textures'
 
 // Cozy homes: the Rose Cottage, the Sunny Bungalow and the Log Cabin (see
@@ -127,28 +128,30 @@ function Win({ k, at, w = 0.22, h = 0.24, ry = 0, trim = TRIM, shutter, flowers,
 // A door with an arched (round) top on a wall facing +z, standing on y = 0.
 function RoundDoor({ k, at, w = 0.24, h = 0.38, c, trim = TRIM }: { k: Kit; at: V3; w?: number; h?: number; c: string; trim?: string }) {
   const { m, win } = k
+  const tag = useDoorTag()
   const R = w / 2 + 0.03
   return (
     <group position={at}>
       <Box m={m} at={[0, h / 2, 0.01]} s={[w + 0.06, h, 0.02]} c={trim} shadow={false} />
       <mesh position={[0, h, 0.01]} rotation-x={Math.PI / 2}><cylinderGeometry args={[R, R, 0.02, 14, 1, false, Math.PI / 2, Math.PI]} />{m(trim)}</mesh>
-      <mesh position={[0, h / 2, 0.024]}><planeGeometry args={[w, h]} />{m(c)}</mesh>
+      <mesh position={[0, h / 2, 0.024]} userData={tag}><planeGeometry args={[w, h]} />{m(c)}</mesh>
       <mesh position={[0, h, 0.024]}><circleGeometry args={[w / 2, 12, 0, Math.PI]} />{m(c)}</mesh>
       <mesh position={[0, h + 0.03, 0.028]}><circleGeometry args={[0.045, 10]} />{win}</mesh>
-      <Ball m={m} at={[w * 0.32, h * 0.52, 0.036]} r={0.014} c="#ffca28" />
+      <Ball m={m} at={[w * 0.32, h * 0.52, 0.02]} r={0.012} c="#ffca28" />
     </group>
   )
 }
 
 // A plain panel door with a small light on a wall facing +z, standing on y = 0.
 function Door({ k, at, w = 0.24, h = 0.52, c, trim = TRIM, lite = true }: { k: Kit; at: V3; w?: number; h?: number; c: string; trim?: string; lite?: boolean }) {
+  const tag = useDoorTag()
   const { m, win } = k
   return (
     <group position={at}>
       <Box m={m} at={[0, (h + 0.03) / 2, 0.01]} s={[w + 0.06, h + 0.03, 0.02]} c={trim} shadow={false} />
-      <mesh position={[0, h / 2, 0.024]}><planeGeometry args={[w, h]} />{m(c)}</mesh>
+      <mesh position={[0, h / 2, 0.024]} userData={tag}><planeGeometry args={[w, h]} />{m(c)}</mesh>
       {lite && <mesh position={[0, h * 0.78, 0.028]}><planeGeometry args={[w * 0.62, h * 0.18]} />{win}</mesh>}
-      <Ball m={m} at={[w * 0.32, h * 0.48, 0.036]} r={0.014} c="#ffca28" />
+      <Ball m={m} at={[w * 0.32, h * 0.48, 0.02]} r={0.012} c="#ffca28" />
     </group>
   )
 }
@@ -191,8 +194,10 @@ function Roses({ m, at, s = 1, c = '#e91e63' }: { m: Mat; at: V3; s?: number; c?
 
 // A rose arch over a garden gate, facing +z.
 // `lite`: single posts and fewer roses, for the lane's little gates.
-function RoseArch({ m, at, w = 0.42, h = 0.56, lite }: { m: Mat; at: V3; w?: number; h?: number; lite?: boolean }) {
-  const roses = [[-w / 2, h * 0.55, 0.05], [w / 2, h * 0.75, 0.05], [-w * 0.42, h + 0.1, 0], [-w * 0.12, h + w * 0.48, 0.02], [w * 0.25, h + w * 0.4, 0.03], [w / 2, h * 0.3, -0.05], [-w / 2, h * 0.2, -0.04]]
+function RoseArch({ m, at, w = 0.42, h = 0.64, lite }: { m: Mat; at: V3; w?: number; h?: number; lite?: boolean }) {
+  // Roses climb the outsides of the posts, leaving the way through clear.
+  const o = w / 2 + 0.03
+  const roses = [[-o, h * 0.55, 0.05], [o, h * 0.75, 0.05], [-w * 0.42, h + 0.1, 0], [-w * 0.12, h + w * 0.48, 0.02], [w * 0.25, h + w * 0.4, 0.03], [o, h * 0.3, -0.05], [-o, h * 0.2, -0.04]]
   return (
     <group position={at}>
       {[-1, 1].map((sd) => (
@@ -449,7 +454,7 @@ function CottageLot({ def, level, k }: { def: NewModelProps['def']; level: numbe
             {level >= 5 && <Greenhouse m={m} k={k} at={[0.62, LAWN, 0.58]} />}
             {level >= 6 && (
               // A rose arbour with a bench under it.
-              <group position={[-0.66, LAWN, 0.22]} rotation-y={0.3}>
+              <group position={[-0.72, LAWN, 0.22]} rotation-y={0.3}>
                 <RoseArch m={m} at={[0, 0, 0]} w={0.5} h={0.5} lite />
                 <GardenBench m={m} at={[0, 0, -0.02]} />
               </group>
@@ -527,6 +532,8 @@ function CottageLane({ def, level, k }: { def: NewModelProps['def']; level: numb
   const roofs = [def.roof, shade(def.roof, 0.1), shade(def.roof, 0.05)]
   const doors = ['#558b2f', '#1565c0', '#c62828']
   const z0 = -0.42
+  // Lane furniture stands between the paths up to the doors (each a little left of its cottage's middle).
+  const gaps = [-0.445, 0.187]
   return (
     <group>
       <Lawn m={m} />
@@ -543,15 +550,15 @@ function CottageLane({ def, level, k }: { def: NewModelProps['def']; level: numb
           </group>
         )
       })}
-      {!ghost && level >= 8 && [-0.62, 0.62].map((x) => <Lantern key={x} k={k} at={[x, LAWN, 0.9]} h={0.5} />)}
+      {!ghost && level >= 8 && gaps.map((x) => <Lantern key={x} k={k} at={[x, LAWN, 0.9]} h={0.5} />)}
       {!ghost && level >= 10 && (
         <group>
           {/* Bunting strung along the lane between two posts. */}
-          {[-0.9, 0.9].map((x) => <Cyl key={x} m={m} at={[x, LAWN + 0.4, 0.38]} r={0.014} h={0.8} c={DARK_WOOD} seg={5} />)}
-          <Bulbs from={[-0.9, LAWN + 0.78, 0.38]} to={[0.9, LAWN + 0.78, 0.38]} n={11} sag={0.08} />
+          {[-0.93, 0.93].map((x) => <Cyl key={x} m={m} at={[x, LAWN + 0.4, 0.38]} r={0.014} h={0.8} c={DARK_WOOD} seg={5} />)}
+          <Bulbs from={[-0.93, LAWN + 0.78, 0.38]} to={[0.93, LAWN + 0.78, 0.38]} n={11} sag={0.08} />
         </group>
       )}
-      {!ghost && level >= 9 && <Well m={m} at={[0, LAWN, 0.62]} level={level} />}
+      {!ghost && level >= 9 && <group position={[gaps[1], LAWN, 0.62]} rotation-y={Math.PI / 2}><Well m={m} at={[0, 0, 0]} level={level} /></group>}
     </group>
   )
 }
@@ -572,7 +579,7 @@ function LaneCottage({ k, level, H, wall, roof, door, z0, w, v }: { k: Kit; leve
       </group>
       <RoundDoor k={k} at={[-0.13, y0, zf]} w={0.17} h={0.38} c={door} />
       <mesh position={[-0.13, y0 + 0.535, zf + 0.02]}><boxGeometry args={[0.04, 0.04, 0.04]} />{bulb}</mesh>
-      <Win k={k} at={[0.13, y0 + H * 0.56, zf]} w={0.15} h={0.18} flowers={['#ec407a', '#ffca28', '#ab47bc'][v]} bars={false} />
+      <Win k={k} at={[0.145, y0 + H * 0.56, zf]} w={0.15} h={0.18} flowers={['#ec407a', '#ffca28', '#ab47bc'][v]} bars={false} />
       {/* Attic window up in the gable. */}
       <group position={[0, y0 + H + pitch * 0.38, zf + 0.003]}>
         <mesh position={[0, 0, 0.004]} rotation-x={Math.PI / 2}><cylinderGeometry args={[0.06, 0.06, 0.012, 12]} />{m(TRIM)}</mesh>
@@ -592,7 +599,7 @@ function LaneCottage({ k, level, H, wall, roof, door, z0, w, v }: { k: Kit; leve
       {!ghost && (
         <group>
           <Roses m={m} at={[0.13, LAWN, zf + 0.14]} s={0.55} c={['#e91e63', '#ffb300', '#8e24aa'][v]} />
-          {level >= 9 && <RoseArch m={m} at={[-0.13, LAWN, zf + 0.3]} w={0.22} h={0.5} lite />}
+          {level >= 9 && <RoseArch m={m} at={[-0.13, LAWN, zf + 0.3]} w={0.38} lite />}
         </group>
       )}
     </group>
@@ -660,21 +667,25 @@ function Sunflower({ m, at, h = 0.3 }: { m: Mat; at: V3; h?: number }) {
 
 type BungalowProps = {
   k: Kit; at?: V3; w: number; d: number; H: number; wall: string; roof: string; pitch: number; porchX: number; porchW: number
-  pd?: number; eave?: number; side?: number; fixed?: boolean; dormer?: boolean; chimney?: boolean; door?: string
+  pd?: number; eave?: number; side?: number; fixed?: boolean; dormer?: boolean; chimney?: boolean; door?: string; doorX?: number
 }
 
-// Window spots across a front `L` long: one beside the door under the porch,
-// then more either side of the porch, every 0.42.
-function frontWins(L: number, px: number, pw: number) {
-  const xs = [px + 0.15]
-  for (const sd of [-1, 1]) for (let x = px + sd * Math.max(pw / 2 + 0.17, sd < 0 ? 0.47 : 0.4); Math.abs(x) <= L / 2 - 0.16; x += sd * 0.42) xs.push(x)
+// The front door, along the porch from its middle.
+const BUNG_DOOR = -0.06
+
+// Window spots across a front `L` long: one beside the door under the porch
+// (when the door, `dx` along it, leaves room), then more either side of the porch, every 0.42.
+function frontWins(L: number, px: number, pw: number, dx: number) {
+  const beside = dx < -0.05
+  const xs = beside ? [px + dx + 0.32] : []
+  for (const sd of [-1, 1]) for (let x = px + sd * Math.max(pw / 2 + (beside ? 0.21 : 0.17), sd < 0 ? 0.47 : 0.4); Math.abs(x) <= L / 2 - 0.16; x += sd * 0.42) xs.push(x)
   return xs
 }
 
 // A low craftsman bungalow: deep eaves on knee braces, a front-gabled porch on
 // tapered columns, wide windows. Faces +z, standing on the lawn. `fixed` lays
 // the front windows out once (for a bungalow turned sideways in a court).
-function Bungalow({ k, at = [0, 0, 0], w, d, H, wall, roof, pitch, porchX, porchW, pd = 0.42, eave = 0.15, side = 0.09, fixed, dormer, chimney, door = '#6d4c41' }: BungalowProps) {
+function Bungalow({ k, at = [0, 0, 0], w, d, H, wall, roof, pitch, porchX, porchW, pd = 0.42, eave = 0.15, side = 0.09, fixed, dormer, chimney, door = '#6d4c41', doorX = BUNG_DOOR }: BungalowProps) {
   const { m, bulb } = k
   const y0 = LAWN + 0.01
   const top = y0 + H
@@ -682,9 +693,9 @@ function Bungalow({ k, at = [0, 0, 0], w, d, H, wall, roof, pitch, porchX, porch
   const ph = pitch * 0.75
   const ridgeBack = (d / 2) * (ph / pitch) + 0.04
   const pLen = pd - 0.04 + ridgeBack
-  const deck = 0.1
+  // A low deck, one easy step up from the lawn.
+  const deck = 0.066
   const trim = TRIM
-  const doorX = -0.14
   const wins = (xs: number[]) => xs.map((x) => <Win key={x} k={k} at={[x, H * 0.56, 0]} w={0.24} h={0.26} bars={false} />)
   return (
     <group position={at}>
@@ -705,7 +716,7 @@ function Bungalow({ k, at = [0, 0, 0], w, d, H, wall, roof, pitch, porchX, porch
       <group position={[porchX, 0, 0]}>
         <Box m={m} at={[0, LAWN + deck / 2, zf + pd / 2]} s={[porchW, deck, pd]} c="#a1665e" t={brickTex(2, 1)} />
         <Box m={m} at={[0, LAWN + deck + 0.006, zf + pd / 2]} s={[porchW + 0.02, 0.012, pd + 0.02]} c="#a1887f" t={paverTex(3, 1)} shadow={false} />
-        <Box m={m} at={[doorX, LAWN + 0.03, zf + pd + 0.06]} s={[0.3, 0.06, 0.1]} c={STONE} />
+        <Box m={m} at={[doorX, LAWN + 0.02, zf + pd + 0.06]} s={[0.3, 0.04, 0.1]} c={STONE} />
         {[-1, 1].map((sd) => <Column key={sd} m={m} at={[(sd * (porchW - 0.12)) / 2, LAWN + deck + 0.012, zf + pd - 0.07]} h={top - LAWN - deck - 0.012 - 0.03} />)}
         <Box m={m} at={[0, top - 0.03, zf + pd - 0.07]} s={[porchW, 0.06, 0.08]} c={trim} />
         {[-1, 1].map((sd) => <Box key={sd} m={m} at={[(sd * (porchW - 0.12)) / 2, top - 0.03, zf + (pd - 0.07) / 2]} s={[0.06, 0.05, pd - 0.07]} c={trim} shadow={false} />)}
@@ -720,9 +731,9 @@ function Bungalow({ k, at = [0, 0, 0], w, d, H, wall, roof, pitch, porchX, porch
         {!k.ghost && <Pool r={0.42} x={doorX} z={zf + pd + 0.3} />}
       </group>
       {fixed ? (
-        <group position={[0, y0, zf]}>{wins(frontWins(w, porchX, porchW))}</group>
+        <group position={[0, y0, zf]}>{wins(frontWins(w, porchX, porchW, doorX))}</group>
       ) : (
-        <Facade at={[0, y0, zf]} len={w}>{(L) => wins(frontWins(L, (porchX * L) / w, porchW))}</Facade>
+        <Facade at={[0, y0, zf]} len={w}>{(L) => wins(frontWins(L, (porchX * L) / w, porchW, doorX))}</Facade>
       )}
       {[-1, 1].map((sd) => <Win key={sd} k={k} at={[sd * (w / 2), y0 + H * 0.56, -d * 0.08]} ry={(sd * Math.PI) / 2} w={0.22} h={0.24} bars={false} />)}
       {[-0.25, 0.25].map((x) => (
@@ -802,7 +813,7 @@ function BungalowLot({ def, level, k }: { def: NewModelProps['def']; level: numb
   const zf = z0 + d / 2
   const pw = 0.8
   const px = -w / 2 + pw / 2 + 0.02
-  const walkX = x0 + px - 0.14
+  const walkX = x0 + px + BUNG_DOOR
   const portX = 0.66
   return (
     <group>
@@ -821,7 +832,7 @@ function BungalowLot({ def, level, k }: { def: NewModelProps['def']; level: numb
           <Mailbox m={m} at={[0.3, LAWN, 0.95]} c="#1565c0" />
           <Shrub m={m} at={[x0 + px - pw / 2 - 0.0, LAWN, zf + 0.5]} r={0.08} />
           <Shrub m={m} at={[x0 + px + pw / 2 + 0.1, LAWN, zf + 0.12]} r={0.1} />
-          <Tree m={m} at={[-0.68, LAWN, 0.68]} s={0.6} leaves={PAL.leaves} bare={BARE} />
+          <Tree m={m} at={[0.04, LAWN, 0.6]} s={0.6} leaves={PAL.leaves} bare={BARE} />
           {/* Path lights either side of the walk. */}
           {[-1, 1].map((sd) => (
             <group key={sd} position={[walkX + sd * 0.19, LAWN, 0.84]}>
@@ -830,9 +841,10 @@ function BungalowLot({ def, level, k }: { def: NewModelProps['def']; level: numb
               <Box m={m} at={[0, 0.215, 0]} s={[0.06, 0.02, 0.06]} c="#37474f" shadow={false} />
             </group>
           ))}
-          {level >= 2 && [0.04, 0.22].map((x, i) => <RockingChair key={x} m={m} at={[x0 + px + x, LAWN + 0.112, zf + 0.2]} rot={i ? -0.35 : 0.1} c="#fafafa" />)}
+          {/* Rocking chairs either side of the door. */}
+          {level >= 2 && [-0.3, 0.25].map((x, i) => <RockingChair key={x} m={m} at={[x0 + px + x, LAWN + 0.078, zf + 0.14]} rot={i ? -0.35 : 0} c="#fafafa" />)}
           {level >= 3 && [0, 0.08, 0.16, 0.24].map((x, i) => <Sunflower key={x} m={m} at={[x0 + px + pw / 2 + 0.06 + x, LAWN, zf + 0.12 + (i % 2) * 0.06]} h={0.26 + (i % 3) * 0.05} />)}
-          {big && <BirdBath m={m} at={[0.12, LAWN, 0.62]} />}
+          {big && <BirdBath m={m} at={[-0.8, LAWN, 0.35]} />}
           {level >= 6 && <Bulbs from={[x0 + px - pw / 2 + 0.02, LAWN + H - 0.04, zf + 0.4]} to={[x0 + px + pw / 2 - 0.02, LAWN + H - 0.04, zf + 0.4]} n={7} sag={0.04} />}
         </group>
       )}
@@ -841,7 +853,7 @@ function BungalowLot({ def, level, k }: { def: NewModelProps['def']; level: numb
 }
 
 // Bungalow Court: three little bungalows round a shared garden court, the
-// side ones facing in across it.
+// side ones facing in across it, the back one's door at the head of the walk.
 function BungalowCourt({ def, level, k }: { def: NewModelProps['def']; level: number; k: Kit }) {
   const { m, ghost } = k
   const H = 0.66 + 0.03 * (level - 7)
@@ -853,12 +865,12 @@ function BungalowCourt({ def, level, k }: { def: NewModelProps['def']; level: nu
       {/* Paved court walk up the middle, out to each side door. */}
       <Box m={m} at={[0, LAWN + 0.008, 0.25]} s={[0.26, 0.016, 1.4]} c="#d8d4cc" t={paverTex(1, 4)} shadow={false} />
       <Box m={m} at={[0, LAWN + 0.01, sz - 0.14]} s={[0.84, 0.02, 0.18]} c="#d8d4cc" t={paverTex(3, 1)} shadow={false} />
-      <Bungalow k={k} at={[0, 0, -0.68]} w={1.06} d={0.46} H={H} wall={walls[0]} roof={def.roof} pitch={0.24} porchX={0.14} porchW={0.46} pd={0.22} eave={0.07} side={0.05} fixed />
+      <Bungalow k={k} at={[0, 0, -0.68]} w={1.3} d={0.46} H={H} wall={walls[0]} roof={def.roof} pitch={0.24} porchX={0} porchW={0.6} pd={0.22} eave={0.07} side={0.05} fixed doorX={0} />
       {[-1, 1].map((sd) => (
         <group key={sd} position={[sd * 0.74, 0, sz]}>
           <Upright>
           <group rotation-y={(-sd * Math.PI) / 2}>
-          <Bungalow k={k} w={0.74} d={0.4} H={H - 0.04} wall={walls[sd < 0 ? 1 : 2]} roof={shade(def.roof, sd * 0.06)} pitch={0.22} porchX={0.14} porchW={0.42} pd={0.2} eave={0.06} side={0.05} fixed door={sd < 0 ? '#2e7d32' : '#c62828'} />
+          <Bungalow k={k} w={0.74} d={0.4} H={H - 0.04} wall={walls[sd < 0 ? 1 : 2]} roof={shade(def.roof, sd * 0.06)} pitch={0.22} porchX={0.14} porchW={0.42} pd={0.2} eave={0.06} side={0.05} fixed door={sd < 0 ? '#2e7d32' : '#c62828'} doorX={-0.14} />
           </group>
           </Upright>
         </group>
@@ -869,7 +881,7 @@ function BungalowCourt({ def, level, k }: { def: NewModelProps['def']; level: nu
           <Shrub m={m} at={[0.3, LAWN, 0.86]} r={0.09} />
           {[-0.62, 0.62].map((x) => [0.82].map((z) => <Sunflower key={`${x}${z}`} m={m} at={[x, LAWN, z]} h={0.3} />))}
           {level >= 8 && [-0.24, 0.24].map((x) => <Lantern key={x} k={k} at={[x, LAWN, 0.66]} h={0.5} />)}
-          {level >= 9 && <BirdBath m={m} at={[0, LAWN, 0.62]} />}
+          {level >= 9 && <BirdBath m={m} at={[0.8, LAWN, 0.9]} />}
           {level >= 10 && <Bulbs from={[-0.3, LAWN + 0.94, 0.92]} to={[0.3, LAWN + 0.94, 0.92]} n={6} sag={0.05} posts={0.94} />}
         </group>
       )}
@@ -1043,6 +1055,7 @@ function CabinLot({ def, level, k }: { def: NewModelProps['def']; level: number;
 
 function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number; k: Kit }) {
   const { m, ghost, bulb } = k
+  const doorTag = useDoorTag()
   const w = 1.0
   const d = 0.86
   const rows = 8
@@ -1054,6 +1067,7 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
   const zf = z0 + d / 2
   const pitch = 0.52
   const pd = 0.38
+  const deck = 0.076 // the porch deck, one easy step up
   return (
     <group>
       <Lawn m={m} />
@@ -1063,13 +1077,13 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
       <group position={[x0, top + LOG_STEP / 2, z0]} rotation-y={Math.PI / 2}>
         <Gable m={m} w={d} d={w} h={pitch} over={0.12} side={0.14} wall={shade(def.color, -0.05)} roof={def.roof} t={0.04} />
       </group>
-      {/* Plank door with strap hinges, a lantern beside it. */}
+      {/* Plank door with strap hinges, hung on the face of its frame, a lantern beside it. */}
       <group position={[x0, y0, zf]}>
-        <mesh position={[0, 0.28, 0.0]}><planeGeometry args={[0.26, 0.56]} />{m(DARK_WOOD)}</mesh>
-        {[0.12, 0.42].map((y) => <Box key={y} m={m} at={[-0.04, y, 0.006]} s={[0.16, 0.02, 0.008]} c="#37474f" shadow={false} />)}
+        <mesh position={[0, 0.28, 0.066]} userData={doorTag}><planeGeometry args={[0.26, 0.56]} />{m(DARK_WOOD)}</mesh>
+        {[0.12, 0.42].map((y) => <Box key={y} m={m} at={[-0.04, y, 0.07]} s={[0.16, 0.02, 0.008]} c="#37474f" shadow={false} />)}
         <Box m={m} at={[0, 0.575, 0.034]} s={[0.36, 0.05, 0.06]} c={WOOD} />
         {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 0.152, 0.28, 0.034]} s={[0.05, 0.56, 0.06]} c={WOOD} shadow={false} />)}
-        <Ball m={m} at={[0.09, 0.28, 0.012]} r={0.014} c="#37474f" />
+        <Ball m={m} at={[0.09, 0.28, 0.062]} r={0.012} c="#37474f" />
         <mesh position={[-0.21, 0.5, 0.07]}><boxGeometry args={[0.05, 0.07, 0.05]} />{bulb}</mesh>
         <Box m={m} at={[-0.21, 0.55, 0.07]} s={[0.07, 0.025, 0.07]} c="#263238" shadow={false} />
       </group>
@@ -1080,9 +1094,9 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
       <LogWin k={k} at={[x0, y0 + 0.38, z0 - d / 2 - 0.03]} ry={Math.PI} w={0.26} h={0.22} />
       {/* Porch: plank deck on log posts under a lean-to roof, log rails, steps. */}
       <group position={[x0, 0, zf]}>
-        <Box m={m} at={[0, LAWN + 0.05, pd / 2]} s={[w + 0.12, 0.1, pd]} c={WOOD} t={paverTex(4, 1)} />
+        <Box m={m} at={[0, LAWN + deck / 2, pd / 2]} s={[w + 0.12, deck, pd]} c={WOOD} t={paverTex(4, 1)} />
         {[-1, 1].map((sd) => (
-          <Cyl key={sd} m={m} at={[sd * (w / 2), LAWN + 0.1 + (top - 0.17 - LAWN - 0.1) / 2, pd - 0.05]} r={0.035} h={top - 0.17 - LAWN - 0.1} c={def.color} seg={7} />
+          <Cyl key={sd} m={m} at={[sd * (w / 2), LAWN + deck + (top - 0.17 - LAWN - deck) / 2, pd - 0.05]} r={0.035} h={top - 0.17 - LAWN - deck} c={def.color} seg={7} />
         ))}
         <Box m={m} at={[0, top - 0.08, pd / 2 + 0.02]} s={[w + 0.2, 0.035, pd + 0.12]} c={def.roof} rot={[0.26, 0, 0]} t={shingleTex(3, 1)} />
         <Cyl m={m} at={[0, top - 0.17, pd - 0.05]} r={0.03} h={w + 0.06} c={def.color} seg={7} rot={[0, 0, Math.PI / 2]} />
@@ -1093,9 +1107,9 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
             {m(shade(def.color, 0.05))}
           </mesh>
         ))}
-        <Box m={m} at={[0, LAWN + 0.03, pd + 0.06]} s={[0.3, 0.06, 0.12]} c={WOOD} />
-        {!ghost && <RockingChair m={m} at={[-0.3, LAWN + 0.1, 0.18]} rot={0.3} />}
-        {!ghost && <RockingChair m={m} at={[0.3, LAWN + 0.1, 0.18]} rot={-0.3} />}
+        <Box m={m} at={[0, LAWN + 0.02, pd + 0.06]} s={[0.3, 0.04, 0.12]} c={WOOD} />
+        {!ghost && <RockingChair m={m} at={[-0.3, LAWN + deck, 0.18]} rot={0.3} />}
+        {!ghost && <RockingChair m={m} at={[0.3, LAWN + deck, 0.18]} rot={-0.3} />}
         {!ghost && <Pool r={0.45} z={pd + 0.3} />}
       </group>
       {/* Stone chimney up the right side, past the eaves. */}
@@ -1114,7 +1128,7 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
           <Mailbox m={m} at={[0.36, LAWN, 0.94]} c="#2e7d32" />
           {level >= 2 && <Pine m={m} at={[0.78, LAWN, -0.8]} s={0.62} />}
           {level >= 2 && <Lantern k={k} at={[x0 + 0.24, LAWN, 0.84]} h={0.46} />}
-          {level >= 3 && <ParkedCar at={[-0.5, LAWN, 0.8]} body="truck" color="#c62828" rot={Math.PI / 2} s={0.46} />}
+          {level >= 3 && <ParkedCar at={[-0.64, LAWN, 0.8]} body="truck" color="#c62828" rot={Math.PI / 2} s={0.46} />}
         </group>
       )}
     </group>
@@ -1123,6 +1137,7 @@ function LogCabin({ def, level, k }: { def: NewModelProps['def']; level: number;
 
 function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: number; k: Kit }) {
   const { m, ghost, bulb } = k
+  const doubleTag = useDoorTag('double')
   const w = 1.16
   const d = 0.92
   const rows = 8 + (level - 4)
@@ -1135,6 +1150,7 @@ function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: numb
   const pitch = 0.78
   const doorX = -0.1
   const bal = 0.34
+  const deck = 0.076 // the porch deck under the balcony, one easy step up
   return (
     <group>
       <Lawn m={m} />
@@ -1146,7 +1162,8 @@ function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: numb
       {/* Front: double doors and windows, a balcony across on log brackets. */}
       <group position={[x0, y0, zf + LOG_R]}>
         <Box m={m} at={[doorX, 0.29, 0]} s={[0.36, 0.58, 0.03]} c={WOOD} />
-        {[-0.08, 0.08].map((x) => <mesh key={x} position={[doorX + x, 0.27, 0.017]}><planeGeometry args={[0.14, 0.52]} />{m(DARK_WOOD)}</mesh>)}
+        <mesh position={[doorX, 0.27, 0.017]} userData={doubleTag}><planeGeometry args={[0.3, 0.52]} />{m(DARK_WOOD)}</mesh>
+        <Box m={m} at={[doorX, 0.27, 0.019]} s={[0.012, 0.52, 0.004]} c={WOOD} shadow={false} />
         {[-0.08, 0.08].map((x) => <mesh key={`g${x}`} position={[doorX + x, 0.4, 0.019]}><planeGeometry args={[0.09, 0.18]} />{k.win}</mesh>)}
         <mesh position={[doorX + 0.26, 0.48, 0.03]}><boxGeometry args={[0.05, 0.07, 0.05]} />{bulb}</mesh>
       </group>
@@ -1156,9 +1173,9 @@ function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: numb
       )))}
       {/* Balcony over the porch, on log posts. */}
       <group position={[x0, 0, zf]}>
-        <Box m={m} at={[0, LAWN + 0.05, bal / 2 + 0.02]} s={[w + 0.12, 0.1, bal + 0.04]} c={WOOD} t={paverTex(4, 1)} />
+        <Box m={m} at={[0, LAWN + deck / 2, bal / 2 + 0.02]} s={[w + 0.12, deck, bal + 0.04]} c={WOOD} t={paverTex(4, 1)} />
         <Box m={m} at={[0, y0 + 0.62, bal / 2 + 0.02]} s={[w + 0.12, 0.05, bal + 0.04]} c={WOOD} t={paverTex(4, 1)} />
-        {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[sd * (w / 2 + 0.02), LAWN + 0.1 + (y0 + 0.595 - LAWN - 0.1) / 2, bal - 0.02]} r={0.035} h={y0 + 0.595 - LAWN - 0.1} c={def.color} seg={7} />)}
+        {[-1, 1].map((sd) => <Cyl key={sd} m={m} at={[sd * (w / 2 + 0.02), LAWN + deck + (y0 + 0.595 - LAWN - deck) / 2, bal - 0.02]} r={0.035} h={y0 + 0.595 - LAWN - deck} c={def.color} seg={7} />)}
         <Box m={m} at={[0, y0 + 0.645 + 0.15, bal + 0.02]} s={[w + 0.12, 0.03, 0.03]} c={DARK_WOOD} />
         {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * (w / 2 + 0.045), y0 + 0.645 + 0.15, bal / 2 + 0.02]} s={[0.03, 0.03, bal]} c={DARK_WOOD} shadow={false} />)}
         <Facade at={[0, y0 + 0.645, bal + 0.02]} len={w + 0.1}>
@@ -1166,9 +1183,9 @@ function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: numb
             <Box key={i} m={m} at={[-L / 2 + (i + 0.5) * (L / Math.round(L / 0.13)), 0.075, 0]} s={[0.02, 0.15, 0.02]} c={DARK_WOOD} shadow={false} />
           ))}
         </Facade>
-        <Box m={m} at={[doorX, LAWN + 0.03, bal + 0.1]} s={[0.36, 0.06, 0.12]} c={WOOD} />
-        {!ghost && <RockingChair m={m} at={[0.28, LAWN + 0.1, 0.16]} rot={-0.3} />}
-        {!ghost && <RockingChair m={m} at={[-0.42, LAWN + 0.1, 0.16]} rot={0.3} />}
+        <Box m={m} at={[doorX, LAWN + 0.02, bal + 0.1]} s={[0.36, 0.04, 0.12]} c={WOOD} />
+        {!ghost && <RockingChair m={m} at={[0.28, LAWN + deck, 0.16]} rot={-0.3} />}
+        {!ghost && <RockingChair m={m} at={[-0.42, LAWN + deck, 0.16]} rot={0.3} />}
         {!ghost && <Pool r={0.45} x={doorX} z={bal + 0.32} />}
       </group>
       {/* Stone chimney up the left side. */}
@@ -1184,11 +1201,11 @@ function TimberLodge({ def, level, k }: { def: NewModelProps['def']; level: numb
           <ParkedCar at={[0.68, LAWN + 0.016, 0.3]} body="suv" color="#33691e" s={0.5} />
           <WoodPile m={m} at={[0.64, LAWN, -0.62]} rot={Math.PI} />
           <Pine m={m} at={[-0.8, LAWN, 0.45]} s={0.62} />
-          <Pine m={m} at={[-0.62, LAWN, 0.8]} s={0.5} />
+          <Pine m={m} at={[-0.85, LAWN, 0.85]} s={0.5} />
           <Mailbox m={m} at={[0.36, LAWN, 0.94]} c="#2e7d32" />
           <Lantern k={k} at={[x0 + doorX + 0.26, LAWN, 0.8]} h={0.5} />
           {level >= 5 && <HotTub m={m} at={[0.25, LAWN, 0.72]} />}
-          {level >= 6 && <Canoe m={m} at={[-0.35, LAWN, 0.75]} rot={Math.PI / 2} />}
+          {level >= 6 && <Canoe m={m} at={[-0.52, LAWN, 0.55]} />}
           {level >= 6 && <Bulbs from={[x0 - w / 2 - 0.045, y0 + 0.8125 + 0.12, zf + bal + 0.02]} to={[x0 + w / 2 + 0.045, y0 + 0.8125 + 0.12, zf + bal + 0.02]} n={8} sag={0.05} posts={0.12} />}
         </group>
       )}
@@ -1229,12 +1246,14 @@ function Adirondack({ m, at, rot = 0, c }: { m: Mat; at: V3; rot?: number; c: st
 
 function MountainLodge({ def, level, k }: { def: NewModelProps['def']; level: number; k: Kit }) {
   const { m, ghost, bulb } = k
+  const doubleTag = useDoorTag('double')
   const w = 1.24
   const d = 0.96
   const x0 = -0.27
   const z0 = -0.4
   const zf = z0 + d / 2
   const base = 0.5 + 0.03 * (level - 7)
+  const PORCH = 0.64 // the portico's height
   const rows = 6
   const y1 = LAWN + base
   const H = rows * LOG_STEP
@@ -1256,7 +1275,8 @@ function MountainLodge({ def, level, k }: { def: NewModelProps['def']; level: nu
       {/* Ground floor: big doors and windows in the stone. */}
       <group position={[x0, LAWN, zf + 0.02]}>
         <Box m={m} at={[0, 0.31, 0.004]} s={[0.4, 0.62, 0.02]} c={WOOD} />
-        {[-0.09, 0.09].map((x) => <mesh key={x} position={[x, 0.29, 0.016]}><planeGeometry args={[0.16, 0.56]} />{m(DARK_WOOD)}</mesh>)}
+        <mesh position={[0, 0.29, 0.016]} userData={doubleTag}><planeGeometry args={[0.34, 0.56]} />{m(DARK_WOOD)}</mesh>
+        <Box m={m} at={[0, 0.29, 0.018]} s={[0.014, 0.56, 0.004]} c={WOOD} shadow={false} />
         {[-0.09, 0.09].map((x) => <mesh key={`g${x}`} position={[x, 0.42, 0.018]}><planeGeometry args={[0.1, 0.2]} />{k.win}</mesh>)}
         {[-0.4, 0.4].map((x) => (
           <group key={x} position={[x, 0.3, 0]}>
@@ -1273,19 +1293,19 @@ function MountainLodge({ def, level, k }: { def: NewModelProps['def']; level: nu
         </group>
       ))}
       {[-0.34, 0.34].map((x) => <LogWin key={x} k={k} at={[x0 + x, y1 + 0.28, zf + 0.03]} w={0.24} h={0.24} />)}
-      {/* Entrance portico: stone piers, log posts and a little glass gable. */}
+      {/* Entrance portico: stone piers, log posts and a little glass gable, its beam clear over people's heads. */}
       <group position={[x0, 0, zf]}>
         {[-1, 1].map((sd) => (
           <group key={sd} position={[sd * 0.25, 0, 0.36]}>
             <Box m={m} at={[0, LAWN + 0.11, 0]} s={[0.13, 0.22, 0.13]} c={STONE} t={brickTex(1, 1)} />
-            <Cyl m={m} at={[0, LAWN + 0.22 + (base - 0.18) / 2, 0]} r={0.04} h={base - 0.18} c={def.color} seg={7} />
+            <Cyl m={m} at={[0, LAWN + 0.22 + (PORCH - 0.18) / 2, 0]} r={0.04} h={PORCH - 0.18} c={def.color} seg={7} />
           </group>
         ))}
-        <Cyl m={m} at={[0, LAWN + base + 0.01, 0.36]} r={0.035} h={0.62} c={shade(def.color, 0.05)} seg={7} rot={[0, 0, Math.PI / 2]} />
-        <GlassGable k={k} at={[0, LAWN + base + 0.045, 0.18]} span={0.62} len={0.4} h={0.32} wall={shade(def.color, -0.05)} roof={def.roof} />
+        <Cyl m={m} at={[0, LAWN + PORCH + 0.01, 0.36]} r={0.035} h={0.62} c={shade(def.color, 0.05)} seg={7} rot={[0, 0, Math.PI / 2]} />
+        <GlassGable k={k} at={[0, LAWN + PORCH + 0.045, 0.18]} span={0.62} len={0.4} h={0.32} wall={shade(def.color, -0.05)} roof={def.roof} />
         <Box m={m} at={[0, LAWN + 0.03, 0.3]} s={[0.56, 0.06, 0.46]} c={STONE} t={paverTex(2, 1)} />
         {!ghost && <Pool r={0.5} z={0.62} />}
-        {!ghost && level >= 8 && <Bulbs from={[-w / 2, y1 + 0.02, 0.08]} to={[w / 2, y1 + 0.02, 0.08]} n={10} sag={0.05} />}
+        {!ghost && level >= 8 && <Bulbs from={[-w / 2, LAWN + PORCH + 0.06, 0.08]} to={[w / 2, LAWN + PORCH + 0.06, 0.08]} n={10} sag={0.05} />}
       </group>
       {/* Log wing on the right with its own roof. */}
       <LogWalls m={m} at={[wx, wy, z0 - 0.06]} w={ww} d={0.8} rows={wrows} color={def.color} ext={0.05} gable={0.36} />
@@ -1308,8 +1328,8 @@ function MountainLodge({ def, level, k }: { def: NewModelProps['def']; level: nu
           <Pine m={m} at={[-0.8, LAWN, 0.84]} s={0.6} />
           <Pine m={m} at={[0.8, LAWN, -0.8]} s={0.6} />
           <Lantern k={k} at={[0.0, LAWN, 0.86]} h={0.46} />
-          {level >= 9 && <FirePit m={m} k={k} at={[-0.66, LAWN, 0.6]} />}
-          {level >= 9 && [[-0.44, 0.72, -Math.PI / 2 - 0.5, '#c62828'], [-0.68, 0.84, Math.PI, '#1565c0']].map(([x, z, r, c]) => <Adirondack key={c as string} m={m} at={[x as number, LAWN, z as number]} rot={r as number} c={c as string} />)}
+          {level >= 9 && <FirePit m={m} k={k} at={[-0.84, LAWN, 0.48]} />}
+          {level >= 9 && [[-0.6, 0.6, -Math.PI / 2 - 0.5, '#c62828'], [-0.68, 0.84, Math.PI, '#1565c0']].map(([x, z, r, c]) => <Adirondack key={c as string} m={m} at={[x as number, LAWN, z as number]} rot={r as number} c={c as string} />)}
           {level >= 10 && <HotTub m={m} at={[0.25, LAWN, 0.78]} />}
           {level >= 10 && <Bulbs from={[wx - ww / 2 - 0.02, wy + wrows * LOG_STEP - 0.02, z0 + 0.38]} to={[wx + ww / 2 + 0.02, wy + wrows * LOG_STEP - 0.02, z0 + 0.38]} n={6} sag={0.05} />}
         </group>

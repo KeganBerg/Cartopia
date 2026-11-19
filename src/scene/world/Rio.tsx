@@ -1132,7 +1132,7 @@ export default function Rio({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`rio-d3:${len}`} cell={24}>
+      <Batch version={`rio-d3:${len}`} cell={24} freeze prune>
         {/* The lay-by's asphalt and its kerb, the beach's cycle lane, and the sand down to the surf. */}
         <mesh rotation-x={-Math.PI / 2} position={[EDGE + LANE / 2, 0.011, len / 2 + 5]}>
           <planeGeometry args={[LANE, len + 60]} />

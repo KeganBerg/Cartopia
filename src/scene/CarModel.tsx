@@ -6,7 +6,7 @@ import {
   InstancedMesh, Mesh, MeshBasicMaterial, MeshStandardMaterial, PlaneGeometry, Quaternion, Raycaster, Shape as ThreeShape, SphereGeometry, TorusGeometry, Vector3,
   type Group,
 } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { wheelTex } from './textures'
 import { glowMats } from './dayNight'
@@ -229,6 +229,10 @@ export function cabinPanes(s: Shape, base: number, b: number): Panes {
   }
 }
 // How far each wheel sits from the centre line.
+// A cabin that runs to the back leaves no trunk, so spoilers go on the roof (but never on a
+// round glass dome: they stand on the deck behind it).
+const spoilerOnRoof = (s: Shape) => !s.open && !s.round && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
+
 const wheelX = (s: Shape) => s.track ?? s.wid / 2 - 0.02 - (s.inset ?? 0)
 
 // Extrudes a side profile across the car's width with bevelled (rounded) edges.
@@ -264,7 +268,8 @@ export class Kit {
   parts = new Map<Part, BufferGeometry[]>()
   add(part: Part, geo: BufferGeometry, p: V3 = [0, 0, 0], r: V3 = [0, 0, 0], s: V3 = [1, 1, 1]) {
     const m = new Matrix4().compose(new Vector3(...p), new Quaternion().setFromEuler(new Euler(...r)), new Vector3(...s))
-    const g = (geo.index ? geo.toNonIndexed() : geo.clone()).applyMatrix4(m)
+    // Copied into a plain geometry: clone() builds a default shape of the same kind first.
+    const g = (geo.index ? geo.toNonIndexed() : new BufferGeometry().copy(geo)).applyMatrix4(m)
     geo.dispose()
     for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal' && n !== 'uv') g.deleteAttribute(n)
     g.clearGroups()
@@ -283,9 +288,9 @@ export class Kit {
 }
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 // One bevel segment: for small parts seen through glass.
-const rbox1 = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 1, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox1 = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 1, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 const cyl = (rt: number, rb: number, h: number, seg = 10) => new CylinderGeometry(rt, rb, h, seg)
@@ -348,8 +353,7 @@ export function carFrame(body: Body, model?: string): ModFrame {
   const b = s.round ? Math.min(0.1, s.body * 0.4) : 0.035
   const p = bodyProfile(s, b)
   const cowl = Math.min(s.cabinZ + s.cabinLen / 2, s.len / 2 - s.len * 0.2)
-  // A cabin that runs to the back leaves no trunk, so spoilers go on the roof.
-  const roofMount = !s.open && s.cabinZ - s.cabinLen / 2 < -s.len / 2 + 0.16
+  const roofMount = spoilerOnRoof(s)
   const c = cabinProfile(s, p.deck - 0.01, 0.025)
   return {
     body, len: s.len, wid: s.wid, lift: s.lift, wheel: s.wheel, wz: s.len * 0.33, wx: wheelX(s),
@@ -589,8 +593,9 @@ export function brakes(k: Kit, wx: number | ((z: number) => number), wz: number,
 
 // Stock parts that a fitted mod replaces are left out of the merged body.
 function carGeo(body: Body, fit: Partial<Record<ModSlot, string>>, model?: string): CarGeo {
-  // A roof rack or roof light bar mod takes the place of the model's own roof gear.
-  const roofMod = fit.spoiler === 'roofrack' || fit.lights === 'roofbar'
+  // A roof rack or roof light bar mod takes the place of the model's own roof gear, and so does
+  // a spoiler standing on the roof (a wing through the surfboard and rack reads as a glitch).
+  const roofMod = fit.spoiler === 'roofrack' || fit.lights === 'roofbar' || (!!fit.spoiler && body !== 'formula' && spoilerOnRoof(shapeOf(body, model)))
   const key = `${body}|${model ?? ''}|${fit.spoiler ? 1 : 0}${fit.hood ? 1 : 0}${fit.exhaust ? 1 : 0}${fit.kit === 'reactive' ? 2 : fit.kit ? 1 : 0}${roofMod ? 1 : 0}`
   const hit = geoCache.get(key)
   if (hit) return hit

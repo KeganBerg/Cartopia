@@ -1,6 +1,6 @@
 import { BoxGeometry, BufferGeometry, CylinderGeometry, Float32BufferAttribute, Color, Matrix4, Quaternion, Vector3, Euler } from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 
 // Tank tracks for tracked bodies (the Tomahawk): a loop of steel links that runs round a
 // toothed drive sprocket at the back and an idler at the front, over a row of double road
@@ -44,15 +44,15 @@ export function linkGeo(pads: Pads) {
   const w = TRACK_W
   const top = PLATE / 2
   // The plate, with a slight bevel, and the hinge knuckles at each end with their pins.
-  put(L, 'plate', new RoundedBoxGeometry(w, PLATE, d, 1, 0.003), [0, 0, 0])
+  put(L, 'plate', roundedBox(w, PLATE, d, 1, 0.003), [0, 0, 0])
   for (const sd of [-1, 1]) put(L, 'pin', new CylinderGeometry(0.0055, 0.0055, w + 0.012, 6), [0, -0.001, sd * d * 0.5], [0, 0, Math.PI / 2])
   // End connectors on the pins, both sides.
   for (const sx of [-1, 1]) put(L, 'pin', new BoxGeometry(0.008, 0.014, d * 0.55), [sx * (w / 2 + 0.006), -0.001, 0])
   // Guide horn on the inside, between the road wheel pairs.
-  put(L, 'horn', new RoundedBoxGeometry(0.018, 0.024, d * 0.6, 1, 0.004), [0, -top - 0.011, 0])
+  put(L, 'horn', roundedBox(0.018, 0.024, d * 0.6, 1, 0.004), [0, -top - 0.011, 0])
   // The tread outside.
   if (pads === 'rubber' || pads === 'allweather') {
-    for (const sx of [-1, 1]) put(L, 'pad', new RoundedBoxGeometry(w * 0.4, 0.012, d * 0.82, 1, 0.003), [sx * w * 0.24, top + 0.005, 0])
+    for (const sx of [-1, 1]) put(L, 'pad', roundedBox(w * 0.4, 0.012, d * 0.82, 1, 0.003), [sx * w * 0.24, top + 0.005, 0])
     if (pads === 'allweather') for (const sx of [-1, 1]) put(L, 'stud', new CylinderGeometry(0.004, 0.005, 0.006, 6), [sx * w * 0.24, top + 0.013, 0])
   } else {
     const gh = pads === 'paddle' ? 0.02 : 0.009

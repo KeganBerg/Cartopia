@@ -1,15 +1,16 @@
 import type { ReactNode } from 'react'
-import { Color, ExtrudeGeometry, PlaneGeometry, Shape } from 'three'
+import { Color, PlaneGeometry } from 'three'
 import type { Body } from '../game/data'
 import { growthStage } from '../game/growth'
-import { Box, Cyl, Sign, Pool, Bulbs, GOLD, SNOW, type Mat, type NewModelProps, type V3 } from './NewBuildings'
-import { Tree, Bench, Ball } from './edgeKit'
+import { Box, Cyl, Sign, Bulbs, GOLD, SNOW, type Mat, type NewModelProps, type V3 } from './NewBuildings'
+import { Tree, Bench, Ball, Pool } from './edgeKit'
 import { CarModel } from './CarModel'
 import { MergeScale, Upright, useBays } from './mergeScale'
 import { PEOPLE_SIZED } from './keepShape'
 import { ROOFTOP } from './GrowthKit'
 import { Glass } from './OfficeBuildings'
 import { PAL } from './season'
+import { useDoorTag } from './HomeBlock'
 import { awningTex, brickTex, concreteTex, grassTex, gravelTex, paverTex, shingleTex, sidingTex, asphaltTex, waterTex } from './textures'
 
 // City homes: the Brick Townhouse, the Modern Duplex and the Lakeview Condos
@@ -268,14 +269,14 @@ function PostLamp({ m, bulb, at, ghost, h = 0.5 }: { m: Mat; bulb: ReactNode; at
       <Cyl m={m} at={[0, h / 2, 0]} r={0.018} r2={0.026} h={h} c={IRON} seg={6} />
       <mesh position={[0, h + 0.04, 0]}><boxGeometry args={[0.07, 0.08, 0.07]} />{bulb}</mesh>
       <mesh position={[0, h + 0.1, 0]} castShadow><coneGeometry args={[0.065, 0.05, 4]} />{m(IRON)}</mesh>
-      {!ghost && <Pool r={0.4} />}
+      {!ghost && <Pool r={0.4} y={0.06} />}
     </group>
   )
 }
 
 // ---------- the Brick Townhouse ----------
 
-const B = 0.36 // the garden level's stone base, the stoop's height
+const B = 0.36 // the garden level's stone base
 const FH = 0.55 // a storey
 const MH = 0.46 // a mansard's height
 
@@ -297,56 +298,40 @@ function Sash({ k, x, y, z, w = 0.22, h = 0.34, flowers, c = STONE, sill = true 
   )
 }
 
-// A stoop in one piece: the landing at door height and three steps down,
-// drawn from the wall (z = 0) out along +z, 0.36 wide about x = 0.
-let stoopGeo: ExtrudeGeometry | undefined
-function stoop() {
-  if (stoopGeo) return stoopGeo
-  const p = [[0, 0], [0.55, 0], [0.55, 0.25], [0.44, 0.25], [0.44, 0.5], [0.33, 0.5], [0.33, 0.75], [0.22, 0.75], [0.22, 1], [0, 1]]
-  const sh = new Shape()
-  p.forEach(([u, v], i) => (i ? sh.lineTo(u, v * B) : sh.moveTo(u, v * B)))
-  stoopGeo = new ExtrudeGeometry(sh, { depth: 0.36, bevelEnabled: false })
-  stoopGeo.rotateY(-Math.PI / 2)
-  stoopGeo.translate(0.18, 0, 0)
-  return stoopGeo
-}
-
-// The way in: a panelled door in a stone surround under a hood (on the grand
-// houses a little iron balcony instead), a transom over it, and the stoop up
-// to it with iron railings and a lamp, or a lantern, on each newel post.
+// The way in, at street level on a stone doorstep: a tall panelled door in a
+// stone surround up into the parlour floor, a transom over it, a hood (on the
+// grand houses a little iron balcony instead), and an iron post each side of
+// the step with a lamp, or a lantern, on top.
+const E = 0.04 // the doorstep's height
 function Entry({ k, dx, zf, door, lamps = true, panels, stone = STONE, balcony, lantern }: {
   k: K; dx: number; zf: number; door: string; lamps?: boolean; panels?: boolean; stone?: string; balcony?: boolean; lantern?: boolean
 }) {
   const { m, win, bulb, ghost } = k
+  const tag = useDoorTag()
+  const top = E + 0.76 // the hood or balcony floor
   return (
     <group>
-      <Box m={m} at={[dx, B + 0.31, zf + 0.015]} s={[0.34, 0.62, 0.03]} c={stone} />
-      <mesh position={[dx, B + 0.25, zf + 0.034]}><planeGeometry args={[0.24, 0.5]} />{m(door)}</mesh>
-      <mesh position={[dx, B + 0.55, zf + 0.034]}><planeGeometry args={[0.24, 0.07]} />{win}</mesh>
-      {panels && [0.13, 0.37].map((yy) => <Box key={yy} m={m} at={[dx, B + yy, zf + 0.04]} s={[0.16, 0.16, 0.012]} c={shade(door, 0.8)} shadow={false} />)}
+      <Box m={m} at={[dx, (top - 0.02) / 2, zf + 0.015]} s={[0.34, top - 0.02, 0.03]} c={stone} />
+      <mesh position={[dx, E + 0.31, zf + 0.034]} userData={tag}><planeGeometry args={[0.24, 0.62]} />{m(door)}</mesh>
+      <mesh position={[dx, E + 0.665, zf + 0.034]}><planeGeometry args={[0.24, 0.07]} />{win}</mesh>
+      {panels && [0.16, 0.45].map((yy) => <Box key={yy} m={m} at={[dx, E + yy, zf + 0.038]} s={[0.16, 0.2, 0.008]} c={shade(door, 0.8)} shadow={false} />)}
       {balcony ? (
         <group>
-          <Box m={m} at={[dx, B + 0.64, zf + 0.08]} s={[0.42, 0.04, 0.16]} c={stone} />
-          <group position-y={B + 0.66}>
+          <Box m={m} at={[dx, top, zf + 0.08]} s={[0.42, 0.04, 0.16]} c={stone} />
+          <group position-y={top + 0.02}>
             <Railing m={m} a={[dx - 0.19, zf + 0.14]} b={[dx + 0.19, zf + 0.14]} h={0.2} gap={0.2} />
           </group>
         </group>
       ) : (
-        <Box m={m} at={[dx, B + 0.64, zf + 0.06]} s={[0.42, 0.04, 0.12]} c={stone} />
+        <Box m={m} at={[dx, top, zf + 0.06]} s={[0.42, 0.04, 0.12]} c={stone} />
       )}
-      {!balcony && <Box m={m} at={[dx, B + 0.64, zf + 0.123]} s={[0.1, 0.025, 0.006]} c={GOLD} shadow={false} />}
-      <mesh position={[dx, 0, zf]} geometry={stoop()} castShadow receiveShadow>{m(stone)}</mesh>
+      {!balcony && <Box m={m} at={[dx, top, zf + 0.123]} s={[0.1, 0.025, 0.006]} c={GOLD} shadow={false} />}
+      <Box m={m} at={[dx, E / 2, zf + 0.08]} s={[0.4, E, 0.16]} c={stone} />
       {[-1, 1].map((sd) => {
-        const rx = dx + sd * 0.15
-        const z1 = zf + 0.2
-        const z2 = zf + 0.525
-        const y1 = B + 0.3
-        const y2 = 0.36
-        const L = Math.hypot(z2 - z1, y1 - y2)
+        const rx = dx + sd * 0.25
+        const z2 = zf + 0.2
         return (
           <group key={sd}>
-            <Box m={m} at={[rx, y1, zf + 0.1]} s={[0.022, 0.022, 0.2]} c={IRON} shadow={false} />
-            <Box m={m} at={[rx, (y1 + y2) / 2, (z1 + z2) / 2]} s={[0.022, 0.022, L]} rot={[Math.atan2(y1 - y2, z2 - z1), 0, 0]} c={IRON} shadow={false} />
             <Box m={m} at={[rx, 0.18, z2]} s={[0.04, 0.36, 0.04]} c={IRON} />
             {lamps && !lantern && <mesh position={[rx, 0.41, z2]}><sphereGeometry args={[0.045, 10, 8]} />{bulb}</mesh>}
             {lantern && (
@@ -368,9 +353,9 @@ type Row = {
   bay?: boolean; boxes?: boolean; mansard?: boolean; sides?: number[]; over?: number; chimney?: number; lamps?: boolean
 }
 
-// One brick rowhouse on a stone garden level: stoop and railings up to a
-// panelled door, a two-storey bay window, a cornice on brackets, and from
-// level 3 a slate mansard with dormers.
+// One brick rowhouse on a stone garden level: a panelled door at street level,
+// a two-storey bay window, a cornice on brackets, and from level 3 a slate
+// mansard with dormers.
 function Rowhouse({ k, x, w, zb, d, floors, wall, roof, door, bay, boxes, mansard, sides = [], over = 0, chimney = 1, lamps = true }: Row) {
   const { m, win } = k
   const zf = zb + d
@@ -488,12 +473,12 @@ function Townhouse({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: numb
   return (
     <group>
       <Rowhouse k={k} x={x} w={w} zb={zb} d={d} floors={3} wall={def.color} roof={def.roof} door="#1b5e20" bay boxes={lvl >= 2} mansard={lvl >= 3} sides={[1]} over={0.03} chimney={-1} />
-      {/* Front garden behind iron railings, stone gate piers by the stoop. */}
+      {/* Front garden behind iron railings, stone gate piers by the path. */}
       <Lawn m={m} x={-0.08} z={(zf + 0.91) / 2} w={0.76} d={0.91 - zf} />
       <Pave m={m} x={door} z={0.875} w={0.36} d={0.15} h={0.035} c={STONE} tex="concrete" />
       <GardenFence m={m} a={door + 0.24} b={0.28} z={0.94} />
       <Railing m={m} a={[0.3, zf + 0.22]} b={[0.3, 0.92]} h={0.26} gap={0.09} />
-      {[door - 0.2, door + 0.2].map((px) => (
+      {[door - 0.21, door + 0.21].map((px) => (
         <group key={px} position={[px, 0, 0.94]}>
           <Box m={m} at={[0, 0.17, 0]} s={[0.08, 0.34, 0.08]} c={STONE} />
           <Box m={m} at={[0, 0.355, 0]} s={[0.1, 0.03, 0.1]} c={STONE} />
@@ -533,9 +518,9 @@ function RowHouses({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: numb
   )
 }
 
-// The terrace's front gardens: a lawn behind iron railings beside each stoop,
+// The terrace's front gardens: a lawn behind iron railings beside each door,
 // trees from level 5 (clipped bays in stone urns from 7), and at level 6-8 a
-// lamp by the first gate (then lanterns on the stoops take over).
+// lamp by the first gate (then lanterns by the doors take over).
 function Gardens({ k, lvl }: { k: K; lvl: number }) {
   const { m, bulb, ghost } = k
   const zf = TZB + TD
@@ -551,14 +536,14 @@ function Gardens({ k, lvl }: { k: K; lvl: number }) {
           </group>
         )
       })}
-      {lvl >= 5 && lvl < 7 && [-TW, TW].map((x) => <HomeTree key={x} m={m} at={[x + 0.21, 0.05, 0.72]} s={0.42} />)}
+      {lvl >= 5 && lvl < 7 && [-TW, TW].map((x) => <HomeTree key={x} m={m} at={[x + 0.21, 0.05, 0.72]} s={0.36} />)}
       {lvl >= 7 && TXS.map((x) => (
         <group key={x} position={[x + 0.21, 0.05, 0.72]}>
           <Cyl m={m} at={[0, 0.06, 0]} r={0.07} r2={0.05} h={0.12} c={STONE} seg={8} />
           <mesh position={[0, 0.27, 0]} castShadow><coneGeometry args={[0.09, 0.32, 7]} />{m(PAL.bush[0])}</mesh>
         </group>
       ))}
-      {lvl >= 6 && lvl < 9 && <PostLamp m={m} bulb={bulb} ghost={ghost} at={[-0.95 + 0.04, 0, 0.94]} h={0.5} />}
+      {lvl >= 6 && lvl < 9 && <PostLamp m={m} bulb={bulb} ghost={ghost} at={[-0.95, 0, 0.94]} h={0.5} />}
     </group>
   )
 }
@@ -577,7 +562,7 @@ function mix(a: string, b: string, t: number) {
 // One house of the Brownstone Terrace: four storeys, the garden and parlour
 // floors in brownstone and brick above, with brownstone lintels and sills.
 // A dormer in the mansard above. g counts the steps past level 6: an oriel
-// and a balcony over the door (2), a roof garden and stoop lanterns (3),
+// and a balcony over the door (2), a roof garden and door lanterns (3),
 // copper caps (4).
 function Brownstone({ k, x, wall, stone, dressed, roof, door, g, chimney, side }: {
   k: K; x: number; wall: string; stone: string; dressed: string; roof: string; door: string; g: number; chimney: number; side?: boolean
@@ -714,6 +699,7 @@ const U = 0.6 // an upper floor
 // of a dark party fin, the lots' driveways, paths and lawns.
 function DuplexGround({ k, def, cars, zf = 0.27 }: { k: K; def: NewModelProps['def']; cars: number; zf?: number }) {
   const { m, win, bulb, ghost } = k
+  const tag = useDoorTag()
   const tints = ['#e53935', '#1e88e5']
   const bodies: Body[] = ['compact', 'compact']
   return (
@@ -723,21 +709,20 @@ function DuplexGround({ k, def, cars, zf = 0.27 }: { k: K; def: NewModelProps['d
           <Box m={m} at={[s * 0.66, 0.25, zf + 0.01]} s={[0.5, 0.5, 0.02]} c={def.roof} shadow={false} />
           <mesh position={[s * 0.66, 0.225, zf + 0.024]}><planeGeometry args={[0.44, 0.45]} />{m(WOOD, sidingTex(1, 3))}</mesh>
           <Box m={m} at={[s * 0.255, 0.31, zf + 0.01]} s={[0.3, 0.62, 0.02]} c={def.roof} shadow={false} />
-          <mesh position={[s * 0.2, 0.28, zf + 0.024]}><planeGeometry args={[0.17, 0.56]} />{m(shade(WOOD, 0.7))}</mesh>
-          <mesh position={[s * 0.355, 0.28, zf + 0.024]}><planeGeometry args={[0.07, 0.56]} />{win}</mesh>
+          <mesh position={[s * 0.31, 0.28, zf + 0.024]} userData={tag}><planeGeometry args={[0.17, 0.56]} />{m(shade(WOOD, 0.7))}</mesh>
+          <mesh position={[s * 0.155, 0.28, zf + 0.024]}><planeGeometry args={[0.07, 0.56]} />{win}</mesh>
           <Box m={m} at={[s * 0.255, 0.02, zf + 0.08]} s={[0.32, 0.04, 0.16]} c="#bdbdbd" />
-          <Box m={m} at={[s * 0.16, 0.37, zf + 0.025]} s={[0.012, 0.12, 0.01]} c={STEEL} shadow={false} />
-          {/* Driveway, path to the door across the lawn, a bollard light. */}
+          <Box m={m} at={[s * 0.25, 0.37, zf + 0.025]} s={[0.012, 0.12, 0.01]} c={STEEL} shadow={false} />
+          {/* Driveway, path to the door across the lawn, a bollard light by the door. */}
           <Pave m={m} x={s * 0.66} z={(zf + 0.98) / 2} w={0.52} d={0.98 - zf} />
           <Lawn m={m} x={s * 0.22} z={(zf + 0.16 + 0.98) / 2} w={0.34} d={0.98 - zf - 0.16} />
-          {[0.25, 0.42, 0.59].map((t) => <Box key={t} m={m} at={[s * 0.24, 0.055, zf + t]} s={[0.2, 0.012, 0.12]} c="#cfd8dc" shadow={false} />)}
-          <group position={[s * 0.38, 0.05, zf + 0.5]}>
+          {[0.25, 0.42, 0.59].map((t) => <Box key={t} m={m} at={[s * 0.3, 0.055, zf + t]} s={[0.18, 0.012, 0.12]} c="#cfd8dc" shadow={false} />)}
+          <group position={[s * 0.13, 0.05, zf + 0.12]}>
             <Cyl m={m} at={[0, 0.08, 0]} r={0.025} h={0.16} c={def.roof} seg={8} />
             <mesh position={[0, 0.175, 0]}><cylinderGeometry args={[0.028, 0.028, 0.03, 8]} />{bulb}</mesh>
           </group>
-          {!ghost && <Mailbox m={m} at={[s * 0.09, 0.05, 0.9]} c={def.roof} />}
-          {!ghost && i < cars && <Car at={[s * 0.66, 0.03, zf + 0.34]} rot={Math.PI} body={bodies[i]} color={tints[i]} s={0.64} />}
-          {!ghost && <Pool r={0.35} x={s * 0.2} z={zf + 0.25} />}
+          {!ghost && i < cars && <Car at={[s * 0.7, 0.03, zf + 0.34]} rot={Math.PI} body={bodies[i]} color={tints[i]} s={0.64} />}
+          {!ghost && <Pool r={0.35} x={s * 0.31} z={zf + 0.25} />}
         </group>
       ))}
     </group>
@@ -795,7 +780,7 @@ function Duplex({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: number 
       <Box m={m} at={[0, (top + 0.12) / 2, (zb + 0.01 + 0.69) / 2]} s={[0.08, top + 0.12, 0.68 - zb]} c={def.roof} />
       {[-1, 1].map((s) => <Box key={s} m={m} at={[s * 0.043, 0.5, 0.55]} s={[0.006, 0.07, 0.12]} c={GOLD} shadow={false} />)}
       {/* Downlights in the soffit over each door. */}
-      {[-1, 1].map((s) => <mesh key={s} position={[s * 0.22, G - 0.008, 0.37]}><boxGeometry args={[0.06, 0.016, 0.06]} />{bulb}</mesh>)}
+      {[-1, 1].map((s) => <mesh key={s} position={[s * 0.31, G - 0.008, 0.37]}><boxGeometry args={[0.06, 0.016, 0.06]} />{bulb}</mesh>)}
       <DuplexGround k={k} def={def} cars={cars} />
       <DuplexFloor k={k} def={def} y={G} zf={zf} />
       {four && <DuplexFloor k={k} def={def} y={G + U} zf={zf} timberIn balcony />}
@@ -829,9 +814,11 @@ function Duplex({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: number 
           </group>
         )}
       </group>
-      {!four && lvl >= 2 && !ghost && [-1, 1].map((s) => <GrassPot key={s} m={m} at={[s * 0.095, 0.05, 0.6]} s={0.09} />)}
+      {/* Down the strip between the two front paths: mailboxes, pots and shrubs, or a tree once it's grown. */}
+      {!ghost && [-1, 1].map((s) => <Mailbox key={s} m={m} at={[s * 0.093, 0.05, four ? 0.6 : 0.9]} c={def.roof} />)}
+      {!four && lvl >= 2 && !ghost && [-1, 1].map((s) => <group key={s} position={[s * 0.088, 0.05, 0.6]} rotation-y={Math.PI / 2}><GrassPot m={m} at={[0, 0, 0]} s={0.09} /></group>)}
       {!four && lvl >= 3 && [-1, 1].map((s) => <Shrub key={s} at={[s * 0.095, 0.05, 0.74]} r={0.06} c={PAL.bush[1]} />)}
-      {four && [-1, 1].map((s) => <HomeTree key={s} m={m} at={[s * 0.095, 0.05, 0.62]} s={0.28} />)}
+      {four && <HomeTree m={m} at={[0, 0.05, 0.85]} s={0.28} />}
     </group>
   )
 }
@@ -847,9 +834,11 @@ const CUBES: Cube[] = [
   { x: -0.22, z: -0.56, w: 0.66, d: 0.56, t: 3, f: 'white', from: 10 },
 ]
 const TH = 0.6
+const LOBBY = -0.58 // the lobby door, left of the first cube's mullion
 
 function Lofts({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: number }) {
   const { m, win, bulb, ghost } = k
+  const tag = useDoorTag()
   const cubes = CUBES.filter((c) => c.from <= lvl)
   const finish = (f: Cube['f']): [string, ReturnType<typeof sidingTex> | undefined] =>
     f === 'wood' ? [WOOD, sidingTex(2, 3)] : f === 'dark' ? [def.roof, undefined] : [def.color, undefined]
@@ -892,20 +881,26 @@ function Lofts({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: number }
         )
       })}
       {lvl >= 10 && <Pergola m={m} at={[-0.22, 4 * TH + 0.05, -0.56]} w={0.5} d={0.4} h={0.4} lights c={def.roof} />}
+      {/* The lobby door: timber in a dark surround, set into the first cube's glazing. */}
+      <group position={[LOBBY, 0, CUBES[0].z + CUBES[0].d / 2]}>
+        <Box m={m} at={[0, 0.34, 0.044]} s={[0.36, 0.6, 0.02]} c={DARK} shadow={false} />
+        <mesh position={[0, 0.06 + 0.27, 0.056]} userData={tag}><planeGeometry args={[0.28, 0.54]} />{m(WOOD, sidingTex(1, 3))}</mesh>
+        <Box m={m} at={[0.1, 0.33, 0.06]} s={[0.014, 0.2, 0.006]} c={STEEL} shadow={false} />
+      </group>
       {/* The lot: a lobby path, lawn and grasses, a car out front, bollard lights. */}
       <Lawn m={m} x={-0.46} z={0.73} w={0.9} d={0.5} />
-      <Pave m={m} x={-0.46} z={0.74} w={0.24} d={0.5} h={0.06} c="#cfd8dc" tex="concrete" />
+      <Pave m={m} x={LOBBY} z={0.74} w={0.24} d={0.5} h={0.06} c="#cfd8dc" tex="concrete" />
       <Pave m={m} x={0.47} z={0.6} w={0.88} d={0.8} />
       {!ghost && <Car at={[0.47, 0.03, 0.58]} rot={Math.PI} body="ev" color="#26a69a" s={0.7} />}
-      {!ghost && [-0.8, -0.12].map((x) => <GrassPot key={x} m={m} at={[x, 0.05, 0.6]} />)}
-      {[-0.66, -0.26].map((x) => (
+      {!ghost && [-0.88, -0.12].map((x) => <GrassPot key={x} m={m} at={[x, 0.05, 0.6]} />)}
+      {[-0.79, -0.4].map((x) => (
         <group key={x} position={[x, 0.05, 0.92]}>
           <Cyl m={m} at={[0, 0.08, 0]} r={0.025} h={0.16} c={def.roof} seg={8} />
           <mesh position={[0, 0.175, 0]}><cylinderGeometry args={[0.028, 0.028, 0.03, 8]} />{bulb}</mesh>
         </group>
       ))}
-      {!ghost && <Pool r={0.45} x={-0.46} z={0.7} />}
-      {lvl >= 8 && <HomeTree m={m} at={[-0.82, 0.05, 0.85]} s={0.35} />}
+      {!ghost && <Pool r={0.45} x={LOBBY} z={0.7} />}
+      {lvl >= 8 && <HomeTree m={m} at={[-0.18, 0.05, 0.84]} s={0.35} />}
     </group>
   )
 }
@@ -953,7 +948,7 @@ function CondoGarden({ k, def, zf, lvl, px = 0, ramp = true }: { k: K; def: NewM
       {[-1.6, -0.55, 0.35].map((x) => <Shrub key={x} at={[x, 0.05, zf + 0.1]} r={0.1} />)}
       {lvl >= 2 && !ghost && [-1.45, -0.7, 0.5].map((x, i) => <Ball key={x} m={m} at={[x, 0.1, zf + 0.12]} r={0.05} c={FLOWERS[i]} flat />)}
       {/* The name on a low stone wall by the path. */}
-      <group position={[0.42, 0.05, z1 - 0.12]}>
+      <group position={[0.46, 0.05, z1 - 0.12]}>
         <Box m={m} at={[0, 0.09, 0]} s={[0.56, 0.18, 0.08]} c={STONE} />
         <Box m={m} at={[0, 0.19, 0]} s={[0.6, 0.02, 0.1]} c={def.roof} />
         <Sign text="LAKEVIEW" w={0.48} at={[0, 0.09, 0.042]} bg={def.roof} fg="#ffffff" />
@@ -977,6 +972,27 @@ function CondoGarden({ k, def, zf, lvl, px = 0, ramp = true }: { k: K; def: NewM
 }
 
 const CP = 0.3 // the car park level, half under ground
+
+// The street-level lobby in front of the car park level: a dark box glazed
+// to the front, automatic glass doors in the middle on a stone apron, a flat
+// canopy over it with downlights.
+function Lobby({ k, x, w, roof }: { k: K; x: number; w: number; roof: string }) {
+  const { m, win, bulb } = k
+  const tag = useDoorTag('slide')
+  const zf = 0
+  const side = (w - 0.06 - 0.36) / 2 // each glazed side panel
+  return (
+    <group position-x={x}>
+      <Box m={m} at={[0, 0.33, zf + 0.12]} s={[w, 0.66, 0.24]} c={DARK} />
+      {[-1, 1].map((sd) => <mesh key={sd} position={[sd * (0.18 + side / 2), 0.34, zf + 0.246]}><planeGeometry args={[side, 0.52]} />{win}</mesh>)}
+      <mesh position={[0, 0.34, zf + 0.246]} userData={tag}><planeGeometry args={[0.36, 0.52]} />{win}</mesh>
+      {[-0.18, 0.18].map((dx) => <Box key={dx} m={m} at={[dx, 0.34, zf + 0.252]} s={[0.02, 0.52, 0.012]} c={TRIM} shadow={false} />)}
+      <Box m={m} at={[0, 0.04, zf + 0.34]} s={[w + 0.04, 0.08, 0.2]} c={STONE} />
+      <Box m={m} at={[0, 0.72, zf + 0.25]} s={[w + 0.24, 0.05, 0.5]} c={roof} />
+      {[-0.2, 0.2].map((dx) => <mesh key={dx} position={[dx, 0.687, zf + 0.42]}><boxGeometry args={[0.06, 0.016, 0.06]} />{bulb}</mesh>)}
+    </group>
+  )
+}
 
 // Level 1-3 (three storeys) and 4-6 (five and six): a long block of flats with
 // balconies on every floor, the glass lobby in the middle.
@@ -1053,14 +1069,8 @@ function CondoBlock({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl: num
           )))}
         </group>
       )}
-      {/* The lobby: a glass box under a flat canopy. */}
-      <Box m={m} at={[0, (CP + 0.01) / 2, zf + 0.12]} s={[0.8, CP + 0.01, 0.24]} c={STONE} />
-      <Box m={m} at={[0, CP + 0.29, zf + 0.12]} s={[0.76, 0.56, 0.24]} c={DARK} />
-      <mesh position={[0, CP + 0.27, zf + 0.246]}><planeGeometry args={[0.7, 0.5]} />{win}</mesh>
-      {[-0.12, 0.12].map((x) => <Box key={x} m={m} at={[x, CP + 0.27, zf + 0.252]} s={[0.02, 0.5, 0.012]} c={TRIM} shadow={false} />)}
-      <Box m={m} at={[0, CP + 0.6, zf + 0.25]} s={[1.0, 0.05, 0.5]} c={def.roof} />
-      {[-0.2, 0.2].map((x) => <mesh key={x} position={[x, CP + 0.567, zf + 0.42]}><boxGeometry args={[0.06, 0.016, 0.06]} />{bulb}</mesh>)}
-      {[0.1, 0.2].map((t, i) => <Box key={t} m={m} at={[0, 0.03 + i * 0.1 + 0.05 + 0.0, zf + 0.26 + (1 - i) * 0.1 + 0.05]} s={[0.6, CP - 0.1 - i * 0.1 + 0.06, 0.1]} c={STONE} />)}
+      {/* The lobby, at street level. */}
+      <group position-z={zf}><Lobby k={k} x={0} w={0.76} roof={def.roof} /></group>
       {!ghost && <Pool r={0.6} x={0} z={zf + 0.6} />}
       {/* Car park door under the right-hand flats. */}
       <mesh position={[1.42, 0.15, zf + 0.006]}><planeGeometry args={[0.48, 0.28]} />{m('#212121')}</mesh>
@@ -1108,13 +1118,8 @@ function LakeviewTowers({ k, def, lvl }: { k: K; def: NewModelProps['def']; lvl:
         <planeGeometry args={[W - 0.02, zf - zb - 0.02]} />
         {m('#ffffff', paverTex(6, 2))}
       </mesh>
-      {/* Lobby entrance with a canopy. */}
-      <Box m={m} at={[-0.1, CP + 0.29, zf + 0.12]} s={[0.6, 0.56, 0.24]} c={DARK} />
-      <mesh position={[-0.1, CP + 0.27, zf + 0.246]}><planeGeometry args={[0.54, 0.5]} />{win}</mesh>
-      <Box m={m} at={[-0.1, CP + 0.6, zf + 0.25]} s={[0.84, 0.05, 0.5]} c={def.roof} />
-      <Box m={m} at={[-0.1, (CP + 0.01) / 2, zf + 0.12]} s={[0.64, CP + 0.01, 0.24]} c={STONE} />
-      {[0, 1].map((i) => <Box key={i} m={m} at={[-0.1, 0.08 + i * 0.1, zf + 0.29 + (1 - i) * 0.1]} s={[0.56, 0.16 + i * 0.1 - 0.0, 0.1]} c={STONE} />)}
-      {[-0.32, 0.12].map((x) => <mesh key={x} position={[x, CP + 0.567, zf + 0.42]}><boxGeometry args={[0.06, 0.016, 0.06]} />{bulb}</mesh>)}
+      {/* Lobby entrance at street level, with a canopy. */}
+      <group position-z={zf}><Lobby k={k} x={-0.1} w={0.6} roof={def.roof} /></group>
       {!ghost && <Pool r={0.6} x={-0.1} z={zf + 0.6} />}
       <mesh position={[1.42, 0.15, zf + 0.006]}><planeGeometry args={[0.48, 0.28]} />{m('#212121')}</mesh>
       <Box m={m} at={[1.42, CP - 0.015, zf + 0.02]} s={[0.56, 0.03, 0.04]} c="#fdd835" shadow={false} />

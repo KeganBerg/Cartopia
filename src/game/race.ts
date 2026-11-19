@@ -11,6 +11,10 @@ export const TOP_GEAR = RATIO.length - 1
 // The car's top speed and its pull, from PI.
 export const topSpeed = (pi: number) => 70 + pi * 0.3
 const pull = (pi: number) => 5.4 + pi * 0.048
+// What the speedo and the result card read for a speed: km/h, stretched at the top end so the
+// best cars read like hypercars (a maxed Vanta's mile tops out past 500) while starters read about
+// as before. Only the reading: it rises with speed everywhere and the race itself is untouched.
+export const kmh = (speed: number) => Math.round(speed * 3.6 * (1 + 0.22 * Math.max(0, (speed - 40) / 78) ** 2))
 // Torque across the rev range (0-1), peaking near the redline.
 const torque = (rpm: number) => 0.62 + 0.55 * rpm - 0.25 * rpm * rpm
 // Lower gears multiply the engine's pull.

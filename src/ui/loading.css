@@ -2,6 +2,7 @@
 .pc-body { position: relative; isolation: isolate; }
 .pc-body img { display: block; width: 100%; height: auto; }
 .pc-paint { position: absolute; inset: 0; mix-blend-mode: multiply; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
+.pc-skin { width: 100%; height: 100%; transition: opacity .3s ease; }
 
 .lb-tire {
   width: 18px; height: 18px; flex: none; border-radius: 50%; border: 4px solid #14213d;

@@ -866,10 +866,11 @@ export const fuelRegenSeconds = (level: number) => 60 / fuelPerMin(level)
 /** The next level where fuel refills faster, or null past the last step. */
 export const nextFuelStep = (level: number) => FUEL_RATE_STEPS.find((st) => st.level > level) ?? null
 export const RACE_FUEL = 3
-// Gems to fill the tank to the cap in one go: at least REFILL_BUCKS, and REFILL_BUCKS_PER_5 per 5 fuel it adds.
+// Gems to fill the tank to the cap in one go: REFILL_BUCKS_PER_FUEL for each fuel it adds.
+// REFILL_BUCKS is what a Full tank deal is marked down from.
 export const REFILL_BUCKS = 30
-export const REFILL_BUCKS_PER_5 = 10
-export const refillBucks = (fuelToAdd: number) => Math.max(REFILL_BUCKS, REFILL_BUCKS_PER_5 * Math.ceil(fuelToAdd / 5))
+export const REFILL_BUCKS_PER_FUEL = 1
+export const refillBucks = (fuelToAdd: number) => Math.max(1, Math.ceil(fuelToAdd)) * REFILL_BUCKS_PER_FUEL
 
 // Grand Prix: six races in a row against tougher and tougher rivals. Win
 // all six for a mystery box car. Each repeat of a series gets harder.

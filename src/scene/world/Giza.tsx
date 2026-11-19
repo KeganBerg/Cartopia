@@ -977,7 +977,7 @@ export default function Giza({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`giza:${len}`} cell={24}>
+      <Batch version={`giza:${len}`} cell={24} freeze prune>
         {/* Street-side pavement on the left, in front of the houses. */}
         <mesh rotation-x={-Math.PI / 2} position={[-(EDGE + 3), 0.012, len / 2 + 5]}>
           <planeGeometry args={[6, len + 60]} />

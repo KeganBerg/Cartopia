@@ -19,6 +19,7 @@ import { layoutRoads, type Light } from './traffic/layout'
 import { useVisitors, tapVisitor, type Visitor } from '../lib/visitors'
 import { AMBULANCE, TownAmbulance } from './ServiceVehicles'
 import { townTraffic } from '../game/traffic'
+import { useCruise } from './cruise'
 
 // Buses run the school routes: they drop in at schools more than anywhere else.
 const SCHOOLS = ['school', 'highschool', 'university']
@@ -334,7 +335,10 @@ function ShowcaseStars({ uids }: { uids: string[] }) {
 
 export function TownCars() {
   const roads = useGame((s) => (s.visiting ?? s).roads)
-  const cars = useGame((s) => (s.visiting ?? s).cars)
+  const owned = useGame((s) => (s.visiting ?? s).cars)
+  // The car you're driving by hand (CruiseCar) leaves the traffic while you do.
+  const driving = useCruise((c) => c.uid)
+  const cars = useMemo(() => (driving ? owned.filter((c) => c.uid !== driving) : owned), [owned, driving])
   // Too little road jams the town: everyone crawls (src/game/traffic.ts).
   const pace = useGame((s) => townTraffic(s.visiting ?? s).pace)
   const buildings = useGame((s) => (s.visiting ?? s).buildings)

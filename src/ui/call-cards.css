@@ -2,9 +2,11 @@
    Cheap on purpose, since six are on a phone screen at once: every moving layer only animates
    transform or opacity (the compositor moves a picture the browser drew once), patterns are tiny
    SVG tiles, and a scrolling layer is only one tile bigger than the card. At most three moving
-   layers a card; .still (pickers) and reduced motion stop them all. */
+   layers a card; .still (pickers) and reduced motion stop them all.
+   Square corners: every holder clips it with its own rounded border, so a rounded .cc would show
+   a second, tighter corner inside the frame (callCardStage.test). */
 
-.cc { --cc: #5aa9ff; position: absolute; inset: 0; overflow: hidden; contain: strict; container-type: size; isolation: isolate; pointer-events: none; background: #0b1430; border-radius: inherit; }
+.cc { --cc: #5aa9ff; position: absolute; inset: 0; overflow: hidden; contain: strict; container-type: size; isolation: isolate; pointer-events: none; background: #0b1430; }
 .cc > i { position: absolute; display: block; pointer-events: none; }
 .cc > i::before, .cc > i::after { content: ''; position: absolute; display: block; }
 .cc.still > i, .cc.still > i::before, .cc.still > i::after { animation: none !important; }
@@ -301,7 +303,9 @@
    moves, so it costs one picture. A stand thumbnail's ground point is about 60% down it (--wf). */
 .cc-stage { container-type: size; --wf: .6; --H: min(var(--car-h, 60cqh), 69cqw); }
 .cc-stage:is(.cc-show, .rm-qc) { background: var(--cc-base, #0b1430); }
-.cc-stage > .cc { top: calc((var(--g, .7) - var(--f, .7)) * 100%); bottom: auto; height: 100%; }
+/* The scene only ever slides up, never down: a gap above it would show as a band under the frame.
+   */
+.cc-stage > .cc { top: min(0%, calc((var(--g, .7) - var(--f, .7)) * 100%)); bottom: auto; height: 100%; }
 .cc-stage .cc-show-car, .cc-stage .rm-qc-top > .thumb3d { position: absolute; z-index: 1; left: 50%; right: auto; bottom: auto; top: calc(var(--g, .7) * 100% - var(--wf) * var(--H)); width: auto; height: var(--H); max-height: none; aspect-ratio: 4 / 3; margin: 0; translate: -50% 0; }
 .cc-show-car .thumb3d { position: absolute; inset: 0; width: auto; height: auto; --th: 100%; background: none; border-radius: 0; }
 .cc-ground { position: absolute; z-index: 1; left: 50%; top: calc(var(--g, .7) * 100% - .62 * var(--H)); width: calc(var(--H) * 2.3); height: var(--H); translate: -50% 0; pointer-events: none;
@@ -350,7 +354,8 @@
 /* A card with the player's car on it (CallCardShowcase): picker preview, crate prize. */
 .cc-show { position: relative; display: block; overflow: hidden; isolation: isolate; border: 3px solid var(--line, #14213d); border-radius: 16px; background: #0b1430; box-shadow: 0 4px 0 rgba(0,0,0,.3); }
 .cc-show::after { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: 13px; pointer-events: none; box-shadow: inset 0 0 0 2px var(--cc-edge, rgba(255,255,255,.16)); }
-.cc-show { --g: .7; --car-h: 74cqh; }
+/* The car stands on the card's own ground, so the scene doesn't move at all. */
+.cc-show { --g: var(--f, .7); --car-h: 74cqh; }
 .cc-show-car .thumb3d { position: absolute; inset: 0; width: auto; height: auto; --th: 100%; background: none; border-radius: 0; }
 
 /* ---- Call Card picker (CallCardPicker.tsx) ---- */

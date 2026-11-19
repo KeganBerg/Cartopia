@@ -5,6 +5,7 @@ import { Box, Cyl, Sign, Pool, Flag, ShellBuilding, GOLD, SNOW, type Mat, type V
 import { Facade, Upright } from './mergeScale'
 import { PAL } from './season'
 import { PEOPLE_SIZED } from './keepShape'
+import { doorTag } from './doors'
 import { asphaltTex, awningTex, corrugatedTex, grassTex, paverTex, shutterTex } from './textures'
 
 // Town services from the third wave of buildings (laundromat, vet, post office,
@@ -174,10 +175,19 @@ function ArchRow({ m, win, at, len, y, w = 0.28, h = 0.6, skip, step = 0.42, tri
 
 // A classical entrance on a front at z: steps up to a row of columns, a lettered
 // frieze and a pediment (with a clock in it, if asked). True shape in a pair.
+// The steps stay a kerb's height off the ground and the middle bay is wide, so
+// people walk straight up to the doors.
 function Portico({ k, z, span, colH, n, sign, fg, signW, clock, stone = STONE, base = 0 }: { k: Kit; z: number; span: number; colH: number; n: number; sign: string; fg: string; signW: number; clock?: boolean; stone?: string; base?: number }) {
   const { m, win, bulb, ghost } = k
-  const y0 = 0.18
+  const y0 = 0.115 - base
+  const rise = y0 / 3
   const yE = y0 + colH
+  const gap = Math.max(span / (n - 1), 0.46)
+  const colX = (i: number) => {
+    if (n % 2) return -span / 2 + (span * i) / (n - 1)
+    const half = n / 2, j = i < half ? half - 1 - i : i - half
+    return (i < half ? -1 : 1) * (gap / 2 + ((span / 2 - gap / 2) * j) / Math.max(1, half - 1))
+  }
   const eh = signW / 4 + 0.08
   const ph = 0.3
   const sc = ph / 0.36
@@ -186,14 +196,14 @@ function Portico({ k, z, span, colH, n, sign, fg, signW, clock, stone = STONE, b
     <Upright>
       <group position={[0, base, 0]}>
         {[0, 1, 2].map((i) => {
-          const top = y0 - 0.06 * i
+          const top = y0 - rise * i
           const bot = 0.004 * i
           const zb = z - 0.03 - 0.01 * i
           const zfr = z + 0.4 + 0.1 * i
           return <Box key={i} m={m} at={[0, (top + bot) / 2, (zb + zfr) / 2]} s={[W + 0.12 * i, top - bot, zfr - zb]} c={STEP} shadow={false} />
         })}
         {Array.from({ length: n }, (_, i) => {
-          const x = -span / 2 + (span * i) / (n - 1)
+          const x = colX(i)
           return (
             <group key={i}>
               <Cyl m={m} at={[x, y0 + colH / 2, z + 0.3]} r={0.055} r2={0.065} h={colH} c={stone} seg={10} />
@@ -214,10 +224,11 @@ function Portico({ k, z, span, colH, n, sign, fg, signW, clock, stone = STONE, b
             <Box m={m} at={[0.02, 0, 0.006]} s={[0.05, 0.012, 0.006]} c="#212121" shadow={false} />
           </group>
         )}
-        {/* The doors: panelled wood under a lit fanlight, a lantern either side. */}
-        <mesh position={[0, y0 + 0.34, z + 0.006]}><planeGeometry args={[0.4, 0.68]} />{m('#5d4037')}</mesh>
-        <Box m={m} at={[0, y0 + 0.34, z + 0.012]} s={[0.012, 0.66, 0.006]} c="#3e2723" shadow={false} />
-        <mesh position={[0, y0 + 0.68, z + 0.006]}><circleGeometry args={[0.2, 12, 0, Math.PI]} />{win}</mesh>
+        {/* The doors: a panelled wooden pair in a stone case under a lit fanlight, a lantern either side. */}
+        <Box m={m} at={[0, y0 + 0.46, z + 0.014]} s={[0.5, 0.92, 0.028]} c={stone} shadow={false} />
+        <mesh position={[0, y0 + 0.34, z + 0.03]} userData={doorTag('double')}><planeGeometry args={[0.4, 0.68]} />{m('#5d4037')}</mesh>
+        <Box m={m} at={[0, y0 + 0.34, z + 0.0335]} s={[0.012, 0.66, 0.005]} c="#3e2723" shadow={false} />
+        <mesh position={[0, y0 + 0.68, z + 0.03]}><circleGeometry args={[0.2, 12, 0, Math.PI]} />{win}</mesh>
         {[-1, 1].map((sd) => <mesh key={sd} position={[sd * 0.32, y0 + 0.5, z + 0.05]}><boxGeometry args={[0.07, 0.1, 0.07]} />{bulb}</mesh>)}
       </group>
     </Upright>
@@ -267,12 +278,12 @@ function Laundry({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: numb
             })]
           }}
         </Facade>
-        {/* Door with a push bar and a lit step. */}
+        {/* Door with a pull handle and a lit step. */}
         <group position={[0.6, 0, zf]}>
           <Box m={m} at={[0, 0.38, 0.01]} s={[0.42, 0.76, 0.02]} c="#eceff1" shadow={false} />
-          <mesh position={[0, 0.36, 0.022]}><planeGeometry args={[0.32, 0.66]} />{m(teal)}</mesh>
-          <mesh position={[0, 0.46, 0.026]}><planeGeometry args={[0.22, 0.34]} />{win}</mesh>
-          <Box m={m} at={[0, 0.3, 0.032]} s={[0.24, 0.02, 0.014]} c="#cfd8dc" shadow={false} />
+          <mesh position={[0, 0.36, 0.022]} userData={doorTag()}><planeGeometry args={[0.32, 0.66]} />{m(teal)}</mesh>
+          <mesh position={[0, 0.46, 0.026]}><planeGeometry args={[0.15, 0.34]} />{win}</mesh>
+          <Box m={m} at={[0.12, 0.34, 0.026]} s={[0.018, 0.12, 0.004]} c="#cfd8dc" shadow={false} />
           <Box m={m} at={[0, 0.05, 0.1]} s={[0.5, 0.1, 0.2]} c="#cfd8dc" />
         </group>
         <Box m={m} at={[0, 1.02, zf + 0.15]} rot={[0.45, 0, 0]} s={[1.64, 0.03, 0.32]} c="#ffffff" t={awningTex(teal)} />
@@ -440,8 +451,8 @@ function Vet({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: number }
         {live && <Sign text={def.sign ?? 'VET'} w={0.56} at={[-0.33, 0.92, zf + 0.042]} bg="#ffffff" fg={green} />}
         <group position={[0.3, 0, zf]}>
           <Box m={m} at={[0, 0.36, 0.01]} s={[0.42, 0.72, 0.02]} c="#ffffff" shadow={false} />
-          <mesh position={[0, 0.34, 0.022]}><planeGeometry args={[0.32, 0.64]} />{m('#2e7d32')}</mesh>
-          <mesh position={[0, 0.44, 0.026]}><planeGeometry args={[0.2, 0.28]} />{win}</mesh>
+          <mesh position={[0, 0.34, 0.022]} userData={doorTag()}><planeGeometry args={[0.32, 0.64]} />{m('#2e7d32')}</mesh>
+          <mesh position={[0, 0.44, 0.026]}><planeGeometry args={[0.14, 0.28]} />{win}</mesh>
           <Box m={m} at={[0, 0.05, 0.1]} s={[0.5, 0.1, 0.2]} c="#cfd8dc" />
         </group>
         <Box m={m} at={[0.3, 0.84, zf + 0.15]} rot={[0.4, 0, 0]} s={[0.6, 0.03, 0.3]} c={green} />
@@ -543,7 +554,7 @@ function PostOffice({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: n
         <Box m={m} at={[0, 0.08, z0]} s={[w + 0.03, 0.16, d + 0.03]} c={def.color} shadow={false} />
         <Box m={m} at={[0, 0.98, zf + 0.012]} s={[w + 0.02, 0.1, 0.024]} c={blue} shadow={false} />
         <ArchRow m={m} win={win} at={[0, 0, zf]} len={w} y={0.55} w={0.26} h={0.5} skip={0.72} step={0.36} trim={def.color} />
-        <Portico k={k} z={zf} span={1.0} colH={0.95} n={4} sign={def.sign ?? 'POST OFFICE'} fg={blue} signW={0.92} clock={st > 1} />
+        <Portico k={k} z={zf} span={1.0} colH={1.015} n={4} sign={def.sign ?? 'POST OFFICE'} fg={blue} signW={0.92} clock={st > 1} />
       </ShellBuilding>
       {/* Sorting Hub: an upper block with a radio mast. */}
       {st === 3 && (
@@ -662,7 +673,7 @@ function Library({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: numb
         <Box m={m} at={[0, 0.08, z0]} s={[w + 0.03, 0.16, d + 0.03]} c="#a1887f" shadow={false} />
         <Box m={m} at={[0, 1.18, z0]} s={[w + 0.02, 0.06, d + 0.02]} c={STONE} shadow={false} />
         <ArchRow m={m} win={win} at={[0, 0, zf]} len={w} y={0.62} w={0.3} h={0.62} skip={0.72} step={0.42} />
-        <Portico k={k} z={zf} span={0.8} colH={1.0} n={4} sign={def.sign ?? 'LIBRARY'} fg={brown} signW={0.84} clock={st === 3} />
+        <Portico k={k} z={zf} span={0.8} colH={1.065} n={4} sign={def.sign ?? 'LIBRARY'} fg={brown} signW={0.84} clock={st === 3} />
       </ShellBuilding>
       <Books m={m} at={[1.0, h + 0.13, -0.6]} />
       {/* Library & Archive: a copper dome; the Grand Library gilds it and rings it with columns. */}
@@ -678,7 +689,7 @@ function Library({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: numb
       {/* Reading benches, trees, lamps and the book return. */}
       {live && [-1.05, 1.05].map((x) => <Bench key={x} m={m} at={[x, 0.055, 0.66]} c="#6d4c41" />)}
       {live && [-1.62, 1.62].map((x) => <Tree key={x} m={m} at={[x, 0.055, 0.62]} s={0.6} />)}
-      {live && [-0.6, 0.6].map((x) => <Lamp key={x} m={m} bulb={bulb} ghost={ghost} at={[x, 0.055, 0.86]} />)}
+      {live && [-0.68, 0.68].map((x) => <Lamp key={x} m={m} bulb={bulb} ghost={ghost} at={[x, 0.055, 0.86]} />)}
       {live && <BookDrop m={m} at={[1.3, 0.055, 0.84]} />}
     </group>
   )
@@ -710,25 +721,26 @@ function BusDepot({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
   const w = 3.6, d = 0.95, z0 = -1.4, zf = z0 + d / 2, h0 = 1.3, grow = 0.6
   const h = h0 + levelLift(lvl) * grow
   const yellow = def.roof
-  const bays = [-1.35, -0.45, 0.45, 1.35]
+  const bays = [-1.4, -0.5, 0.5, 1.4]
   const parked = bays.slice(0, st === 1 ? 2 : st === 2 ? 3 : 4)
-  const islands = [-0.9, 0, 0.9]
+  const islands = [-0.95, 0, 0.95]
   return (
     <group>
       <Box m={m} at={[0, 0.03, 0]} s={[3.8, 0.06, 3.8]} c="#ffffff" t={asphaltTex()} shadow={false} />
-      {/* Passenger platform along the terminal, under a long canopy. */}
-      <Box m={m} at={[0, 0.11, -0.67]} s={[3.7, 0.1, 0.55]} c="#cfd8dc" shadow={false} />
-      <Box m={m} at={[0, 0.17, -0.41]} s={[3.7, 0.02, 0.04]} c="#fdd835" shadow={false} />
-      {[-1.5, -0.5, 0.5, 1.5].map((x) => <Cyl key={x} m={m} at={[x, 0.53, -0.5]} r={0.03} h={0.74} c="#546e7a" seg={6} />)}
+      {/* Passenger platform along the terminal, a kerb high, under a long canopy. */}
+      <Box m={m} at={[0, 0.0875, -0.67]} s={[3.7, 0.055, 0.55]} c="#cfd8dc" shadow={false} />
+      <Box m={m} at={[0, 0.117, -0.41]} s={[3.7, 0.004, 0.04]} c="#fdd835" shadow={false} />
+      {[-1.5, -0.5, 0.5, 1.5].map((x) => <Cyl key={x} m={m} at={[x, 0.505, -0.5]} r={0.03} h={0.78} c="#546e7a" seg={6} />)}
       <Box m={m} at={[0, 0.92, -0.69]} s={[3.7, 0.05, 0.5]} c={roofSnow(yellow)} />
-      {live && [-1.0, 1.0].map((x) => <Bench key={x} m={m} at={[x, 0.16, -0.75]} c="#546e7a" />)}
-      {/* Bus bays: painted lanes between islands, each island with a canopy. */}
+      {live && [-1.0, 1.0].map((x) => <Bench key={x} m={m} at={[x, 0.115, -0.75]} c="#546e7a" />)}
+      {/* Bus bays: painted lanes between islands, each island with a canopy. The
+          middle island is the walk in to the terminal, its canopy on twin posts. */}
       {bays.map((x) => <Paint key={x} m={m} at={[x, 0.064, 1.05]} s={[0.4, 0.04]} c="#fdd835" />)}
       {islands.map((x) => (
         <group key={x}>
-          <Box m={m} at={[x, 0.09, 0.25]} s={[0.22, 0.06, 1.26]} c="#b0bec5" shadow={false} />
-          {[-0.2, 0.7].map((z) => <Box key={z} m={m} at={[x, 0.51, z]} s={[0.05, 0.78, 0.05]} c="#546e7a" />)}
-          <Box m={m} at={[x, 0.92, 0.25]} s={[0.24, 0.04, 1.2]} c={roofSnow(yellow)} />
+          <Box m={m} at={[x, 0.0875, 0.25]} s={[x ? 0.22 : 0.44, 0.055, 1.26]} c="#b0bec5" shadow={false} />
+          {[-0.2, 0.7].flatMap((z) => (x ? [0] : [-0.18, 0.18]).map((dx) => <Box key={`${z}${dx}`} m={m} at={[x + dx, 0.5, z]} s={[0.05, 0.77, 0.05]} c="#546e7a" />))}
+          <Box m={m} at={[x, 0.92, 0.25]} s={[x ? 0.24 : 0.46, 0.04, 1.2]} c={roofSnow(yellow)} />
           <mesh position={[x, 0.885, 0.25]}><boxGeometry args={[0.06, 0.03, 1.0]} />{bulb}</mesh>
         </group>
       ))}
@@ -753,7 +765,7 @@ function BusDepot({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
       {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[-0.65, 0.105, 1.15]} />}
       {live && <Lamp m={m} bulb={bulb} ghost={ghost} at={[1.85, 0.06, 1.85]} />}
       {/* A bus pulling out at the Transit Center. */}
-      {live && st > 1 && <CityBus m={m} at={[1.0, 0.06, 1.48]} rot={Math.PI / 2} />}
+      {live && st > 1 && <CityBus m={m} at={[1.05, 0.06, 1.48]} rot={Math.PI / 2} />}
       {/* The terminal. */}
       <ShellBuilding {...k} w={w} d={d} h0={h0} z0={z0} wall={def.color} tex="siding" roof={yellow} sign={def.sign} signBg="#263238" signFg={yellow} shopfront={null} grow={grow}>
         <mesh position={[0, 0.55, zf + 0.005]}><planeGeometry args={[3.3, 0.6]} />{win}</mesh>
@@ -763,10 +775,11 @@ function BusDepot({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
             return <Box key={i} m={m} at={[x, 0.55, 0.012]} s={[0.03, 0.6, 0.02]} c="#eceff1" shadow={false} />
           })}
         </Facade>
-        {[-0.9, 0.9].map((x) => (
+        {/* Glass doors: the automatic pair in the middle, under the clock, is the way in. */}
+        {[-0.9, 0, 0.9].map((x) => (
           <group key={x}>
             <Box m={m} at={[x, 0.42, zf + 0.03]} s={[0.46, 0.66, 0.02]} c="#37474f" shadow={false} />
-            <mesh position={[x, 0.45, zf + 0.042]}><planeGeometry args={[0.38, 0.54]} />{win}</mesh>
+            <mesh position={[x, 0.45, zf + 0.042]} userData={x ? undefined : doorTag('slide')}><planeGeometry args={[0.38, 0.54]} />{win}</mesh>
           </group>
         ))}
         {/* A clock over the entrance from level 4. */}
@@ -782,9 +795,10 @@ function BusDepot({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
       {/* Grand Terminal: steel arches over the bays. */}
       {st === 3 && (
         <group>
-          {[-0.3, 0.3, 0.9].map((z) => (
-            <mesh key={z} position={[0, 0.06, z]} castShadow><torusGeometry args={[1.84, 0.035, 6, 36, Math.PI]} />{m('#78909c')}</mesh>
-          ))}
+          {/* Each arch in three lengths (two legs and the crown), so none spans the walk in under it. */}
+          {[-0.3, 0.3, 0.9].flatMap((z) => ([[2, -1], [1, 1], [2, 1]] as const).map(([i, sx]) => (
+            <group key={`${z}${i}${sx}`} scale-x={sx}><mesh position={[0, 0.06, z]} rotation-z={(i * Math.PI) / 3} castShadow><torusGeometry args={[1.84, 0.035, 6, 12, Math.PI / 3]} />{m('#78909c')}</mesh></group>
+          )))}
           <Box m={m} at={[0, 1.92, 0.3]} s={[0.06, 0.06, 1.28]} c="#78909c" />
           {[-1, 1].map((sd) => <Box key={sd} m={m} at={[sd * 1.301, 0.06 + 1.301, 0.3]} rot={[0, 0, -sd * Math.PI / 4]} s={[0.06, 0.06, 1.28]} c="#78909c" />)}
         </group>
@@ -832,14 +846,15 @@ function CityHall({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
           {live && <Bench m={m} at={[sd * 1.05, 0.08, 0.75]} rot={-sd * Math.PI / 2} c="#5d4037" />}
         </group>
       ))}
-      <Fountain m={m} at={[0, 0.06, 0.9]} ghost={ghost} />
+      {/* A pair of fountains either side of the walk up to the portico. */}
+      {[-0.55, 0.55].map((x) => <group key={x} position={[x, 0.06, 0.9]} scale={0.6}><Fountain m={m} at={[0, 0, 0]} ghost={ghost} /></group>)}
       {live && [[-0.9, 0.2], [0.9, 0.2], [-0.9, 1.65], [0.9, 1.65]].map(([x, z]) => <Lamp key={`${x}${z}`} m={m} bulb={bulb} ghost={ghost} at={[x, 0.06, z]} twin />)}
       {live && flags.map((c, i) => <Flag key={c} at={[(i % 2 ? 1 : -1) * (1.2 + Math.floor(i / 2) * 0.42), 0.08, 0.3]} color={c} tall={1.5} star={lvl >= 10 && i < 2} />)}
       <ShellBuilding {...k} w={w} d={d} h0={h0} z0={z0} wall={def.color} tex="brick" roof={slate} shopfront={null} grow={grow} rowFrom={1.55}>
         <Box m={m} at={[0, 0.1, z0]} s={[w + 0.04, 0.2, d + 0.04]} c="#bdbdbd" shadow={false} />
         <Box m={m} at={[0, 1.32, zf + 0.015]} s={[w + 0.02, 0.07, 0.03]} c={STONE} shadow={false} />
         <ArchRow m={m} win={win} at={[0, 0, zf]} len={w} y={0.7} w={0.28} h={0.62} skip={1.15} step={0.4} />
-        <Portico k={k} z={zf} span={1.6} colH={1.2} n={6} sign={def.sign ?? 'CITY HALL'} fg={slate} signW={1.2} clock={st > 1} base={0.06} />
+        <Portico k={k} z={zf} span={1.6} colH={1.325} n={6} sign={def.sign ?? 'CITY HALL'} fg={slate} signW={1.2} clock={st > 1} base={0.06} />
       </ShellBuilding>
       {/* Clock cupola, then a green dome (Civic Center), then a gilded colonnaded dome (Capitol Hall). */}
       {st === 1 ? (
@@ -866,14 +881,14 @@ function CityHall({ k, def, lvl }: { k: Kit; def: NewModelProps['def']; lvl: num
       ) : (
         <Dome k={k} at={[0, h + 0.13, z0]} r={st === 3 ? 0.54 : 0.55} drum={st === 3 ? 0.7 : 0.42} c={STONE} top={st === 3 ? GOLD : '#7fb8a4'} windows={st === 3 ? 0 : 8} cols={st === 3 ? 16 : 0} clocks={st === 3} />
       )}
-      {/* A gilded statue on a plinth for the Capitol. */}
-      {st === 3 && live && (
-        <group position={[0, 0.06, 1.66]} userData={PEOPLE_SIZED}>
+      {/* Gilded statues on plinths flanking the walk, for the Capitol. */}
+      {st === 3 && live && [-0.5, 0.5].map((x) => (
+        <group key={x} position={[x, 0.06, 1.66]} userData={PEOPLE_SIZED}>
           <Box m={m} at={[0, 0.12, 0]} s={[0.24, 0.24, 0.24]} c={STONE} />
           <Cyl m={m} at={[0, 0.36, 0]} r={0.05} r2={0.07} h={0.24} c={GOLD} seg={8} />
           <mesh position={[0, 0.53, 0]}><sphereGeometry args={[0.05, 8, 6]} />{m(GOLD)}</mesh>
         </group>
-      )}
+      ))}
     </group>
   )
 }

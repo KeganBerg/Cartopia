@@ -18,6 +18,7 @@ import { concreteTex, helipadTex, shutterTex, gravelTex } from './textures'
 import { Storefront, BrickFloors, StoneShaft, GlassDrum, WaterTank, GiantProp, Beacon, type Kit, type Giant } from './GrowthKit'
 import { PEOPLE_SIZED } from './keepShape'
 import { LAYER } from './layers'
+import { doorTag } from './doors'
 
 // The grown forms of shops and services (names in src/game/growth.ts). Level
 // 4-6 rebuilds the business as a bigger building of its kind (a brick walk-up
@@ -169,7 +170,7 @@ function DinerModel({ def, ghost, m, win, bulb, level }: Props) {
         <StreamBlock k={k} z={-0.15} y0={0} len={3.5} d={1.4} floors={1} fh={0.95} wall={def.color} chrome="#eceff1" tint={tint} />
         <StreamBlock k={k} z={-0.2} y0={1.0} len={3.2} d={1.2} floors={fl} fh={0.42} wall={wall} chrome={def.roof} tint={tint} />
         <Box m={m} at={[0, 0.5, 0.57]} s={[0.5, 0.82, 0.02]} c="#eceff1" shadow={false} />
-        <mesh position={[0, 0.42, 0.585]}><planeGeometry args={[0.4, 0.7]} />{m('#37474f')}</mesh>
+        <mesh position={[0, 0.42, 0.585]} userData={doorTag()}><planeGeometry args={[0.4, 0.7]} />{m('#37474f')}</mesh>
         <Box m={m} at={[0, 0.9, 0.78]} s={[1.2, 0.04, 0.42]} c={def.roof} />
         {[-0.55, 0.55].map((x) => <Cyl key={x} m={m} at={[x, 0.45, 0.95]} r={0.02} h={0.9} c="#eceff1" seg={6} />)}
         <Bulbs from={[-0.6, 0.86, 0.99]} to={[0.6, 0.86, 0.99]} n={7} />
@@ -346,7 +347,8 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
         {Array.from({ length: decks }, (_, i) => (
           <group key={i}>
             <Box m={m} at={[0, i * fh + 0.03, -0.25]} s={[3.5, 0.06, 1.3]} c="#263238" />
-            {!ghost && [-1.15, 0, 1.15].map((x, j) => <BlockCar key={x} m={m} at={[x, i * fh + 0.04, -0.2]} c={CAR_COLS[(i * 3 + j) % CAR_COLS.length]} rot={Math.PI / 2 + (j - 1) * 0.3} />)}
+            {/* The middle car stands back square-on, leaving the aisle in from the street clear. */}
+            {!ghost && [-1.15, 0, 1.15].map((x, j) => <BlockCar key={x} m={m} at={[x, i * fh + 0.04, j === 1 ? -0.62 : -0.2]} c={CAR_COLS[(i * 3 + j) % CAR_COLS.length]} rot={Math.PI / 2 + (j - 1) * 0.3} />)}
           </group>
         ))}
         <Box m={m} at={[0, H + 0.04, -0.25]} s={[3.6, 0.08, 1.4]} c="#212121" />
@@ -355,6 +357,8 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
         <Glass m={m} ghost={ghost} at={[0, H / 2, -0.94]} w={3.5} h={H} ry={Math.PI} tint="#cfd8dc" />
         {[-1, 1].map((sd) => <Glass key={sd} m={m} ghost={ghost} at={[sd * 1.77, H / 2, -0.25]} w={1.3} h={H} ry={(sd * Math.PI) / 2} tint="#cfd8dc" />)}
         {!ghost && Array.from({ length: decks }, (_, i) => <Neon key={i} at={[0, i * fh + 0.07, 0.44]} s={[3.5, 0.025, 0.025]} c={orange} />)}
+        {/* The way in: a mat set in the showroom floor between the middle posts. */}
+        <mesh position={[0, 0.058, 0.33]} userData={doorTag('gate')}><boxGeometry args={[1.0, 0.016, 0.12]} />{m('#37474f')}</mesh>
         <RoofSign m={m} text="TUNER" w={1.4} at={[0, H + 0.08, 0.1]} bg="#212121" fg={orange} board={orange} ghost={ghost} />
         {!ghost && <Pool r={1.0} z={0.8} />}
       </group>
@@ -372,6 +376,11 @@ function TunerModel({ def, ghost, m, win, bulb, level }: Props) {
       <GlassBlock m={m} ghost={ghost} x={1.2} z={-0.1} w={1.3} d={1.5} h={0.9} tint="#cfd8dc" frame="#212121" />
       {!ghost && <LitSign text="TUNER" w={1.0} at={[1.2, 1.12, 0.66]} bg="#212121" fg={orange} m={m} />}
       <Box m={m} at={[1.2, 0.98, 0.625]} s={[1.08, 0.3, 0.04]} c={orange} shadow={false} />
+      {/* The lobby's automatic doors under the sign, with a mat out front. */}
+      <Box m={m} at={[1.2, 0.36, 0.658]} s={[0.56, 0.72, 0.012]} c="#212121" shadow={false} />
+      <mesh position={[1.2, 0.34, 0.666]} userData={doorTag('slide')}><planeGeometry args={[0.48, 0.64]} />{bulb}</mesh>
+      <Box m={m} at={[1.2, 0.34, 0.669]} s={[0.02, 0.64, 0.004]} c="#cfd8dc" shadow={false} />
+      <Box m={m} at={[1.2, 0.0175, 0.8]} s={[0.6, 0.035, 0.24]} c="#37474f" shadow={false} />
       {/* The car tower stays round along a pair: kept in shape round its own axis. */}
       <group position={[cx, 0, cz]}>
         <Upright>
@@ -417,7 +426,8 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Columned entrance up a few steps, blue lamps, a patrol car. */}
       <Box m={m} at={[0, 1.0, z + 0.25]} s={[1.1, 0.1, 0.5]} c="#eceff1" />
       {[-0.45, 0.45].map((x) => <Cyl key={x} m={m} at={[x, 0.5, z + 0.43]} r={0.06} h={0.95} c="#fafafa" seg={10} />)}
-      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.03 + i * 0.05, z + 0.57 - i * 0.1]} s={[1.0, 0.06 + i * 0.05, 0.12]} c="#e0e0e0" shadow={false} />)}
+      {/* Shallow steps, so the way in stays an easy walk. */}
+      {[0, 1, 2].map((i) => <Box key={i} m={m} at={[0, 0.02 + i * 0.0175, z + 0.57 - i * 0.1]} s={[1.0, 0.04 + i * 0.035, 0.12]} c="#e0e0e0" shadow={false} />)}
       {!ghost && [-0.32, 0.32].map((x) => <mesh key={x} position={[x, 0.78, z + 0.08]}><sphereGeometry args={[0.07, 10, 8]} /><meshStandardMaterial color="#42a5f5" emissive="#1e88e5" emissiveIntensity={0.6} /></mesh>)}
       {!ghost && (
         <group position={[-1.37, LAYER.lot, z + 0.4]}>
@@ -442,7 +452,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
       <group>
         <Box m={m} at={[0, 0.55, -0.3]} s={[3.5, 1.1, 1.35]} c={def.color} t={concreteTex(3, 1)} />
         {[-1.25, -0.65, 0.65, 1.25].map((x) => <mesh key={x} position={[x, 0.6, 0.377]}><planeGeometry args={[0.42, 0.5]} />{win}</mesh>)}
-        <mesh position={[0, 0.42, 0.378]}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
+        <mesh position={[0, 0.42, 0.378]} userData={doorTag()}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
         <BrickFloors k={k} w={3.5} d={1.35} z0={-0.3} y0={1.1} floors={fl} fh={0.42} wall="#b0bec5" trim="#eceff1" tex="stone" escape={false} />
         <Box m={m} at={[0, 1.12, 0.389]} s={[3.52, 0.12, 0.02]} c="#1565c0" shadow={false} />
         {front(0.35)}
@@ -461,7 +471,7 @@ function PoliceModel({ def, ghost, m, win, bulb, level }: Props) {
     <group>
       <Box m={m} at={[0, 0.55, -0.3]} s={[3.6, 1.1, 1.35]} c={def.color} t={concreteTex(3, 1)} />
       {[-1.25, -0.65, 0.65, 1.25].map((x) => <mesh key={x} position={[x, 0.6, 0.377]}><planeGeometry args={[0.42, 0.5]} />{win}</mesh>)}
-      <mesh position={[0, 0.42, 0.378]}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
+      <mesh position={[0, 0.42, 0.378]} userData={doorTag()}><planeGeometry args={[0.44, 0.74]} />{m('#37474f')}</mesh>
       <Box m={m} at={[0, 1.12, -0.3]} s={[3.66, 0.06, 1.41]} c={navy} />
       {/* Clear of the portico, so the whole name shows. */}
       {!ghost && <LitSign text="POLICE HQ" w={1.0} at={[1.17, 0.88, 0.385]} bg={navy} fg="#ffffff" m={m} />}
@@ -574,8 +584,11 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
   const zf = z0 + D / 2
   const h = 1.1
   const up = st === 3 ? 0.62 : 0
-  const bays = wide ? [-1.15, -0.25, 0.65] : [-0.35, 0.4]
-  const bw = wide ? 0.78 : 0.62
+  // Narrow shops squeeze their two bays left to make room for the office door.
+  const bays = wide ? [-1.15, -0.25, 0.65] : [-0.45, 0.15]
+  const bw = wide ? 0.78 : 0.5
+  const dx = wide ? 1.4 : 0.64
+  const dw = wide ? 0.36 : 0.3
   return (
     <group>
       <Box m={m} at={[0, 0.025, 0.1]} s={[W + 0.3, 0.05, 1.9]} c="#9e9e9e" t={concreteTex(2, 1)} shadow={false} />
@@ -592,8 +605,13 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
         </group>
       ))}
       {!ghost && <BlockCar m={m} at={[bays[1], 0.15, zf - 0.3]} c={CAR_COLS[def.id.length % CAR_COLS.length]} rot={0} />}
-      {/* Office corner and roof edge. */}
-      {wide && <mesh position={[1.45, 0.45, zf + 0.006]}><planeGeometry args={[0.4, 0.5]} />{win}</mesh>}
+      {/* The office door: frame, a glazed panel, a step on the apron and a lamp. */}
+      <Box m={m} at={[dx, 0.38, zf + 0.012]} s={[dw + 0.06, 0.66, 0.025]} c={a.trim} shadow={false} />
+      <mesh position={[dx, 0.38, zf + 0.027]} userData={doorTag()}><planeGeometry args={[dw, 0.6]} />{m('#37474f')}</mesh>
+      <mesh position={[dx, 0.5, zf + 0.029]}><planeGeometry args={[dw - 0.12, 0.22]} />{win}</mesh>
+      <Box m={m} at={[dx, 0.065, zf + 0.07]} s={[dw + 0.1, 0.03, 0.12]} c="#cfd8dc" shadow={false} />
+      <mesh position={[dx, 0.76, zf + 0.04]}><boxGeometry args={[0.1, 0.05, 0.06]} />{bulb}</mesh>
+      {/* Roof edge. */}
       <Box m={m} at={[0, h + 0.04, z0]} s={[W + 0.08, 0.08, D + 0.08]} c={a.trim} />
       <mesh position={[0, h + 0.084, z0]} rotation-x={-Math.PI / 2}><planeGeometry args={[W, D]} />{m('#cfd8dc', gravelTex(Math.max(1, Math.round(W)), 1))}</mesh>
       {st === 3 && (
@@ -606,13 +624,14 @@ function AutoModel({ def, ghost, m, win, bulb, level }: Props) {
       {/* Forecourt: cones, a tyre stack or oil drums by the door. */}
       {!ghost && (
         <group>
+          {/* Cones either side, the right one kept left of the office door's path. */}
           {[-1, 1].map((sd) => (
-            <group key={sd} position={[sd * (W / 2 - 0.1), 0, zf + 0.3]}>
+            <group key={sd} position={[sd < 0 ? 0.1 - W / 2 : wide ? W / 2 - 0.1 : 0.42, 0, zf + 0.3]}>
               <mesh position={[0, 0.1, 0]} castShadow><coneGeometry args={[0.06, 0.2, 8]} />{m('#ff6d00')}</mesh>
             </group>
           ))}
           {def.id === 'tires' && <group userData={PEOPLE_SIZED}>{[0, 1, 2, 3].map((i) => <mesh key={i} position={[-W / 2 + 0.25, 0.08 + i * 0.12, zf + 0.25]} rotation-x={Math.PI / 2} castShadow><torusGeometry args={[0.13, 0.06, 8, 14]} />{m('#212121')}</mesh>)}</group>}
-          {def.id === 'lube' && <group userData={PEOPLE_SIZED}>{[0, 1].map((i) => <Cyl key={i} m={m} at={[W / 2 - 0.3 - i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}</group>}
+          {def.id === 'lube' && <group userData={PEOPLE_SIZED}>{[0, 1].map((i) => <Cyl key={i} m={m} at={[0.3 - W / 2 + i * 0.22, 0.16, zf + 0.25]} r={0.1} h={0.3} c={i ? '#1565c0' : '#ffb300'} seg={10} />)}</group>}
           {st === 3 && <Flag at={[-W / 2 + 0.1, h + up + 0.08, z0 - 0.5]} color={a.board} star={level >= 10} />}
           <Pool r={0.9} z={zf + 0.4} />
         </group>

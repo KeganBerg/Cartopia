@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { TOP_GEAR, JUMP_START_DELAY, MAX_RACE_PI, dynoPull, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
+import { TOP_GEAR, JUMP_START_DELAY, MAX_RACE_PI, dynoPull, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer, kmh } from './race'
 
 const dir = new URL('../../supabase/migrations/', import.meta.url)
 // The newest migration that sets public.race_floor().
@@ -117,5 +117,43 @@ describe('garage dyno', () => {
       expect(t).toBeGreaterThan(raceFloor(pi))
       last = t
     }
+  })
+})
+
+describe('speedo reading', () => {
+  // The top speed a clean run reaches over `track` metres.
+  const topOver = (pi: number, track: number) => {
+    const r = freshRacer()
+    let t = 0
+    let top = 0
+    while (r.finished === null && t < 120) {
+      t += 1 / 240
+      if (r.gear < TOP_GEAR && r.rpm >= 0.92) shiftRacer(r, 1.08)
+      if (r.gear >= 3) fireBoost(r)
+      stepRacer(r, pi, 1 / 240, t, 1, track)
+      top = Math.max(top, r.speed)
+    }
+    return top
+  }
+
+  it('reads the best cars well past 425 km/h over a mile (a maxed Vanta is PI 159)', () => {
+    expect(kmh(topOver(159, 1609))).toBeGreaterThan(500)
+    expect(kmh(topOver(159, 400))).toBeGreaterThan(390)
+  })
+
+  it('leaves starter cars reading about as before', () => {
+    const v = topOver(40, 400)
+    expect(kmh(v)).toBeLessThan(v * 3.6 * 1.05)
+    expect(kmh(v)).toBeGreaterThanOrEqual(Math.round(v * 3.6))
+  })
+
+  it('always reads higher for a faster car, so the ladder never bunches', () => {
+    let last = -1
+    for (let v = 0; v <= 160; v += 0.25) {
+      expect(kmh(v)).toBeGreaterThanOrEqual(last)
+      last = kmh(v)
+    }
+    const tops = [60, 80, 100, 120, 140, 159].map((pi) => kmh(topOver(pi, 1609)))
+    for (let i = 1; i < tops.length; i++) expect(tops[i] - tops[i - 1]).toBeGreaterThan(30)
   })
 })

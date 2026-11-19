@@ -20,3 +20,30 @@ describe('Call Card stages', () => {
     })
   }
 })
+
+// Kegan 10-17: a gold card showed a dark band between its frame and the art, and a second rounded
+// corner inside the frame. The art must fill its frame edge to edge on every screen.
+describe('Call Card art fills its frame', () => {
+  const all = ['call-cards.css', 'race-menu.css', 'crates.css'].map((f) => readFileSync(new URL(`./${f}`, import.meta.url), 'utf8')).join('\n')
+  const fs = CALL_CARDS.map((c) => Number(css.match(new RegExp(`\\.cc-on-${c.id} \\{[^}]*--f:\\s*([.\\d]+)`))?.[1]))
+
+  it('has square corners, so no second corner shows inside a rounded frame', () => {
+    const rule = css.match(/^\.cc \{([^}]*)\}/m)?.[1] ?? ''
+    expect(rule).toContain('inset: 0')
+    expect(rule).not.toMatch(/border-radius/)
+  })
+
+  it('only ever slides up on a stage, never down (no band above it)', () => {
+    const rule = css.match(/\.cc-stage > \.cc \{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/top:\s*min\(0%,/)
+  })
+
+  it('every stage puts its ground at or above every card\'s own ground', () => {
+    const gs = [...all.matchAll(/\{[^}]*?--g:\s*([^;}]+)/g)].map((m) => m[1].trim())
+    expect(gs.length).toBeGreaterThan(0)
+    for (const g of gs) {
+      if (g.startsWith('var(--f')) continue
+      expect(Number(g), `--g: ${g}`).toBeLessThanOrEqual(Math.min(...fs))
+    }
+  })
+})

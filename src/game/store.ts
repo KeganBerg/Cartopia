@@ -283,6 +283,8 @@ type Actions = {
   openPanel: (p: Panel) => void
   // Close the open menu: back to the one it was opened from, or the town.
   closePanel: () => void
+  // The X: close every open menu straight to the town, skipping the way back.
+  closeMenus: () => void
   // Switch to a sibling menu from a tab row (Garage / Showroom / Crates, Friends / Crew): same place in the trail.
   swapPanel: (p: Exclude<Panel, null>) => void
   openShop: (focus?: string) => void
@@ -935,6 +937,9 @@ export function lastCollectAll() {
 }
 // What the last Collect All had to leave: idle jobs the fuel didn't cover, and
 // repairs or gas cans the coins didn't cover. The button shows them as icons.
+// The last tick that found the tank full (see tick).
+let fullAt = 0
+
 export type CollectSkips = { fuel: number; coins: number; at: number }
 let skips: CollectSkips = { fuel: 0, coins: 0, at: 0 }
 export const collectAllSkips = () => skips
@@ -1009,6 +1014,11 @@ export const useGame = create<GameState>()(
           if (s.panel) sfx.menuClose()
           return { panel: prev, panelBack: prev ? back : [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
         }),
+      closeMenus: () =>
+        set((s) => {
+          if (s.panel) sfx.menuClose()
+          return { panel: null, panelBack: [], mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
+        }),
       swapPanel: (panel) => set((s) => {
         if (s.panel !== panel) sfx.tab()
         return { panel, panelBack: s.panelBack.filter((p) => p !== panel), mode: 'play', placing: null, placingStored: null, selected: null, shopFocus: null }
@@ -1028,14 +1038,26 @@ export const useGame = create<GameState>()(
         const endless = rolledEndless(get())
         if (endless) set({ endless })
         const cap = fuelCap(s)
+        // A full tank changes nothing in the save. Writing the time each second rewrote the whole
+        // save and woke every part of the screen once a second: a hitch every second. The last
+        // full second is kept here instead, so a tank that stops being full (a bigger cap from a
+        // new gas station) still refills from then, not from whenever the save last spent fuel.
         if (s.fuel >= cap) {
-          if (s.fuelUpdatedAt !== now) set({ fuelUpdatedAt: now })
+          fullAt = now
           return
         }
+        if (now - fullAt < 5000 && fullAt > s.fuelUpdatedAt) {
+          // Just stopped being full without spending (the cap grew): the wait starts now, once.
+          set({ fuelUpdatedAt: fullAt })
+          fullAt = 0
+          return
+        }
+        fullAt = 0
+        const from = s.fuelUpdatedAt
         const every = fuelRegenSeconds(s.level) * 1000
-        const gained = Math.floor((now - s.fuelUpdatedAt) / every)
+        const gained = Math.floor((now - from) / every)
         if (gained > 0) {
-          set({ fuel: Math.min(cap, s.fuel + gained), fuelUpdatedAt: s.fuelUpdatedAt + gained * every })
+          set({ fuel: Math.min(cap, s.fuel + gained), fuelUpdatedAt: from + gained * every })
         }
       },
 
@@ -2604,7 +2626,7 @@ export const useGame = create<GameState>()(
           sfx.start()
           set({
             coins: g.coins - spot.cost,
-            search: { ...rollSearch(spotId, res?.cars ?? null, { truck: g.truck, hot: hotSpot(g.level) === spotId }), ...(piece ? { piece } : {}) },
+            search: { ...rollSearch(spotId, res?.cars ?? null, { truck: g.truck, hot: hotSpot(g.level) === spotId, noFlat: g.tutorial < 99 }), ...(piece ? { piece } : {}) },
             stats: bump(g, 'searches'),
             updatedAt: Date.now(),
           })
@@ -2818,7 +2840,8 @@ function rollCar(spotId: string, hot = false): Loot {
 
 // Pre-rolls what every pin hides. Each search finds at least one car, and
 // about one in four gives the tow truck a flat partway through.
-export function rollSearch(spotId: string, finds: ServerFind[] | null = null, opts: { truck?: number; hot?: boolean } = {}): Search {
+// noFlat: a new player's tutorial search never gets a flat (fixing one costs gems they don't have yet).
+export function rollSearch(spotId: string, finds: ServerFind[] | null = null, opts: { truck?: number; hot?: boolean; noFlat?: boolean } = {}): Search {
   const spot = RESCUE_SPOTS.find((o) => o.id === spotId)!
   const scale = spot.cost / 500
   const truck = truckOf(opts.truck)
@@ -2835,7 +2858,7 @@ export function rollSearch(spotId: string, finds: ServerFind[] | null = null, op
   })
   for (const f of finds ?? []) if (f.i >= 0 && f.i < n) pins[f.i] = { kind: 'car', model: f.model, rarity: f.rarity, uid: f.uid }
   if (!pins.some((p) => p.kind === 'car')) pins[Math.floor(Math.random() * n)] = rollCar(spotId, !!opts.hot)
-  const flatAt = Math.random() < truck.flat ? pick(Array.from({ length: n }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
+  const flatAt = !opts.noFlat && Math.random() < truck.flat ? pick(Array.from({ length: n }, (_, i) => i).filter((i) => pins[i].kind !== 'car')) : null
   return { spot: spotId, pins, revealed: pins.map(() => false), truckAt: null, flatAt: flatAt ?? null, flat: false }
 }
 

@@ -26,3 +26,6 @@ dist-ssr
 .env
 .env.local
 .*.mjs
+
+# Roblox port kit (node scripts/roblox/export.mjs)
+roblox-export

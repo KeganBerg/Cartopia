@@ -4,7 +4,7 @@ import { CLAN_EMBLEMS, carDef } from '../game/data'
 import { CarThumb } from '../scene/BuildingPreview'
 import { useLive, challenge } from '../lib/live'
 import { GHOST_FUEL } from '../lib/ghosts'
-import { CREW_DEMO, demoLadder, fetchLadder, nextUp, raceCrewMate, useCrewMates, type Racer } from '../lib/crewRaces'
+import { CREW_DEMO, demoLadder, fetchLadder, ladderPlaces, nextUp, raceCrewMate, useCrewMates, type Racer } from '../lib/crewRaces'
 import { DEMO } from '../lib/friends'
 import type { Member, MyClan } from '../lib/clans'
 import { useCrewGoal } from './CrewGoal'
@@ -48,6 +48,9 @@ function Name({ r, me }: { r: Racer; me: string }) {
   return <button className="cl-name link" onClick={() => !r.demo && go(r.id)}><PlayerName id={r.demo ? null : r.id} town={r.name} /></button>
 }
 
+// Shown beside a time another racer matched to the thousandth: same place, same medal.
+const Tie = () => <small className="cl-tie" title="Same time to the thousandth">🤝 Tie</small>
+
 const timeOf = (r: Racer) => (r.time === null ? '—' : r.par ? 'No time' : secs(r.time))
 
 export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
@@ -76,8 +79,10 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
   // #2 on the left, #1 in the middle, #3 on the right.
   const order = [podium[1], podium[0], podium[2]].filter(Boolean) as Racer[]
   const rest = ladder.slice(3)
+  const places = ladderPlaces(ladder)
   const up = nextUp(ladder, uid)
-  const myRank = ladder.findIndex((r) => r.id === uid) + 1
+  const mine = places[ladder.findIndex((r) => r.id === uid)]
+  const myRank = mine?.place ?? 0
 
   return (
     <div className="rm-tile rm-photo cl" style={artStyle('camp', 'main')}>
@@ -85,13 +90,14 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
       <div className={`cl-podium n${order.length}`}>
         {order.map((r) => {
           const rank = ladder.indexOf(r)
+          const { place, tied } = places[rank]
           return (
             <div key={r.id} className={`cl-spot p${rank + 1}${r.id === uid ? ' me' : ''}${online.has(r.id) ? ' on' : ''}`}>
               <div className="cl-car"><Car r={r} /></div>
               <div className="cl-step">
-                <em>{MEDAL[rank]}</em>
+                <em>{MEDAL[place - 1]}</em>
                 <Name r={r} me={uid} />
-                <span className="cl-time">{timeOf(r)}</span>
+                <span className="cl-time">{timeOf(r)}{tied && <Tie />}</span>
                 <RaceBtn r={r} me={uid} online={online} />
               </div>
             </div>
@@ -102,13 +108,13 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
         <div className="cl-rows">
           {rest.map((r, i) => (
             <div key={r.id} className={`cl-row${r.id === uid ? ' me' : ''}${online.has(r.id) ? ' on' : ''}`}>
-              <span className="cl-rank">{i + 4}</span>
+              <span className="cl-rank">{places[i + 3].place}</span>
               <div className="cl-car sm"><Car r={r} /></div>
               <div className="cl-main">
                 <Name r={r} me={uid} />
                 <small><span className="rm-pi">PI {r.pi}</span> {r.carName}</small>
               </div>
-              <span className="cl-time">{timeOf(r)}</span>
+              <span className="cl-time">{timeOf(r)}{places[i + 3].tied && <Tie />}</span>
               <RaceBtn r={r} me={uid} online={online} />
             </div>
           ))}
@@ -116,7 +122,9 @@ export function CrewLadder({ members, uid }: { members: Mate[]; uid: string }) {
       )}
       {myRank > 0 && (
         <span className="rm-cta cl-me">
-          {myRank === 1 || !up
+          {mine?.tied && up?.gap === 0
+            ? <span>🤝 Tied for <b>#{myRank}</b> with <PlayerName id={up.racer.demo ? null : up.racer.id} town={up.racer.name} /></span>
+            : myRank === 1 || !up
             ? <span>👑 You're the crew's fastest. Defend it!</span>
             : <span>You're <b>#{myRank}</b> · {up.gap !== null ? <><b>{up.gap.toFixed(3)}s</b> off </> : 'set a time to pass '}<PlayerName id={up.racer.demo ? null : up.racer.id} town={up.racer.name} /></span>}
           {up && myRank > 1 && <RaceBtn r={up.racer} me={uid} online={online} />}

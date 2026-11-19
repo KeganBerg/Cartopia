@@ -1367,7 +1367,7 @@ export default function Sydney({ len, race }: WorldProps) {
   const lawnB = len + 46 - (b1 + 1)
   return (
     <>
-      <Batch version={`sydney-d3:${len}`} cell={24}>
+      <Batch version={`sydney-d3:${len}`} cell={24} freeze prune>
         {/* The foreshore lawn and the sandstone sea wall either side of the beach, the beach
             promenade and wet sand; the footpath and the grass behind the terraces. */}
         {[[-14, lawnA], [b1 + 1, lawnB]].map(([z0, d]) => (

@@ -271,6 +271,36 @@ export async function deleteChat(room: Room, id: number): Promise<string | null>
   return null
 }
 
+export type ReportReason = 'mean' | 'spam' | 'unsafe'
+export const REPORT_REASONS: { id: ReportReason; label: string }[] = [
+  { id: 'mean', label: '😠 Mean' },
+  { id: 'spam', label: '📢 Spam' },
+  { id: 'unsafe', label: '⚠️ Unsafe' },
+]
+
+// Flags a message for the admins (admin panel 🚩 Reports + an email to support) through
+// netlify/functions/chat-report.mts. Returns an error to show, or null once reported.
+export async function reportChat(id: number, reason: ReportReason): Promise<string | null> {
+  if (!supabase) return 'Chat needs an internet connection'
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) return 'Sign in to report'
+  try {
+    const res = await fetch('/.netlify/functions/chat-report', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, reason }),
+    })
+    if (res.ok) return null
+    const { error } = await res.json().catch(() => ({ error: '' })) as { error?: string }
+    if (error === 'slow down') return 'Too many reports today'
+    if (error === 'gone') return 'That message is already gone'
+  } catch {
+    // falls through to the generic line
+  }
+  return "Couldn't send the report. Try again."
+}
+
 export function setMuted(owner: string, name: string | null) {
   useChat.setState((s) => {
     const muted = { ...s.muted }

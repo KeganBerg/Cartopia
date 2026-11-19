@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useGame } from '../game/store'
 import { CARS, carDef, xpToNext } from '../game/data'
 import { activeEvent, liveEvents } from '../game/liveEvents'
-import { admin, type AdminLogRow, type AdminPlayer, type LiveKind } from '../lib/admin'
+import { admin, type AdminLogRow, type AdminPlayer, type AdminReport, type LiveKind, type ReportOutcome } from '../lib/admin'
 import { useNow } from '../scene/useNow'
 import { CarThumb } from '../scene/BuildingPreview'
 import { Panel, SheetTabs } from './Menus'
@@ -15,12 +15,7 @@ import './admin.css'
 // Kegan's admin panel (Menu > 🛡 for admins only). Every button is an admin_* RPC
 // that the server checks and logs (0095_admin_panel.sql); this screen only drives them.
 
-type Tab = 'live' | 'players' | 'log'
-const TABS = [
-  { id: 'live', label: '⚡ Live' },
-  { id: 'players', label: '👤 Players' },
-  { id: 'log', label: '📜 Log' },
-] as const
+type Tab = 'live' | 'reports' | 'players' | 'log'
 
 const toast = (t: string) => useGame.getState().toast(t)
 
@@ -44,10 +39,28 @@ function AskModal({ ask, onClose }: { ask: Ask; onClose: () => void }) {
 export function AdminPanel() {
   const [tab, setTab] = useState<Tab>('live')
   const [ask, setAsk] = useState<Ask | null>(null)
+  const [reports, setReports] = useState<AdminReport[] | null>(null)
+  const loadReports = useCallback(async () => {
+    const r = await admin.reports()
+    setReports(r.data ?? [])
+    return r.data ?? []
+  }, [])
+  // Open on the reports when someone is waiting on an answer.
+  useEffect(() => {
+    void loadReports().then((r) => { if (r.length) setTab('reports') })
+  }, [loadReports])
+  const open = reports?.length ?? 0
+  const tabs = [
+    { id: 'live', label: '⚡ Live' },
+    { id: 'reports', label: open ? `🚩 ${open}` : '🚩' },
+    { id: 'players', label: '👤 Players' },
+    { id: 'log', label: '📜 Log' },
+  ] as const
   return (
     <Panel title="🛡 Admin" wide className="adm">
-      <SheetTabs items={TABS} value={tab} onChange={setTab} />
+      <SheetTabs items={tabs} value={tab} onChange={setTab} />
       {tab === 'live' && <LiveTab confirm={setAsk} />}
+      {tab === 'reports' && <ReportsTab rows={reports} reload={loadReports} confirm={setAsk} />}
       {tab === 'players' && <PlayersTab confirm={setAsk} />}
       {tab === 'log' && <LogTab />}
       {ask && <AskModal ask={ask} onClose={() => setAsk(null)} />}
@@ -362,8 +375,49 @@ function PlayerView({ id, onBack, confirm }: { id: string; onBack: () => void; c
 
 // ---------------------------------------------------------------- log
 
+// ---------------------------------------------------------------- chat reports
+const REASON_ICON: Record<string, string> = { mean: '😠', spam: '📢', unsafe: '⚠️' }
+
+function ReportsTab({ rows, reload, confirm }: { rows: AdminReport[] | null; reload: () => Promise<AdminReport[]>; confirm: (a: Ask) => void }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  if (open) return <PlayerView id={open} onBack={() => setOpen(null)} confirm={confirm} />
+  if (!rows) return <p className="hint adm-empty">⏳</p>
+  if (!rows.length) return <p className="hint adm-empty">✅ No reports</p>
+  const act = async (r: AdminReport, outcome: ReportOutcome) => {
+    if (busy) return
+    setBusy(true)
+    let err: string | null = null
+    if (outcome === 'deleted' && r.reported && r.live) err = (await admin.chatDelete(r.reported, r.message)).error
+    if (outcome === 'muted' && r.reported) err = (await admin.mute(r.reported, 24 * 60, `Chat report: ${r.reasons.join(', ')}`)).error
+    if (!err) err = (await admin.closeReport(r.message, outcome)).error
+    setBusy(false)
+    if (err) return toast(`⚠️ ${err}`)
+    toast(outcome === 'dismissed' ? '✔ Dismissed' : outcome === 'deleted' ? '🗑 Deleted' : '🔇 Muted 24h')
+    await reload()
+  }
+  return (
+    <div className="adm-rows">
+      {rows.map((r) => (
+        <div key={r.message} className="adm-row adm-report">
+          <span className="adm-run-ico" title={r.reasons.join(', ')}>{r.reasons.map((x) => REASON_ICON[x] ?? '🚩').join('')}</span>
+          <button className="adm-who adm-rep-who" onClick={() => r.reported && setOpen(r.reported)}>
+            <b>{r.reportedName}{r.count > 1 ? ` ×${r.count}` : ''}</b>
+            <small className="adm-rep-body">“{r.body}”</small>
+          </button>
+          <span className="adm-rep-acts">
+            <button className="sell small" disabled={busy || !r.live} title="Delete message" onClick={() => confirm({ icon: '🗑', title: 'Delete this message?', ok: 'Delete', run: () => void act(r, 'deleted') })}>🗑</button>
+            <button className="sell small" disabled={busy} title="Mute 24 hours" onClick={() => confirm({ icon: '🔇', title: `Mute ${r.reportedName} for 24h?`, ok: 'Mute', run: () => void act(r, 'muted') })}>🔇</button>
+            <button className="buy small alt" disabled={busy} title="Dismiss" onClick={() => void act(r, 'dismissed')}>✔</button>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 const ACTION_ICON: Record<string, string> = {
-  live_start: '▶', live_end: '⏹', grant: '💰', give_car: '🎁', take_car: '🚗', mute: '🔇', unmute: '🔊', chat_delete: '🗑', chat_purge: '🗑',
+  report_close: '🚩', live_start: '▶', live_end: '⏹', grant: '💰', give_car: '🎁', take_car: '🚗', mute: '🔇', unmute: '🔊', chat_delete: '🗑', chat_purge: '🗑',
 }
 
 function logLine(r: AdminLogRow) {
@@ -376,6 +430,7 @@ function logLine(r: AdminLogRow) {
     case 'give_car': case 'take_car': return carDef(String(d.model)).name
     case 'mute': return d.minutes ? `${d.minutes}m` : '∞'
     case 'chat_purge': return `${d.deleted}`
+    case 'report_close': return String(d.outcome)
     default: return ''
   }
 }

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { flyFrom, openChestFx, type Amounts } from './Fly'
+import { KeepTabs } from './KeepTabs'
 import {
   useGame, activeGoals, eventGoals, goalOpen, goalDone, statValue, claimable, taskDef, taskText, taskProgress, periodSlots, periodDone, chestOpened,
   activeEndless, endlessReady, endlessTown,
@@ -350,7 +351,7 @@ export function GoalsPanel() {
   // Opens on the first tab with something to collect, else where it was left.
   const ev = activeEvent()
   const eventDot = eventGoals().filter((g) => goalOpen(s, g) && goalDone(s, g)).length
-  const [tab, setTabState] = useState<GoalsTab>(() => {
+  const pick = (): GoalsTab => {
     const has = (p: Period) => periodSlots(s.quests, p).some((t) => !periodDone(s.quests, p).includes(t.id) && taskProgress(s, p, t) >= t.n)
       || (periodDone(s.quests, p).length >= TASKS_PER_PERIOD && !chestOpened(s.quests, p))
     if (activeGoals(s).some((g) => goalDone(s, g)) || (!endlessCapped(s.endless) && activeEndless(s).some((g) => endlessReady(s, g)))) return 'story'
@@ -358,7 +359,11 @@ export function GoalsPanel() {
     if (has('daily')) return 'daily'
     if (has('weekly')) return 'weekly'
     return lastGoalsTab === 'event' && !ev ? 'story' : lastGoalsTab ?? 'story'
-  })
+  }
+  const [tab, setTabState] = useState<GoalsTab>(pick)
+  // Shown again after being kept out of sight (Kept): picks again, like a fresh open.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => setTabState(pick()), [])
   const setTab = (t: GoalsTab) => { lastGoalsTab = t; setTabState(t) }
   const dot = (p: Period) => {
     const done = periodDone(s.quests, p)
@@ -374,7 +379,7 @@ export function GoalsPanel() {
         { id: 'weekly', label: <>📅 Weekly{dot('weekly')}</> },
         ...(ev ? [{ id: 'event' as const, label: <>{ev.icon} Event{eventDot ? <span className="tab-dot">{eventDot}</span> : null}</> }] : []),
       ]} />
-      {tab === 'story' ? <StoryGoals /> : tab === 'event' ? <EventGoals /> : <Tasks key={tab} period={tab} />}
+      <KeepTabs tab={tab} render={(t) => (t === 'story' ? <StoryGoals /> : t === 'event' ? <EventGoals /> : <Tasks period={t} />)} />
     </Panel>
   )
 }

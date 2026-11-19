@@ -154,6 +154,7 @@ uniform vec3 uShallow;
 uniform vec3 uFoam;
 uniform float uRing;
 uniform float uEdge;
+uniform float uRough;
 varying vec3 vWPos;
 varying vec2 vDisk;
 float lwHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -278,6 +279,9 @@ export type WaterLook = {
   shore?: boolean
   // Where the shore foam starts, in disk radii (a big lake's band is thinner).
   edge?: number
+  // The smoothest the surface gets (calm water is a near mirror). A fountain's small pools
+  // sit next to neon and lamps at night, where a mirror turns every light into a hot glint.
+  rough?: number
 }
 
 export function liveWater(look: WaterLook) {
@@ -289,6 +293,7 @@ export function liveWater(look: WaterLook) {
     uFoam: { value: new Color(look.foam ?? '#f4fbff') },
     uRing: { value: look.ring ?? 0 },
     uEdge: { value: look.edge ?? 0.9 },
+    uRough: { value: look.rough ?? 0.07 },
   }
   const defines = `${look.verts ? '#define LW_VERTS\n' : ''}${look.ring ? '#define LW_RING\n' : ''}${look.shore === false ? '' : '#define LW_SHORE\n'}`
   m.onBeforeCompile = (sh) => {
@@ -323,7 +328,10 @@ export function liveWater(look: WaterLook) {
         vec2 lwGe = vec2(dFdx(lwE), dFdy(lwE));
         mat2 lwJ = mat2(dFdx(lwP), dFdy(lwP));
         vec2 lwGw = inverse(transpose(lwJ)) * lwGe;
-        lwSlope += lwGw * sign(lwE - uRing) * cos(lwPh) * 26.0 * lwFall * 0.008;
+        // On a pool's thin side wall the xz position barely changes across the pixel, so the
+        // gradient blows up: cap it, or the rim lights up as a white-hot glint.
+        vec2 lwRs = lwGw * sign(lwE - uRing) * cos(lwPh) * 26.0 * lwFall * 0.008;
+        lwSlope += lwRs * min(1.0, 0.35 / max(length(lwRs), 1e-4));
         lwFoam = max(lwFoam, smoothstep(0.1, 0.0, lwR) * (0.55 + 0.45 * lwNoise(lwP * 30.0 + uWT * 6.0)));
       #endif
       float lwDepth = 1.0;
@@ -338,7 +346,7 @@ export function liveWater(look: WaterLook) {
       // Light catching the faces of the waves.
       lwBody *= 1.0 + dot(lwSlope, vec2(0.6, 0.45)) * 0.45;
       diffuseColor.rgb = mix(lwBody, uFoam, lwFoam * 0.9);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.07 + uWind * 0.08, 0.7, lwFoam);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(uRough + uWind * 0.08, 0.7, lwFoam);')
       .replace('#include <normal_fragment_begin>', /* glsl */ `#include <normal_fragment_begin>
       vec3 lwN = normalize(vec3(-lwSlope.x, 1.0, -lwSlope.y));
       normal = normalize((viewMatrix * vec4(lwN, 0.0)).xyz);`)
@@ -367,8 +375,8 @@ function makeKinds() {
   return {
     pond: liveWater({ deep: '#2b8fc4', shallow: '#62c6e8', edge: 0.95 }),
     koi: liveWater({ deep: '#1f6f7c', shallow: '#3fa5a8', edge: 0.95 }),
-    basin: liveWater({ deep: '#3aa6d8', shallow: '#7fd3f2', ring: 0.82, shore: false }),
-    bowl: liveWater({ deep: '#5bbbe6', shallow: '#9ee0f7', ring: 0.05, shore: false }),
+    basin: liveWater({ deep: '#3aa6d8', shallow: '#7fd3f2', ring: 0.82, shore: false, rough: 0.42 }),
+    bowl: liveWater({ deep: '#5bbbe6', shallow: '#9ee0f7', ring: 0.05, shore: false, rough: 0.42 }),
   }
 }
 export const waterKinds = () => (kinds ??= makeKinds())
@@ -378,7 +386,7 @@ export const waterKinds = () => (kinds ??= makeKinds())
 let falling: MeshStandardMaterial | null = null
 export function fallingWater() {
   if (falling) return falling
-  const m = (falling = new MeshStandardMaterial({ color: '#b3e5fc', roughness: 0.1, metalness: 0.05 }))
+  const m = (falling = new MeshStandardMaterial({ color: '#b3e5fc', roughness: 0.55, metalness: 0 }))
   m.userData.live = true
   m.onBeforeCompile = (sh) => {
     addFog(sh)

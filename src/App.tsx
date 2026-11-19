@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CountFrames, FpsMeter } from './ui/FpsMeter'
 import { SharedShapes } from './scene/sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -8,10 +8,12 @@ import { Hud } from './ui/Hud'
 import { FlyLayer } from './ui/Fly'
 import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
+import { WarmPreview } from './scene/WarmPreview'
 import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
 import { ShotGrabber, ShotMode } from './ui/ShotMode'
+import { Cruise } from './ui/Cruise'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
@@ -20,10 +22,11 @@ import { CupPrizePopup, MasteryPrizePopup } from './ui/ClassCups'
 import { joinLobby, useLive } from './lib/live'
 import { chatDemo, startChat } from './lib/chat'
 import { ChatPanel } from './ui/Chat'
-import { FriendsPanel, VisitBanner } from './ui/Friends'
-import { LeadersPanel, ClanPanel } from './ui/Social'
-import { MeetPanel } from './ui/Meet'
+import { VisitBanner } from './ui/Friends'
+import { SocialPanel, isSocialTab, type SocialTab } from './ui/SocialPanel'
+import { Kept } from './ui/KeepTabs'
 import { Tutorial } from './ui/Tutorial'
+import { TutHand } from './ui/TutHand'
 import { Tips } from './ui/Tips'
 import { Badges } from './ui/Badges'
 import { ThoughtBubble } from './ui/Thought'
@@ -48,6 +51,7 @@ import { useGame } from './game/store'
 import { setCalmSky } from './game/weather'
 import { startCloudSync } from './lib/cloud'
 import { startPurchaseSync } from './lib/payments'
+import { startMenuHistory } from './lib/menuHistory'
 import './lib/rescue'
 import './lib/crates'
 import './lib/accountSwitch'
@@ -67,10 +71,11 @@ import { VisitorBadges, StreetRaceCard } from './ui/Visitors'
 import { visitorTick, forceVisitor } from './lib/visitors'
 import type { VisitorKind } from './game/data'
 import { hideSplash, splashProgress } from './lib/splash'
-import { rememberSplashCar } from './lib/splashCar'
+import { rememberSplashCar, skinSplashCar } from './lib/splashCar'
 import { usePrefs } from './lib/prefs'
 import { onDemand, reopenAfterReload } from './ui/lazy'
 import { useAdminCheck } from './lib/admin'
+import { captureArrival, startInviteFollowUp } from './lib/invite'
 
 // Rusty's yard, the crate depot and the arcade each bring their own 3D scenes,
 // so they load on first open instead of with the town. Once the town is up they
@@ -105,6 +110,9 @@ const prefetchPanels = () => {
 export default function App() {
   useAdminCheck()
   const panel = useGame((s) => s.panel)
+  // The Social window kept out of sight shows the tab it was left on.
+  const [socialTab, setSocialTab] = useState<SocialTab>('friends')
+  if (isSocialTab(panel) && panel !== socialTab) setSocialTab(panel)
   // Real-money menus need the Crew House (src/game/payGate.ts).
   const bankOn = useGame((s) => unlocked(s, 'bank'))
   const paceStep = useTownPace((p) => p.step)
@@ -124,8 +132,10 @@ export default function App() {
   useCrewBattleWatcher()
 
   useEffect(() => {
+    captureArrival()
     startCloudSync()
     startPurchaseSync()
+    const stopMenuHistory = startMenuHistory()
     startAmbience()
     startMusic()
     startTechnoMusic()
@@ -140,6 +150,7 @@ export default function App() {
     // The loading screen leaves after the town's first frames; this is the fallback if they never come.
     const splashFallback = setTimeout(hideSplash, 15000)
     const prefetch = setTimeout(prefetchPanels, 6000)
+    skinSplashCar()
     const stopSplashCar = rememberSplashCar()
     // Checked again when it fires: a cloud save may have loaded since, already claimed today.
     // On first launch it waits for the flashing-lights warning (FlashWarning opens it after).
@@ -154,6 +165,7 @@ export default function App() {
     // ?visitor=racer|tourist|mystery|barn brings a guest's visitor right away (for testing).
     const forced = new URLSearchParams(location.search).get('visitor') as VisitorKind | null
     if (forced) setTimeout(() => forceVisitor(forced), 2500)
+    const stopInvite = startInviteFollowUp()
     const id = setInterval(() => {
       tick(Date.now())
       visitorTick()
@@ -162,8 +174,10 @@ export default function App() {
       clearInterval(id)
       clearTimeout(splashFallback)
       unsubDaily()
+      stopInvite()
       clearTimeout(prefetch)
       stopSplashCar()
+      stopMenuHistory()
     }
   }, [tick])
 
@@ -195,35 +209,36 @@ export default function App() {
       <ThumbRenderer />
       <StageCanvas />
       <Preview.StageCanvas />
+      <WarmPreview />
       <Hud />
       <LiveBanner />
       <BottomBar />
-      {panel === 'shop' && <ShopPanel />}
-      {panel === 'inventory' && <InventoryPanel />}
+      {/* The main menus stay built while switching between them (Kept), and go back in town. */}
+      <Kept on={panel === 'shop'} open={!!panel}><ShopPanel /></Kept>
+      <Kept on={panel === 'inventory'} open={!!panel}><InventoryPanel /></Kept>
       {/* My Cars, For Sale, Collection and Crates are one page that stays up while its tabs switch. */}
-      {(panel === 'garage' || panel === 'showroom' || panel === 'crates') && <CarsPage crates={(onReady) => <CratesPanel embedded onReady={onReady} />} />}
+      <Kept on={panel === 'garage' || panel === 'showroom' || panel === 'crates'} open={!!panel}><CarsPage crates={(onReady) => <CratesPanel embedded onReady={onReady} />} /></Kept>
       {panel === 'race' && !liveRace && <RacePanel />}
       {liveRace && <LiveRaceOverlay />}
       {panel === 'invites' && <InvitesPanel />}
-      {panel === 'friends' && <FriendsPanel />}
-      {panel === 'leaders' && <LeadersPanel />}
-      {panel === 'clan' && <ClanPanel />}
-      {panel === 'meet' && <MeetPanel />}
+      {/* Friends, Crew, Meet and Leaderboards: one window that stays up while its tabs switch. */}
+      <Kept on={isSocialTab(panel)} open={!!panel}><SocialPanel tab={socialTab} /></Kept>
       {panel === 'chat' && <ChatPanel />}
       {panel === 'need' && <NeedPanel />}
       {panel === 'upgrade' && <UpgradePanel />}
       {panel === 'rescue' && <RescuePanel />}
-      {panel === 'bank' && bankOn && <BankPanel />}
-      {panel === 'carpacks' && bankOn && <CarPacksPanel />}
+      <Kept on={panel === 'bank' && bankOn} open={!!panel}><BankPanel /></Kept>
+      <Kept on={panel === 'carpacks' && bankOn} open={!!panel}><CarPacksPanel /></Kept>
       {panel === 'deals' && <DealsPanel />}
       {panel === 'battle' && <BattlePanel />}
       <VisitBanner />
       <Tutorial />
+      <TutHand />
       <Tips />
       <GoalSplash />
       <AlertsCard />
       {panel === 'account' && <AccountPanel />}
-      {panel === 'goals' && <GoalsPanel />}
+      <Kept on={panel === 'goals'} open={!!panel}><GoalsPanel /></Kept>
       {panel === 'season' && <SeasonPanel />}
       {panel === 'daily' && <WheelPanel />}
       {panel === 'flat' && <FlatPanel />}
@@ -254,6 +269,7 @@ export default function App() {
       <RaveHeadsUp />
       <FlashWarning />
       <ShotMode />
+      <Cruise />
     </>
   )
 }

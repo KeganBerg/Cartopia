@@ -1566,7 +1566,7 @@ export default function Vegas({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`vegas:${len}`} cell={24}>
+      <Batch version={`vegas:${len}`} cell={24} freeze prune>
         {[1, -1].map((s) => (
           <mesh key={s} rotation-x={-Math.PI / 2} position={[s * (EDGE + 0.9), 0.012, len / 2 + 5]}>
             <planeGeometry args={[1.8, len + 60]} />

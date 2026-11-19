@@ -122,6 +122,16 @@ function startTier(): FxTier {
   return tier
 }
 
+// What a falling frame rate does to the effects tier. The town steps down there and then.
+// Anything else (a race, a crate, a minigame) keeps its tier to the end and the next one starts
+// a step lower: stepping down rebuilds every shader, and in a race that froze the screen right
+// at GO and the first shift, when the frame rate dips. One step per scene; null: nothing to do.
+export function declineStep(tier: FxTier, town: boolean, queued: boolean): { live: FxTier; save: FxTier } | null {
+  const next = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(tier) + 1)]
+  if (town) return { live: next, save: next }
+  return queued ? null : { live: tier, save: next }
+}
+
 const pinned = typeof location !== 'undefined' && new URLSearchParams(location.search).has('fx')
 
 
@@ -170,16 +180,26 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
 
   // The town tries drawing fewer pixels, then fewer frames, before giving up effects.
   const pace = useTownPace((p) => p.step)
+  const queued = useRef(false)
   const stepDown = () => {
     if (town && paceDown()) return
-    setTier((t) => {
-      const next = TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(t) + 1)]
+    const save = (t: FxTier) => {
       try {
-        sessionStorage.setItem(STORE, next)
+        sessionStorage.setItem(STORE, t)
       } catch {
         // Not remembered; it will step down again if needed.
       }
-      return next
+    }
+    if (!town) {
+      const step = declineStep(tier, false, queued.current)
+      if (step) save(step.save)
+      queued.current = true
+      return
+    }
+    setTier((t) => {
+      const { live } = declineStep(t, true, false)!
+      save(live)
+      return live
     })
   }
 

@@ -21,6 +21,8 @@
 /* Building cards: the model at its level, a level badge, name, pips and the next price. */
 .ug-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .ug-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 8px 10px; background: #fff; border: 3px solid var(--line, #14213d); border-radius: 18px; box-shadow: 0 4px 0 rgba(20,33,61,.3); cursor: pointer; text-align: center; color: var(--line, #14213d); }
+/* A late-game town has hundreds of cards: the ones off screen skip layout until scrolled near. */
+.ug-card { content-visibility: auto; contain-intrinsic-size: auto 200px; }
 .ug-card:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(20,33,61,.3); }
 .ug-card .thumb3d { --th: 104px; width: 100%; background: #dcecfb; border-radius: 12px; }
 .ug-card.ready { background: #eaffe4; border-color: #1d6b22; }

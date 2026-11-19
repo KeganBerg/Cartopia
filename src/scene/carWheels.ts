@@ -72,9 +72,16 @@ export function brakeGeo(r: number, w: number, sd: number) {
   const x = sd * w * 0.12
   put(rotor, new CylinderGeometry(ri * 0.82, ri * 0.82, 0.012, 20), [x + sd * 0.0085, 0, 0], [0, 0, Math.PI / 2])
   put(rotor, new CylinderGeometry(ri * 0.34, ri * 0.34, 0.03, 12), [x + sd * 0.01, 0, 0], [0, 0, Math.PI / 2])
-  // Caliper clamped over the rotor at the back, top.
+  // Caliper clamped over the rotor at the back, top: a fat arc that follows the rotor's edge
+  // (a flat block reads as a box floating in the spokes), squashed flat against the rotor.
   const a = 2.2
-  put(cal, new BoxGeometry(0.03, ri * 0.32, ri * 0.55), [x + sd * 0.012, Math.sin(a) * ri * 0.66, Math.cos(a) * ri * 0.66], [-(a - Math.PI / 2), 0, 0])
+  const arc = 0.9
+  const tube = ri * 0.15
+  const g = new TorusGeometry(ri * 0.66, tube, 4, 4, arc)
+  g.rotateZ(Math.PI - a - arc / 2)
+  g.rotateY(Math.PI / 2)
+  g.scale(0.03 / (tube * 2), 1, 1)
+  put(cal, g, [x + sd * 0.012, 0, 0])
   return { rotor: merge(rotor), caliper: merge(cal) }
 }
 

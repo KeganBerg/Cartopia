@@ -1,5 +1,5 @@
 import { BoxGeometry, CircleGeometry, CylinderGeometry, PlaneGeometry, Shape, ShapeGeometry, SphereGeometry, TorusGeometry, Vector2 } from 'three'
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
+import { roundedBox } from './roundedBox'
 import type { Kit } from './CarModel'
 import { wellGeo, wellOutline, type ExoticFit, type ExoticHelpers } from './exoticCars'
 import type { Body } from '../game/data'
@@ -11,7 +11,7 @@ import type { Body } from '../game/data'
 // No real brand names or logos.
 
 const box = (w: number, h: number, d: number) => new BoxGeometry(w, h, d)
-const rbox = (w: number, h: number, d: number, r: number) => new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
+const rbox = (w: number, h: number, d: number, r: number) => roundedBox(w, h, d, 2, Math.min(r, w / 2 - 0.001, h / 2 - 0.001, d / 2 - 0.001))
 const plane = (w: number, h: number) => new PlaneGeometry(w, h)
 const disc = (r: number, seg = 16) => new CircleGeometry(r, seg)
 const half = (r: number, seg = 8) => new CircleGeometry(r, seg, Math.PI, Math.PI)

@@ -807,7 +807,7 @@ export default function Jaipur({ len, race }: WorldProps) {
 
   return (
     <>
-      <Batch version={`jaipur:${len}`} cell={24}>
+      <Batch version={`jaipur:${len}`} cell={24} freeze prune>
         {/* Worn stone pavements between the road and the shops. */}
         {[-1, 1].map((s) => (
           <mesh key={s} rotation-x={-Math.PI / 2} position={[s * (EDGE + 1.3), 0.012, len / 2 + 5]}>

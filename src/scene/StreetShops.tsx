@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
-import { InstancedMesh, Matrix4, type Group, type Mesh } from 'three'
+import { BatchedMesh, Matrix4, type BufferGeometry, type Group, type Material, type Mesh } from 'three'
 import { TILE, buildingDef } from '../game/data'
 import { BuildingModel } from './BuildingModel'
 import { Batch } from './Batch'
@@ -13,9 +13,6 @@ import { LAYER } from './layers'
 // half a gigabyte, and phones closed the tab at the start line. Now each kind of
 // shop is built once, merged (Batch), and that merged mesh is drawn at every
 // spot it stands, so the street costs the same however long the race is.
-
-// How long a stretch of street is drawn as one, in world units.
-const STRETCH = 40
 
 export type Slot ={ z: number; side: -1 | 1; def: string }
 type Piece = { key: string; def: string; shop: boolean; at: Matrix4[] }
@@ -64,41 +61,59 @@ export function StreetShops({ slots }: { slots: Slot[] }) {
     const box = models.current
     const out = shown.current
     if (!box || !out) return
-    const made: InstancedMesh[] = []
+    const made: BatchedMesh[] = []
     const where = new Map(pieces.map((p) => [p.key, p.at]))
+    // Every copy of every part that draws alike (same material, shadows and layout of its data)
+    // goes into one BatchedMesh: one draw for all of them, each copy still skipped when it's off
+    // screen. One instanced mesh per part per stretch was over a thousand draws down a race.
+    const looks = new Map<string, { like: Mesh; parts: { geometry: BufferGeometry; at: Matrix4[] }[] }>()
     box.children.forEach((holder) => {
       const at = where.get(holder.name)
       // Batch draws its merged meshes in the second of its two groups.
       if (!at) return
-      // In stretches down the street, so the camera skips the ones it can't see.
-      const stretches = new Map<number, Matrix4[]>()
-      for (const m of at) {
-        const k = Math.floor(m.elements[14] / STRETCH)
-        stretches.set(k, [...(stretches.get(k) ?? []), m])
-      }
       for (const part of holder.children[1]?.children ?? []) {
         const mesh = part as Mesh
-        if (!mesh.isMesh) continue
-        for (const list of stretches.values()) {
-          const many = new InstancedMesh(mesh.geometry, mesh.material, list.length)
-          list.forEach((m, i) => many.setMatrixAt(i, m))
-          many.castShadow = mesh.castShadow
-          many.receiveShadow = mesh.receiveShadow
-          many.renderOrder = mesh.renderOrder
-          many.raycast = () => {}
-          made.push(many)
-          out.add(many)
-        }
+        if (!mesh.isMesh || Array.isArray(mesh.material)) continue
+        const g = mesh.geometry
+        const data = Object.entries(g.attributes).map(([k, a]) => `${k}:${a.itemSize}:${a.normalized}:${a.array.constructor.name}`).sort().join()
+        const key = `${mesh.material.uuid}|${mesh.castShadow}|${mesh.receiveShadow}|${mesh.renderOrder}|${!!g.index}|${data}`
+        let look = looks.get(key)
+        if (!look) looks.set(key, (look = { like: mesh, parts: [] }))
+        look.parts.push({ geometry: g, at })
       }
     })
-    // The models themselves are only the pattern.
+    for (const { like, parts } of looks.values()) {
+      let copies = 0, verts = 0, indices = 0
+      for (const p of parts) {
+        copies += p.at.length
+        verts += p.geometry.attributes.position.count
+        indices += p.geometry.index?.count ?? 0
+      }
+      const many = new BatchedMesh(copies, verts, indices, like.material as Material)
+      for (const p of parts) {
+        const id = many.addGeometry(p.geometry)
+        for (const m of p.at) many.setMatrixAt(many.addInstance(id), m)
+      }
+      many.castShadow = like.castShadow
+      many.receiveShadow = like.receiveShadow
+      many.renderOrder = like.renderOrder
+      // Solid parts don't need putting in order every frame; see-through ones do.
+      many.sortObjects = (like.material as Material).transparent
+      many.raycast = () => {}
+      made.push(many)
+      out.add(many)
+    }
+    // The models themselves are only the pattern: not drawn, and not placed again every frame
+    // (thousands of hidden parts, the most matrix work in a Main Street race).
     box.visible = false
+    box.matrixWorldAutoUpdate = false
     return () => {
       for (const m of made) {
         out.remove(m)
         m.dispose()
       }
       box.visible = true
+      box.matrixWorldAutoUpdate = true
     }
   }, [pieces])
   return (

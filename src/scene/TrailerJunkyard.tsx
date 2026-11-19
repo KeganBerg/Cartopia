@@ -6,6 +6,7 @@ import { Upright } from './mergeScale'
 import { PEOPLE_SIZED } from './keepShape'
 import { SEASON, PAL } from './season'
 import { brickTex, concreteTex, corrugatedTex, gravelTex, paverTex, shingleTex, sidingTex, soilTex } from './textures'
+import { doorTag } from './doors'
 import { Ball, Box, Bulbs, Cyl, Flag, GOLD, Patch, Pool, Sign, type EdgeProps, type Mat, type V3 } from './edgeKit'
 import type { ReactNode } from 'react'
 
@@ -75,20 +76,20 @@ function SingleWide({ m, win, bulb, at, rot = 0, len = 1.45, color, stripe, ghos
         <mesh key={sd} position={[sd * (len / 2 + 0.004), 0.47, 0]} rotation-y={(sd * Math.PI) / 2}><planeGeometry args={[0.18, 0.16]} />{win}</mesh>
       ))}
       {/* Front door, an aluminium awning on two poles and wooden steps. */}
-      <mesh position={[0.15, 0.36, zf + 0.006]}><planeGeometry args={[0.15, 0.34]} />{m('#eceff1')}</mesh>
-      <mesh position={[0.15, 0.44, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
+      <mesh position={[0.15, 0.37, zf + 0.006]} userData={doorTag()}><planeGeometry args={[0.2, 0.4]} />{m('#eceff1')}</mesh>
+      <mesh position={[0.15, 0.46, zf + 0.009]}><planeGeometry args={[0.09, 0.09]} />{win}</mesh>
       {/* Round a shared patio the awning shrinks to a door hood, so no poles stand in the patio. */}
       {hood ? (
         <Box m={m} at={[0.15, 0.66, zf + 0.07]} s={[0.3, 0.02, 0.14]} c="#cfd8dc" rot={[0.12, 0, 0]} />
       ) : (
         <>
-          <Box m={m} at={[0.15, 0.64, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
-          {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.32, zf + 0.32]} r={0.01} h={0.64} c="#b0bec5" seg={5} />)}
+          <Box m={m} at={[0.15, 0.665, zf + 0.17]} s={[0.46, 0.02, 0.34]} c="#cfd8dc" rot={[0.08, 0, 0]} />
+          {[-0.06, 0.36].map((x) => <Cyl key={x} m={m} at={[x, 0.33, zf + 0.32]} r={0.01} h={0.66} c="#b0bec5" seg={5} />)}
         </>
       )}
-      <Box m={m} at={[0.15, 0.075, zf + 0.12]} s={[0.26, 0.15, 0.12]} c="#8d6e63" />
-      <Box m={m} at={[0.15, 0.04, zf + 0.23]} s={[0.26, 0.08, 0.1]} c="#8d6e63" />
-      {!ghost && <mesh position={[0.32, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
+      <Box m={m} at={[0.15, 0.055, zf + 0.12]} s={[0.26, 0.11, 0.12]} c="#8d6e63" />
+      <Box m={m} at={[0.15, 0.0275, zf + 0.23]} s={[0.26, 0.055, 0.1]} c="#8d6e63" />
+      {!ghost && <mesh position={[0.36, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
       {/* Hitch tongue still on the end, a propane bottle and a window AC unit. */}
       <Box m={m} at={[-len / 2 - 0.08, 0.18, 0]} s={[0.22, 0.035, 0.05]} c="#37474f" rot={[0, 0.0, 0]} />
       <Cyl m={m} at={[-len / 2 - 0.16, 0.1, 0]} r={0.015} h={0.16} c="#37474f" seg={5} />
@@ -221,19 +222,19 @@ function DoubleWide({ m, win, bulb, lvl, color, roof, trim, ghost }: { m: Mat; w
       {[-1, 1].map((sd) => (
         <mesh key={sd} position={[sd * (w / 2 + 0.004), 0.45, z0]} rotation-y={(sd * Math.PI) / 2}><planeGeometry args={[0.22, 0.2]} />{win}</mesh>
       ))}
-      <mesh position={[0.1, 0.35, zf + 0.004]}><planeGeometry args={[0.17, 0.36]} />{m('#5d4037')}</mesh>
-      {!ghost && <mesh position={[0.25, 0.5, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
-      {/* Wooden deck along the front with rails and steps. */}
-      <Box m={m} at={[0.05, 0.13, zf + 0.22]} s={[1.15, 0.04, 0.44]} c="#a1887f" t={paverTex(3, 1)} />
-      {[-0.5, -0.1, 0.3, 0.6].map((x) => <Box key={x} m={m} at={[x, 0.06, zf + 0.416]} s={[0.04, 0.12, 0.04]} c="#795548" />)}
-      <Box m={m} at={[-0.22, 0.3, zf + 0.43]} s={[0.66, 0.025, 0.025]} c="#8d6e63" />
-      {[-0.5, -0.38, -0.26, -0.14, -0.02, 0.1].map((x) => <Box key={x} m={m} at={[x, 0.22, zf + 0.43]} s={[0.015, 0.16, 0.015]} c="#8d6e63" shadow={false} />)}
-      <Box m={m} at={[0.45, 0.0475, zf + 0.51]} s={[0.26, 0.095, 0.14]} c="#8d6e63" />
+      <mesh position={[0.1, 0.35, zf + 0.004]} userData={doorTag()}><planeGeometry args={[0.22, 0.4]} />{m('#5d4037')}</mesh>
+      {!ghost && <mesh position={[0.28, 0.6, zf + 0.02]}><boxGeometry args={[0.05, 0.05, 0.04]} />{bulb}</mesh>}
+      {/* Low wooden deck along the front, a rail down one side and steps up to the door. */}
+      <Box m={m} at={[0.05, 0.095, zf + 0.22]} s={[1.15, 0.04, 0.44]} c="#a1887f" t={paverTex(3, 1)} />
+      {[-0.5, -0.12, 0.3, 0.6].map((x) => <Box key={x} m={m} at={[x, 0.06, zf + 0.416]} s={[0.04, 0.12, 0.04]} c="#795548" />)}
+      <Box m={m} at={[-0.31, 0.3, zf + 0.43]} s={[0.42, 0.025, 0.025]} c="#8d6e63" />
+      {[-0.5, -0.38, -0.26, -0.14].map((x) => <Box key={x} m={m} at={[x, 0.22, zf + 0.43]} s={[0.015, 0.16, 0.015]} c="#8d6e63" shadow={false} />)}
+      <Box m={m} at={[0.1, 0.0475, zf + 0.51]} s={[0.26, 0.095, 0.14]} c="#8d6e63" />
       {/* Level 5: string lights over the deck. Level 6: a hot tub out back. */}
       {!ghost && lvl >= 5 && (
         <group>
-          <Cyl m={m} at={[0.62, 0.3, zf + 0.42]} r={0.012} h={0.6} c="#6d4c41" seg={5} />
-          <Bulbs from={[-0.6, 0.62, zf + 0.02]} to={[0.62, 0.6, zf + 0.42]} n={8} sag={0.06} />
+          <Cyl m={m} at={[0.62, 0.36, zf + 0.42]} r={0.012} h={0.72} c="#6d4c41" seg={5} />
+          <Bulbs from={[-0.6, 0.68, zf + 0.06]} to={[0.62, 0.72, zf + 0.42]} n={8} sag={0.04} />
         </group>
       )}
       {!ghost && lvl >= 6 && (
@@ -256,25 +257,27 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
       <group>
         <Box m={m} at={[0, 0.02, 0]} s={[1.94, 0.04, 1.94]} c="#ffffff" t={gravelTex(3, 3)} shadow={false} />
         <Box m={m} at={[0, 0.045, 0.2]} s={[0.56, 0.03, 1.4]} c="#ffffff" t={paverTex(1, 3)} shadow={false} />
+        {/* The way into the court: a mat across the foot of the patio. */}
+        <mesh position={[0, 0.065, 0.86]} userData={doorTag('gate')}><boxGeometry args={[0.5, 0.01, 0.16]} />{m('#8d6e63')}</mesh>
         <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[-0.6, 0, -0.1]} rot={Math.PI / 2} len={1.4} color={color} stripe={stripe} hood />
         <SingleWide m={m} win={win} bulb={bulb} ghost={ghost} at={[0.6, 0, -0.1]} rot={-Math.PI / 2} len={1.4} color="#fff8e1" stripe="#ef6c00" airstream={lvl >= 9} hood />
         {yard && (
           <group>
             {/* Picnic table and a fire pit on the patio under string lights. */}
-            <group position={[0, 0, -0.35]}>
+            <group position={[0, 0, -0.5]}>
               <Box m={m} at={[0, 0.2, 0]} s={[0.22, 0.03, 0.42]} c="#a1887f" />
               {[-0.16, 0.16].map((x) => <Box key={x} m={m} at={[x, 0.12, 0]} s={[0.07, 0.025, 0.42]} c="#a1887f" />)}
               {/* A-frame legs at each end. */}
               {[-0.15, 0.15].map((z) => [-1, 1].map((sd) => <Box key={`${z}${sd}`} m={m} at={[sd * 0.14, 0.1, z]} s={[0.025, 0.28, 0.03]} c="#8d6e63" rot={[0, 0, sd * 0.785]} />))}
             </group>
-            <group position={[0, 0.05, 0.3]}>
+            <group position={[0, 0.05, -0.06]}>
               {Array.from({ length: 8 }, (_, i) => <Ball key={i} m={m} at={[Math.sin(i * 0.785) * 0.12, 0.03, Math.cos(i * 0.785) * 0.12]} r={0.04} c="#9e9e9e" flat />)}
               {[0, 1.2].map((r) => <Cyl key={r} m={m} at={[0, 0.03, 0]} r={0.015} h={0.16} c="#5d4037" seg={5} rot={[Math.PI / 2, r, 0.3]} />)}
               <mesh position={[0, 0.06, 0]}><coneGeometry args={[0.05, 0.1, 6]} />{bulb}</mesh>
             </group>
-            <Bulbs from={[-0.32, 0.68, -0.85]} to={[0.32, 0.68, 0.55]} n={9} sag={0.08} />
-            <Bulbs from={[0.32, 0.68, -0.85]} to={[-0.32, 0.68, 0.55]} n={9} sag={0.08} />
-            {[[-0.32, -0.85], [0.32, 0.55], [0.32, -0.85], [-0.32, 0.55]].map(([x, z]) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.345, z]} r={0.012} h={0.69} c="#6d4c41" seg={5} />)}
+            <Bulbs from={[-0.32, 0.8, -0.85]} to={[0.32, 0.8, 0.55]} n={9} sag={0.08} />
+            <Bulbs from={[0.32, 0.8, -0.85]} to={[-0.32, 0.8, 0.55]} n={9} sag={0.08} />
+            {[[-0.32, -0.85], [0.32, 0.55], [0.32, -0.85], [-0.32, 0.55]].map(([x, z]) => <Cyl key={`${x}${z}`} m={m} at={[x, 0.405, z]} r={0.012} h={0.81} c="#6d4c41" seg={5} />)}
             <Pool r={0.5} z={0} />
             {/* Court sign by the road. */}
             <group position={[-0.62, 0, 0.88]}>
@@ -286,7 +289,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
             <Flamingo m={m} at={[0.25, 0, 0.82]} rot={-0.6} />
             <Flamingo m={m} at={[0.38, 0, 0.78]} rot={0.4} />
             <Grill m={m} at={[-0.26, 0, 0.12]} />
-            <LawnChair m={m} at={[0.2, 0, 0.12]} rot={-2.4} c="#26a69a" />
+            <LawnChair m={m} at={[0.27, 0, 0.12]} rot={-2.4} c="#26a69a" />
             <Mailbox m={m} at={[0.88, 0, 0.7]} />
             <Mailbox m={m} at={[-0.95, 0, 0.6]} c="#1565c0" />
           </group>
@@ -305,7 +308,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
             <Flamingo m={m} at={[-0.56, 0, 0.82]} rot={-0.3} />
             <Mailbox m={m} at={[0.88, 0, 0.9]} />
             <Grill m={m} at={[-0.52, 0, 0.45]} />
-            <LawnChair m={m} at={[0.16, 0.15, 0.4]} rot={0.3} c="#ef5350" />
+            <LawnChair m={m} at={[0.3, 0.115, 0.4]} rot={0.3} c="#ef5350" />
             <Gnome m={m} at={[-0.88, 0, 0.92]} />
             <Clothesline m={m} at={[-0.95, 0, -0.45]} rot={Math.PI / 2} />
             <WireFence m={m} z={0.96} />
@@ -326,8 +329,8 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
         <group>
           <Flamingo m={m} at={[-0.6, 0, 0.55]} rot={0.5} />
           <Flamingo m={m} at={[-0.45, 0, 0.62]} rot={-0.3} />
-          <LawnChair m={m} at={[-0.1, 0, 0.42]} rot={0.3} c="#26a69a" />
-          {lvl >= 2 && <LawnChair m={m} at={[0.22, 0, 0.5]} rot={-0.4} c="#ef5350" />}
+          <LawnChair m={m} at={[-0.32, 0, 0.42]} rot={0.3} c="#26a69a" />
+          {lvl >= 2 && <LawnChair m={m} at={[0.36, 0, 0.5]} rot={-0.4} c="#ef5350" />}
           <Grill m={m} at={[-0.85, 0, 0.3]} />
           <Mailbox m={m} at={[0.88, 0, 0.9]} />
           {lvl >= 2 && <Clothesline m={m} at={[-0.15, 0, -0.85]} />}
@@ -336,7 +339,7 @@ function TrailerHome({ m, win, bulb, ghost, lvl, color, roof }: EdgeProps) {
               <Gnome m={m} at={[-0.88, 0, 0.88]} />
               <Box m={m} at={[-0.6, 0.04, 0.88]} s={[0.4, 0.06, 0.12]} c="#6d4c41" />
               {[-0.75, -0.65, -0.55, -0.45].map((x, i) => <Ball key={x} m={m} at={[x, 0.1, 0.88]} r={0.035} c={PAL.bare ? '#2e7d32' : ['#e91e63', '#ffeb3b', '#ab47bc', '#ff7043'][i]} />)}
-              <Bulbs from={[-0.2, 0.62, 0.2]} to={[0.5, 0.62, 0.2]} n={6} sag={0.05} />
+              <Bulbs from={[-0.18, 0.665, 0.36]} to={[0.24, 0.665, 0.36]} n={5} sag={0} />
             </group>
           )}
           <WireFence m={m} z={0.96} />
@@ -504,9 +507,9 @@ function Junkyard({ m, win, bulb, ghost, lvl, lift }: EdgeProps) {
   }
   return (
     <group>
-      {/* Packed dirt yard with a concrete drive from the gate to the crusher. */}
+      {/* Packed dirt yard with a concrete drive from the gate to the crusher (the way in, under the arch). */}
       <Box m={m} at={[0, 0.025, 0]} s={[3.9, 0.05, 3.9]} c="#ffffff" t={soilTex(4, 4)} shadow={false} />
-      <Box m={m} at={[0.15, 0.055, 1.15]} s={[1.05, 0.02, 1.5]} c="#ffffff" t={concreteTex(1, 2)} shadow={false} />
+      <mesh position={[0.15, 0.055, 1.15]} receiveShadow userData={doorTag('gate')}><boxGeometry args={[1.05, 0.02, 1.5]} />{m('#ffffff', concreteTex(1, 2))}</mesh>
       {!ghost && [[-0.4, -0.2, 0.3], [0.9, 0.4, 0.22], [-1.0, 0.9, 0.18], [0.3, -1.2, 0.25]].map(([x, z, r], i) => (
         <Patch key={i} at={[x, 0.058, z]} r={r} c="#000000" opacity={0.22} sx={1.4} />
       ))}

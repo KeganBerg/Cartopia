@@ -6,6 +6,7 @@ import { tutTarget } from '../ui/Tutorial'
 import { RUSTY_LOT } from '../game/data'
 import { centerOf } from './World'
 import { VIEW, isFree } from './freeCam'
+import { tutPoint } from '../ui/tutPoint'
 
 // Where the tutorial is pointing in the town, if anywhere: the pizza place to tap
 // (the one with a job going, else the one nearest the view) or Rusty's.
@@ -64,6 +65,18 @@ export function TutorialCamera() {
     delta.y = 0
     glide.current = { from: VIEW.clone(), to: VIEW.clone().add(delta), t: 0 }
   }, [key, get])
+
+  // Placing Rusty's: where its ghost sits on screen, for the pointing hand.
+  const lot = useRef(new Vector3())
+  useFrame(() => {
+    const s = useGame.getState()
+    if (s.tutorial !== 3 || s.mode !== 'place' || s.placing !== 'rescue' || s.visiting || s.panel) { tutPoint.at = null; return }
+    const { camera, gl } = get()
+    const [x, z] = centerOf('rescue', ...RUSTY_LOT)
+    const p = lot.current.set(x, 0.6, z).project(camera)
+    const r = gl.domElement.getBoundingClientRect()
+    tutPoint.at = { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height }
+  })
 
   useFrame((_, dt) => {
     const g = glide.current

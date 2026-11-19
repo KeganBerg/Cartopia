@@ -43,8 +43,10 @@ function Spinner({ def, level, landmark, theme }: { def: BuildingDef; level: num
   const size = useThree((t) => t.size)
   useLayoutEffect(() => {
     if (!inner.current || !ref.current) return
-    const b = seat(inner.current, ref.current)
-    const floor = Math.max(b.r * 1.2, 0.8)
+    // Measured by its vertices: a turned pyramid roof's loose box is 1.4x too wide.
+    const b = seat(inner.current, ref.current, undefined, true)
+    // The disc hugs the model's swept footprint so a small shop fills the card too.
+    const floor = Math.max(b.r * 1.08, 0.3)
     disc.current?.scale.setScalar(floor)
     camera.aspect = size.width / Math.max(1, size.height)
     frame(camera, b, VIEW, { floor, pad: 0.06 })
@@ -179,6 +181,8 @@ export function UpgradePanel() {
   // Back to the menu it was opened from; opened from the town (a tap, or Edit > Move), it
   // closes straight back to the town and whatever mode the player was in.
   const close = () => (useGame.getState().panelBack.length ? useGame.getState().closePanel() : useGame.setState({ panel: null, upgrading: null }))
+  // The X always goes straight to the town; the back arrow shows when there is a menu to go back to.
+  const toTown = () => useGame.setState({ panel: null, panelBack: [], upgrading: null })
   if (!b) return null
   const d = buildingDef(b.def)
   if (!themable(d)) return null
@@ -217,14 +221,17 @@ export function UpgradePanel() {
   // A merged block of houses reaching level 10 becomes a landmark (a Vanguard or Globe Tower).
   const becomes = block && isLandmark({ ...block, anchor: { ...block.anchor, level: next } }) ? landmarkName(block) : null
   if (d.kind === 'house') {
-    rows.push({ label: 'Building', now: landmark ?? levelName(d, lvl), next: becomes ?? levelName(d, next) })
+    const now = landmark ?? levelName(d, lvl)
+    const then = becomes ?? levelName(d, next)
+    // Only when the house actually turns into something else.
+    if (now !== then) rows.push({ label: 'Building', now, next: then })
     rows.push({ label: 'Residents', now: `${houseResidents(lvl) * k}`, next: `${houseResidents(next) * k}` })
     rows.push({ label: 'Upgrade XP', now: '', next: `+${xpGain(s.level, buildingUpgradeXp(lvl) * k)}` })
   }
   const name = landmark ? landmark : levelName(d, lvl) + (k > 1 ? ` ×${k}` : '')
 
   return (
-    <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={close}>
+    <Panel title={canUp ? `${name} · Level ${lvl}` : name} onClose={toTown} onBack={s.panelBack.length ? s.closePanel : undefined}>
       <div className="upgrade">
         <LevelPreview def={d} level={canUp ? next : lvl} landmark={becomes} theme={themeFor(b.tint, s.cityTheme, d.kind === 'decor')} />
         {canUp && <Pips level={lvl} max={maxLevel(d)} />}

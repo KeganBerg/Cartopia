@@ -134,7 +134,11 @@ export function bake(parts: [BufferGeometry, Finish, Matrix4?][], uvs = false) {
   out.setAttribute('normal', packed(normal, Int8Array, 127, 3))
   if (uv) out.setAttribute('uv', new BufferAttribute(uv, 2))
   // Colours brighter than white (made to glow under bloom) stay as they are.
-  const rgb = (a: Float32Array) => (a.every((x) => x >= 0 && x <= 1) ? packed(a, Uint16Array, 65535, 3) : new BufferAttribute(a, 3))
+  // (A plain loop: every() with a callback per value was most of a big bake on a slow phone.)
+  const rgb = (a: Float32Array) => {
+    for (let i = 0; i < a.length; i++) if (!(a[i] >= 0 && a[i] <= 1)) return new BufferAttribute(a, 3)
+    return packed(a, Uint16Array, 65535, 3)
+  }
   out.setAttribute('color', rgb(color))
   out.setAttribute('emissive', rgb(emissive))
   out.setAttribute('look', packed(look, Uint8Array, 255, 4))

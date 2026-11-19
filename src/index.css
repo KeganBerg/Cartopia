@@ -276,6 +276,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-dots i.on { background: #ffca28; }
 .tut-dots i.cur { width: 16px; background: #ffca28; }
 .tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tut-actions .buy { white-space: nowrap; }
 .tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
 .tut-car { flex: none; align-self: center; }
 .tut-car .thumb3d.xs { --tw: 104px; --th: 76px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
@@ -291,6 +292,17 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 @keyframes unlockPop { 0% { transform: scale(0); opacity: 0; } 70% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
 @keyframes unlockTag { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .just-unlocked { animation: none; } }
+/* The tutorial's pointing finger and the ring around the next tap (src/ui/TutHand.tsx). Taps pass through. */
+.tut-hand, .tut-ring { position: fixed; left: 0; top: 0; z-index: 400; pointer-events: none; opacity: 0; transition: opacity .25s; }
+.tut-hand.on, .tut-ring.on { opacity: 1; }
+.tut-hand span { display: block; font-size: 46px; line-height: 1; transform-origin: 40% 0; translate: -40% 4px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)) drop-shadow(0 0 6px rgba(255,255,255,.8)); animation: tutTap 1s ease-in-out infinite; }
+.tut-hand.down span { rotate: 180deg; }
+@keyframes tutTap { 0%, 100% { translate: -40% 14px; } 45% { translate: -40% 0; scale: 1; } 55% { scale: .9; } }
+.tut-ring { border: 4px solid #ffca28; border-radius: 16px; box-shadow: 0 0 0 0 rgba(0,0,0,0), 0 0 14px rgba(255,202,40,.9); animation: tutRing 1s ease-in-out infinite; transition: opacity .25s, box-shadow .6s; }
+.tut-ring:not(.top) { z-index: 60; }
+.tut-ring.dim { box-shadow: 0 0 0 200vmax rgba(8,16,32,.55), 0 0 14px rgba(255,202,40,.9); }
+@keyframes tutRing { 50% { border-color: #fff8e1; } }
+@media (prefers-reduced-motion: reduce) { .tut-hand span, .tut-ring { animation: none; } }
 @keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,202,40,.95); transform: scale(1); } 50% { box-shadow: 0 0 0 8px rgba(255,202,40,0); transform: scale(1.08); } }
 
 /* Phones in portrait. */
@@ -682,6 +694,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .ts-secret { max-width: 100%; font-size: 12px; letter-spacing: .06em; color: #546e7a; overflow-wrap: anywhere; text-align: center; user-select: all; }
 .set-group .ts-msg { margin: 0 12px 10px; text-align: center; font-weight: 800; color: #d84343; }
 .set-seg { margin: 10px 12px 4px; }
+.rbx-code { margin: 4px 12px 8px; padding: 10px; text-align: center; font: 900 28px/1 ui-monospace, monospace; letter-spacing: 4px; color: #263238; background: #f1f6fb; border-radius: 12px; user-select: all; }
 .set-note { display: block; padding: 0 14px 10px; color: #607d8b; font-weight: 600; font-size: 12.5px; }
 .switch { flex: none; position: relative; width: 50px; height: 30px; padding: 0; border-radius: 16px; border: 2.5px solid var(--line, #14213d); background: #cfd8dc; box-shadow: inset 0 2px 3px rgba(0,0,0,.18); cursor: pointer; transition: background .15s; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: linear-gradient(#fff, #e3ecf7); border: 2px solid var(--line, #14213d); box-sizing: border-box; transition: transform .15s; }
@@ -709,6 +722,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .reset-type input { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; font-size: 18px; font-weight: 800; letter-spacing: .04em; text-align: center; border: 2px solid #c62828; border-radius: 10px; padding: 8px; background: #fff; }
 .danger-btn:disabled { opacity: .45; filter: grayscale(.6); box-shadow: none; }
 .agree { font-size: 12.5px; margin: 6px 0 12px; }
+.forgot { display: block; font-size: 13px; margin: 8px 0 2px; }
 .legal { font-size: 14px; line-height: 1.55; }
 .legal h3 { color: #1e5fbf; }
 .legal ul { padding-left: 20px; }
@@ -942,17 +956,21 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 /* Free camera toggle, docked above Goals. Lit blue while the free view is on. */
 .goals-btn.cam-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(248px + var(--sab)); width: 60px; height: 60px; border-radius: 16px; }
 .goals-btn.cam-dock.on { background: linear-gradient(#6ab4ff 0 50%, #3a86ea 50%); color: #fff; }
-/* Screenshot mode (src/ui/ShotMode.tsx): hide-everything and save-picture, left of the camera toggle in the free view. */
-.shot-dock { position: absolute; z-index: 51; right: calc(96px + var(--sar)); bottom: calc(248px + var(--sab)); display: flex; gap: 10px; }
+/* Screenshot mode (src/ui/ShotMode.tsx): hide-everything and save-picture, stacked over the camera toggle in the right-hand column. */
+.shot-dock { position: absolute; z-index: 51; right: calc(26px + var(--sar)); bottom: calc(320px + var(--sab)); display: flex; flex-direction: column-reverse; gap: 12px; }
 .shot-dock .goals-btn { position: static; width: 60px; height: 60px; border-radius: 16px; }
 /* While on, only the town's 3D view is left: every other layer of the page is hidden and lets touches through. */
 html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d):not(.shot-ui) *, html.shot body > :not(#root), html.shot body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+/* Driving your own car round town (src/ui/Cruise.tsx): only the town and the driving controls are left, and the town takes no taps. */
+html.cruise #root > :not(.town-3d):not(.cruise-ui), html.cruise #root > :not(.town-3d):not(.cruise-ui) *, html.cruise body > :not(#root), html.cruise body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+html.cruise .town-3d { pointer-events: none; }
+.cruise-ui { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
 .shot-ui { position: absolute; z-index: 60; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,.45); color: #fff; font: 15px var(--display); pointer-events: none; transition: opacity .6s; }
 .shot-ui.gone { opacity: 0; }
 @media (max-width: 700px) {
   .goals-btn.goals-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(140px + var(--sab)); border-radius: 14px; }
   .goals-btn.cam-dock { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(202px + var(--sab)); border-radius: 14px; }
-  .shot-dock { right: calc(70px + var(--sar)); bottom: calc(202px + var(--sab)); gap: 8px; }
+  .shot-dock { right: calc(10px + var(--sar)); bottom: calc(264px + var(--sab)); gap: 10px; }
   .shot-dock .goals-btn { width: 52px; height: 52px; border-radius: 14px; }
   .collect-all { width: 52px; height: 52px; right: calc(10px + var(--sar)); bottom: calc(76px + var(--sab)); }
   .collect-ico { font-size: 24px; }
@@ -961,7 +979,8 @@ html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d)
 @media (max-height: 500px) {
   .goals-btn.goals-dock { width: 44px; height: 44px; font-size: 20px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(164px + var(--sab)); }
   .goals-btn.cam-dock { width: 44px; height: 44px; border-radius: 12px; right: calc(34px + var(--sar)); bottom: calc(216px + var(--sab)); }
-  .shot-dock { right: calc(86px + var(--sar)); bottom: calc(216px + var(--sab)); gap: 6px; }
+  /* No room above in landscape: a row to the left of the camera toggle. */
+  .shot-dock { flex-direction: row; right: calc(86px + var(--sar)); bottom: calc(216px + var(--sab)); gap: 6px; }
   .shot-dock .goals-btn { width: 44px; height: 44px; border-radius: 12px; }
   .collect-all { width: 48px; height: 48px; right: calc(32px + var(--sar)); bottom: calc(110px + var(--sab)); border-width: 2.5px; }
   .collect-all::before { inset: 4px; }
@@ -1143,7 +1162,7 @@ button.lvl-item:hover { border-color: var(--accent); transform: translateY(-2px)
 .race-full .rf-canvas { position: absolute !important; inset: 0; }
 .rf-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: calc(8px + var(--sat)) calc(12px + var(--sar)) 18px calc(14px + var(--sal)); background: linear-gradient(rgba(10,30,60,.55), transparent); pointer-events: none; }
 .rf-top h2 { flex: 1; margin: 0; font: 20px var(--display); color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rf-top .close { pointer-events: auto; flex: none; }
+.rf-top .close, .rf-top .panel-back { pointer-events: auto; flex: none; }
 .rf-lanes { position: absolute; top: calc(52px + var(--sat)); left: calc(12px + var(--sal)); right: calc(12px + var(--sar)); max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 4px; padding: 4px; border-radius: 12px; background: rgba(27,31,36,.55); pointer-events: none; }
 .rf-lane { position: relative; height: 24px; border-radius: 8px; background: repeating-linear-gradient(90deg, transparent 0 30px, rgba(255,255,255,.25) 30px 50px) center / 100% 2px no-repeat, rgba(255,255,255,.08); }
 .rf-lane .lane-name { font-size: 10px; top: 1px; }
@@ -1622,6 +1641,7 @@ button.book-car { font: inherit; color: inherit; }
 .tab-dot, .btn-dot { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; margin-left: 5px; border-radius: 9px; background: #e53935; color: #fff; font: 12px/1 var(--display); vertical-align: middle; }
 .icon-btn .i { position: relative; }
 .btn-dot { position: absolute; top: -4px; right: -6px; margin: 0; border: 2px solid #fff; }
+.btn-dot.war, .tab-dot.war { background: #ff6d00; font-size: 11px; white-space: nowrap; }
 @media (max-width: 600px) {
   .book-cars { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .book-car .thumb3d.sm { --tw: 72px; --th: 56px; }
@@ -1862,7 +1882,7 @@ button.book-car { font: inherit; color: inherit; }
    touch-action: none so a wobbling thumb never turns into a pan that cancels the press. */
 .rf-bottom { display: grid; grid-template-columns: auto 1fr auto; align-items: end; justify-items: center; touch-action: none; }
 .rf-bottom * { touch-action: none; -webkit-touch-callout: none; }
-.rf-dial { display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: none; }
+.rf-dial { display: flex; flex-direction: column; align-items: center; gap: 7px; pointer-events: none; }
 .rf-dial .tach { width: 120px; height: 120px; flex: none; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
 .rf-speed { font: 34px var(--display); color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.4); line-height: 1; white-space: nowrap; }
 .rf-speed small { font-size: 15px; }
@@ -2197,7 +2217,7 @@ button.book-car { font: inherit; color: inherit; }
 .car-traits .loves-ico { padding: 0; background: none; border: 0; font-size: 16px; }
 .car-traits > .driver-row { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 14px; }
 .car-traits > .driver-row b { font: 15px var(--display); }
-.car-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; }
+.car-toggles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; max-width: 420px; }
 .car-toggles .showcase-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 8px; border-radius: 12px; font: 15px var(--display); color: #37474f; background: #fff; border: 2px solid #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; white-space: nowrap; }
 .car-toggles .showcase-toggle.on { background: #ffca28; border-color: #e0a800; box-shadow: 0 2px 0 #c79400; color: #5d4037; }
 .car-toggles .race-toggle.on { background: #43a047; border-color: #2e7d32; box-shadow: 0 2px 0 #1b5e20; color: #fff; opacity: 1; cursor: default; }
@@ -2229,6 +2249,10 @@ button.book-car { font: inherit; color: inherit; }
 .fr-claim { flex-direction: column; align-items: stretch; gap: 6px; border-color: var(--accent); background: #fff8ef; }
 .fr-add { display: flex; gap: 8px; align-items: center; margin: 4px 0 6px; }
 .fr-add input { flex: 1; margin: 0; min-width: 0; }
+.fr-invite { display: flex; gap: 8px; align-items: center; margin: 2px 0 8px; }
+.fr-invite .buy { flex: 1; display: inline-flex; justify-content: center; align-items: center; gap: 8px; }
+.fr-invite-prize { display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: 999px; background: rgba(0,0,0,.18); }
+.fr-invite-stats { display: inline-flex; align-items: center; gap: 4px; font-weight: 800; white-space: nowrap; }
 .fr-h { display: flex; align-items: center; gap: 6px; margin: 12px 0 6px; }
 .fr-h small { font-weight: 800; font-size: 12px; color: #78909c; }
 .fr-empty { margin: 0; font-size: 14px; }
@@ -2270,6 +2294,7 @@ button.book-car { font: inherit; color: inherit; }
 @media (max-width: 400px) { .tab-emo { display: none; } }
 /* The Shop's Recreation tab reads "Rec" on a phone. */
 @media (max-width: 600px) { .tab-long { display: none; } }
+@media (min-width: 601px) { .tab-short { display: none; } }
 /* Town news waits while a race fills the screen. */
 body:has(.race-full) .toasts { display: none; }
 .rf-hold { position: absolute; left: 0; right: 0; bottom: calc(200px + var(--sab)); width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #ffd54f; font: 18px var(--display); pointer-events: none; white-space: nowrap; }

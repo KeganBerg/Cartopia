@@ -14,6 +14,7 @@ import { reducedMotion } from '../game/fx'
 import { buzz } from '../lib/haptics'
 import { wheelTick, wheelWin } from '../lib/wheelSfx'
 import { CoinIcon, BuckIcon, PartsIcon, Icon } from './Icon'
+import { MenuBack } from './MenuBack'
 import { compact } from './format'
 import { flyFrom } from './Fly'
 import { LoadingScene } from './Loading'
@@ -172,9 +173,10 @@ export function WheelPanel() {
       <StageSlot cam={WHEEL_CAM}>{scene}</StageSlot>
       <LoadingScene ready={stageReady} label="Opening the Daily Spin" onClose={close} />
       <div className="rf-top">
+        <MenuBack />
         <h2>🎡 Daily Spin</h2>
         <span className="crate-wallet"><span><CoinIcon size={16} />{compact(coins)}</span><span><BuckIcon size={16} />{compact(bucks)}</span></span>
-        <button className="close" onClick={close} aria-label="Close"><Icon name="close" size={16} /></button>
+        <button className="close" onClick={() => useGame.getState().closeMenus()} aria-label="Close"><Icon name="close" size={16} /></button>
       </div>
       {won && result ? (
         <div className="wh-prize" ref={prizeEl} style={{ ['--tier' as string]: TIER_COLOR[won.tier] }}>

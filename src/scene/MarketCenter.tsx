@@ -11,6 +11,7 @@ import { signTexture } from './signTexture'
 import { PAL, SEASON } from './season'
 import { asphaltTex, concreteTex } from './textures'
 import { decal } from './layers'
+import { doorTag } from './doors'
 
 // Fresh Mart Supercenter: the market's form for a merged block at level 7-10
 // (see src/game/marketCenter.ts for the layout). Built in true units for the
@@ -102,17 +103,18 @@ function Store({ m, win, bulb, level, t }: { m: Mat; win: ReactNode; bulb: React
           <planeGeometry args={[ent - 0.16, eh - 0.4]} />
           <meshStandardMaterial color="#b3e5fc" roughness={0.1} metalness={0.4} />
         </mesh>
-        {/* Two pairs of sliding doors, lit from inside: people walk in here. */}
+        {/* Two pairs of sliding doors, lit from inside, both inside the crossing's width;
+            people walk in at IN, the one clear of the car park's lamps. */}
         {[-1, 1].map((sd) => (
-          <group key={sd} position={[sd * ent * 0.22, 0, 0.306]}>
-            <mesh position={[0, 0.4, 0]}>
+          <group key={sd} position={[sd * ent * 0.19, 0, 0.306]}>
+            <mesh position={[0, 0.4, 0]} userData={sd > 0 ? doorTag('slide') : {}}>
               <planeGeometry args={[ent * 0.3, 0.72]} />
               {bulb}
             </mesh>
             <Box m={m} at={[0, 0.4, 0.004]} s={[0.02, 0.72, 0.008]} c="#cfd8dc" shadow={false} />
             <mesh position={[0, 0.86, 0.004]}>
               <planeGeometry args={[0.24, 0.1]} />
-              <meshBasicMaterial map={signTexture(sd < 0 ? 'IN' : 'OUT', sd < 0 ? GREEN : '#c62828', '#ffffff', 2.4)} toneMapped={false} />
+              <meshBasicMaterial map={signTexture(sd > 0 ? 'IN' : 'OUT', sd > 0 ? GREEN : '#c62828', '#ffffff', 2.4)} toneMapped={false} />
             </mesh>
           </group>
         ))}

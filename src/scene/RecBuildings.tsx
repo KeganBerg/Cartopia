@@ -8,6 +8,7 @@ import { TrueSize, Upright, useMergeScale } from './mergeScale'
 import { PEOPLE_SIZED } from './keepShape'
 import { PAL } from './season'
 import { FairCrowd, type Visitor } from './FairCrowd'
+import { doorTag } from './doors'
 import { awningTex, concreteTex, grassTex, paverTex, sandTex } from './textures'
 
 // Recreation from the third wave of buildings (mini golf, pool, funfair, water park, courts).
@@ -374,7 +375,7 @@ function MiniGolf({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
             <mesh position={[0, 0.38, 0]}><sphereGeometry args={[0.09, 10, 8]} />{m('#e1f5fe')}</mesh>
           </group>
           <Bench m={m} at={[-1.75, 0.05, 0.85]} rot={Math.PI / 2} />
-          <Lamp m={m} bulb={bulb} at={[-0.72, 0.05, 1.02]} ghost={ghost} />
+          <Lamp m={m} bulb={bulb} at={[-0.54, 0.05, 1.02]} ghost={ghost} />
           <Glow r={0.5} x={-0.18} z={0.02} y={0.072} />
           <Glow r={0.4} x={1.62} z={0.3} y={0.096} />
           <Lamp m={m} bulb={bulb} at={[1.9, 0.05, -0.92]} ghost={ghost} />
@@ -490,7 +491,7 @@ function Pool({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
           {[[0.1, 0.3, '#ff7043'], [0.9, -0.1, '#fdd835'], [1.3, 0.25, '#e91e63']].map(([x, z, c]) => <Ring key={x as number} m={m} at={[x as number, 0.042, z as number]} c={c as string} />)}
           <Planter m={m} at={[-0.25, 0.05, 1.02]} w={0.3} d={0.1} />
           {[0.15, 1.1].map((x) => <Glow key={x} r={0.45} x={x} z={(z0 + z1) / 2} y={0.052} />)}
-          <Lamp m={m} bulb={bulb} at={[-0.8, 0.05, 1.0]} ghost={ghost} />
+          <Lamp m={m} bulb={bulb} at={[-0.7, 0.05, 1.0]} ghost={ghost} />
           <Lamp m={m} bulb={bulb} at={[1.9, 0.05, 1.02]} ghost={ghost} />
           {st >= 2 && <Bulbs from={[-0.85, 0.95, 0.56]} to={[1.9, 0.95, 0.56]} n={13} posts={0.9} sag={0.06} />}
         </group>
@@ -889,7 +890,8 @@ function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
       )}
       {/* Clear of the Ferris wheel beside it and the swing ride's chairs. */}
       {st >= 3 && <group position={[0.25, 0.05, -1.55]}><DropTower m={m} bulb={bulb} c={def.roof} /></group>}
-      {/* Entrance: the gateway arch and the ticket booth. */}
+      {/* Entrance: the gateway arch with a red mat through it, and the ticket booth. */}
+      <mesh position={[-0.4, 0.053, 1.88]} userData={doorTag('gate')}><boxGeometry args={[1.1, 0.006, 0.2]} />{m('#c62828')}</mesh>
       <group position={[-0.4, 0.05, 1.9]}>
         <Upright>
           {[-0.62, 0.62].map((x) => (
@@ -919,7 +921,7 @@ function Funfair({ k, def, lvl }: { k: K; def: BuildingDef; lvl: number }) {
           {st >= 2 && <Bulbs from={[-0.9, 1.05, -0.35]} to={[0.1, 1.05, -0.35]} n={7} sag={0.06} />}
           {lvl < 4 && <Bench m={m} at={[-0.4, 0.05, 0.2]} rot={0} />}
           {/* The midway fills up level by level. */}
-          {lvl >= 2 && <group position={[-0.4, 0.05, 1.15]}><SnackCart m={m} c="#c62828" stripe="#e53935" top="popcorn" /></group>}
+          {lvl >= 2 && <group position={[0.1, 0.05, 1.15]}><SnackCart m={m} c="#c62828" stripe="#e53935" top="popcorn" /></group>}
           {lvl >= 3 && <group position={[0.32, 0.05, -0.12]}><BalloonStand m={m} /></group>}
           {lvl >= 4 && <group position={[-0.4, 0.05, 0.55]}><Teacups m={m} bulb={bulb} /></group>}
           {lvl >= 4 && <group position={[-0.15, 0.05, -0.15]}><SnackCart m={m} c="#f48fb1" stripe="#ec407a" top="floss" /></group>}

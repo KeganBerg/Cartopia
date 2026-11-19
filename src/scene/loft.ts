@@ -31,7 +31,16 @@ export class Loft {
     const f = Math.min(1, Math.max(0, t - i))
     const [a, b, c, d] = [k[Math.max(0, i - 1)], k[i], k[i + 1], k[Math.min(n, i + 2)]]
     const pts = b.pts.map((p, j): Pt => [cr(a.pts[j][0], p[0], c.pts[j][0], d.pts[j][0], f), cr(a.pts[j][1], p[1], c.pts[j][1], d.pts[j][1], f), p[2]])
-    return { z: b.z + (c.z - b.z) * f, pts }
+    return { z: this.zAt(t), pts }
+  }
+
+  // Just the z of the section at key index t, as at() gives it.
+  zAt(t: number) {
+    const k = this.keys
+    const n = k.length - 1
+    const i = Math.min(n - 1, Math.max(0, Math.floor(t)))
+    const f = Math.min(1, Math.max(0, t - i))
+    return k[i].z + (k[i + 1].z - k[i].z) * f
   }
 
   // The section at a position along the car (z between the end keys).
@@ -42,7 +51,9 @@ export class Loft {
     const dir = zs[0].z > zs[hi].z ? -1 : 1
     for (let i = 0; i < 40; i++) {
       const m = (lo + hi) / 2
-      if ((this.at(m).z - z) * dir < 0) lo = m
+      // Only the z is needed while searching: building each whole section here made a new car
+      // take most of a second on a slow phone.
+      if ((this.zAt(m) - z) * dir < 0) lo = m
       else hi = m
     }
     return this.at((lo + hi) / 2)
