@@ -276,6 +276,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .tut-dots i.on { background: #ffca28; }
 .tut-dots i.cur { width: 16px; background: #ffca28; }
 .tut-actions { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.tut-actions .buy { white-space: nowrap; }
 .tut-skip { background: none; border: none; padding: 2px 4px; color: #b0bec5; font-weight: 800; font-size: 12px; text-decoration: underline; }
 .tut-car { flex: none; align-self: center; }
 .tut-car .thumb3d.xs { --tw: 104px; --th: 76px; width: var(--tw); height: var(--th); background: radial-gradient(ellipse at 50% 70%, #fff 0 35%, #cfd8dc 80%); border-radius: 10px; }
@@ -693,6 +694,7 @@ button.fuel { background: none; border: none; padding: 0; color: inherit; }
 .ts-secret { max-width: 100%; font-size: 12px; letter-spacing: .06em; color: #546e7a; overflow-wrap: anywhere; text-align: center; user-select: all; }
 .set-group .ts-msg { margin: 0 12px 10px; text-align: center; font-weight: 800; color: #d84343; }
 .set-seg { margin: 10px 12px 4px; }
+.rbx-code { margin: 4px 12px 8px; padding: 10px; text-align: center; font: 900 28px/1 ui-monospace, monospace; letter-spacing: 4px; color: #263238; background: #f1f6fb; border-radius: 12px; user-select: all; }
 .set-note { display: block; padding: 0 14px 10px; color: #607d8b; font-weight: 600; font-size: 12.5px; }
 .switch { flex: none; position: relative; width: 50px; height: 30px; padding: 0; border-radius: 16px; border: 2.5px solid var(--line, #14213d); background: #cfd8dc; box-shadow: inset 0 2px 3px rgba(0,0,0,.18); cursor: pointer; transition: background .15s; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 21px; height: 21px; border-radius: 50%; background: linear-gradient(#fff, #e3ecf7); border: 2px solid var(--line, #14213d); box-sizing: border-box; transition: transform .15s; }
@@ -959,6 +961,10 @@ html.calm *, html.calm *::before, html.calm *::after { animation-duration: .001m
 .shot-dock .goals-btn { position: static; width: 60px; height: 60px; border-radius: 16px; }
 /* While on, only the town's 3D view is left: every other layer of the page is hidden and lets touches through. */
 html.shot #root > :not(.town-3d):not(.shot-ui), html.shot #root > :not(.town-3d):not(.shot-ui) *, html.shot body > :not(#root), html.shot body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+/* Driving your own car round town (src/ui/Cruise.tsx): only the town and the driving controls are left, and the town takes no taps. */
+html.cruise #root > :not(.town-3d):not(.cruise-ui), html.cruise #root > :not(.town-3d):not(.cruise-ui) *, html.cruise body > :not(#root), html.cruise body > :not(#root) * { visibility: hidden !important; pointer-events: none !important; }
+html.cruise .town-3d { pointer-events: none; }
+.cruise-ui { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
 .shot-ui { position: absolute; z-index: 60; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%); padding: 6px 14px; border-radius: 14px; background: rgba(0,0,0,.45); color: #fff; font: 15px var(--display); pointer-events: none; transition: opacity .6s; }
 .shot-ui.gone { opacity: 0; }
 @media (max-width: 700px) {
@@ -2211,7 +2217,7 @@ button.book-car { font: inherit; color: inherit; }
 .car-traits .loves-ico { padding: 0; background: none; border: 0; font-size: 16px; }
 .car-traits > .driver-row { background: #e8f5e9; color: #2e7d32; cursor: pointer; font-size: 14px; }
 .car-traits > .driver-row b { font: 15px var(--display); }
-.car-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 360px; }
+.car-toggles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; max-width: 420px; }
 .car-toggles .showcase-toggle { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; padding: 0 8px; border-radius: 12px; font: 15px var(--display); color: #37474f; background: #fff; border: 2px solid #c6d7ee; box-shadow: 0 2px 0 #c6d7ee; white-space: nowrap; }
 .car-toggles .showcase-toggle.on { background: #ffca28; border-color: #e0a800; box-shadow: 0 2px 0 #c79400; color: #5d4037; }
 .car-toggles .race-toggle.on { background: #43a047; border-color: #2e7d32; box-shadow: 0 2px 0 #1b5e20; color: #fff; opacity: 1; cursor: default; }
@@ -2288,6 +2294,7 @@ button.book-car { font: inherit; color: inherit; }
 @media (max-width: 400px) { .tab-emo { display: none; } }
 /* The Shop's Recreation tab reads "Rec" on a phone. */
 @media (max-width: 600px) { .tab-long { display: none; } }
+@media (min-width: 601px) { .tab-short { display: none; } }
 /* Town news waits while a race fills the screen. */
 body:has(.race-full) .toasts { display: none; }
 .rf-hold { position: absolute; left: 0; right: 0; bottom: calc(200px + var(--sab)); width: fit-content; margin: 0 auto; padding: 6px 16px; border-radius: 999px; background: rgba(27,31,36,.7); color: #ffd54f; font: 18px var(--display); pointer-events: none; white-space: nowrap; }

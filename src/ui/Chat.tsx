@@ -10,6 +10,9 @@ import { Panel } from './Menus'
 import { ClanTag, useVisit } from './Social'
 import './chat.css'
 import { sfx } from '../lib/sound'
+import { fetchTownNews, type NewsItem } from '../lib/townNews'
+import { openPlayerCard } from '../lib/playerCard'
+import { PlayerName } from './Username'
 
 const ago = (at: number) => {
   const m = Math.floor((Date.now() - at) / 60000)
@@ -148,6 +151,7 @@ function ChatRoom({ room }: { room: Room }) {
 
   return (
     <>
+      {room === 'global' && <TownNews />}
       <div
         className="chat-log"
         ref={log}
@@ -167,7 +171,7 @@ function ChatRoom({ room }: { room: Room }) {
               {first && !mine && (
                 <button className="chat-who" onClick={() => setMenu(menu === m.id ? null : m.id)}>
                   <ClanTag clan={m.crew} small />
-                  <b>{senderName(m)}</b>
+                  <b data-no-i18n>{senderName(m)}</b>
                   {m.mod && <span className="chat-mod" title="Cartopia team" aria-label="Cartopia team">✔</span>}
                   <small>Lv {m.level} · {ago(m.at)}</small>
                 </button>
@@ -189,7 +193,7 @@ function ChatRoom({ room }: { room: Room }) {
                 </div>
               )}
               <div className="chat-line">
-                <p className="chat-bubble" {...holdProps(m, has)}><MentionText text={m.body} me={myName} />{mine && first && <small>{ago(m.at)}</small>}</p>
+                <p className="chat-bubble" {...holdProps(m, has)}><span data-no-i18n><MentionText text={m.body} me={myName} /></span>{mine && first && <small>{ago(m.at)}</small>}</p>
                 {has && menu !== m.id && (
                   <button className="chat-more" aria-label="Message options" onClick={() => setMenu(m.id)}>⋯</button>
                 )}
@@ -215,5 +219,28 @@ function ChatRoom({ room }: { room: Room }) {
         <button className="buy" disabled={busy || !text.trim()} aria-label="Send">➤</button>
       </form>
     </>
+  )
+}
+
+// This week's board leaders, one tap from their player card.
+function TownNews() {
+  const [items, setItems] = useState<NewsItem[]>([])
+  useEffect(() => {
+    let on = true
+    void fetchTownNews().then((n) => on && setItems(n))
+    return () => { on = false }
+  }, [])
+  if (!items.length) return null
+  return (
+    <div className="chat-news" aria-label="This week">
+      <span className="chat-news-tag" title="This week's leaders">📰</span>
+      {items.map((it) => (
+        <button key={it.metric} className="chat-news-chip" title={it.tip} onClick={() => openPlayerCard(it.row.ownerId, it.row.townName)}>
+          <i>{it.icon}</i>
+          <b><PlayerName id={it.row.ownerId} town={it.row.townName} /></b>
+          <span>{it.n}</span>
+        </button>
+      ))}
+    </div>
   )
 }

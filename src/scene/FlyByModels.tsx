@@ -6,7 +6,7 @@ import {
 } from 'three'
 import { bake, bakedMaterial, type Finish } from './bake'
 import { signTexture } from './signTexture'
-import { heliParts } from './ServiceVehicles'
+import { heliParts, rotorStep, TAIL_RATIO } from './ServiceVehicles'
 import { dayPhase, nightAmount } from './dayNight'
 import { reduceMotionOn } from '../lib/prefs'
 import { calmFlashing } from '../game/flashing'
@@ -416,9 +416,9 @@ export function NewsHeli() {
   const body = useMemo(() => heliParts.body(NEWS), [])
   useFrame(({ clock }, dt) => {
     if (!shown(root.current)) return
-    const step = Math.min(dt, 0.1) * 28
+    const step = rotorStep(dt)
     if (rotor.current) rotor.current.rotation.y += step
-    if (tail.current) tail.current.rotation.x += step * 1.6
+    if (tail.current) tail.current.rotation.x += step * TAIL_RATIO
     if (beacon.current) {
       const b = clock.elapsedTime % 1.5
       beacon.current.visible = reduceMotionOn() || calmFlashing() || b < 0.08 || (b > 0.22 && b < 0.3)

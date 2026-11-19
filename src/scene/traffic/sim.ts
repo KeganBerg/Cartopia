@@ -76,6 +76,7 @@ export type Agent = {
   pull: number | null // broken down on the verge: odometer reading where it pulled over
 }
 
+const HAND = 'hand' // the uid the hand-driven car goes by
 const ACCEL = 1.6
 const BRAKE = 3.2
 const GAP = 0.22 // bumper to bumper when queued
@@ -206,6 +207,25 @@ export class Traffic {
       if (leg.node && leg.granted) this.net.nodes.get(leg.node)!.occ.set(a.uid, { inDir: leg.inDir, outDir: leg.outDir })
     }
     this.syncCars()
+  }
+
+  // A car the player is driving by hand round town (src/scene/CruiseCar.tsx). It isn't one of
+  // the sim's own cars, but the others see it on the road and pull up behind it.
+  private hand: Agent | null = null
+  setHand(p: { x: number; z: number; yaw: number; len: number; wid: number } | null) {
+    if (!p) {
+      this.hand = null
+      return
+    }
+    const a: Agent = this.hand ?? {
+      uid: HAND, len: p.len, wid: p.wid, cruise: 0, legs: [], ci: 0, s: 0, v: 0, odo: 0, x: 0, z: 0, yaw: 0, hx: 0, hz: 1,
+      stalled: false, parked: 0, parkedAt: null, wait: 0, plan: [], trip: null, nextVisit: Infinity,
+      tow: 0, truck: 0, towT: 0, ot: null, rerouteAt: 0, pend: null, approach: null, arrived: null, halt: null, boxes: [], claim: [], gapTo: null, gap: Infinity,
+      show: 1, leaving: false, queuedAt: -1, pull: null,
+    }
+    Object.assign(a, { x: p.x, z: p.z, yaw: p.yaw, hx: Math.sin(p.yaw), hz: Math.cos(p.yaw), len: p.len, wid: p.wid })
+    a.boxes = [{ x: p.x, z: p.z, ux: a.hx, uz: a.hz, hl: p.len / 2 + 0.02, hw: p.wid / 2 }]
+    this.hand = a
   }
 
   // The cars that should be on the road; stalled ones first so they are always shown.
@@ -1278,6 +1298,8 @@ export class Traffic {
     const others = this.near
     others.length = 0
     for (const o of this.agents.values()) if (o !== a && Math.hypot(o.x - a.x, o.z - a.z) < near + o.len) others.push(o)
+    const hand = this.hand
+    if (hand && Math.hypot(hand.x - a.x, hand.z - a.z) < near + hand.len) others.push(hand)
     const hit = this.scan(a, look, others)
     if (hit) {
       a.gap = hit[0]
@@ -1285,7 +1307,7 @@ export class Traffic {
     }
     a.pend = null
     if (a.gapTo) {
-      const o = this.agents.get(a.gapTo)!
+      const o = this.agents.get(a.gapTo) ?? this.hand!
       const room = o.parked > 0 && !a.ot ? PARKED_GAP : GAP
       cap(a.gap - room)
       if (o.parked > 0 && !a.ot && a.v < 0.2 && a.gap < PARKED_GAP + 0.4) {

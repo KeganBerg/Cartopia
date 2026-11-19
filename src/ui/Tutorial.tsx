@@ -73,9 +73,9 @@ export function handTarget(s: Game): string[] | 'lot' | null {
   if (s.panel) {
     if (!STEP_PANELS[s.panel]?.includes(step)) return CLOSE
     if (s.panel === 'shop') return ['.start-here']
-    // The race menu: the first campaign race. In the race: the pedal on the line, then SHIFT
+    // The race menu: the Next race button (the first campaign race). In the race: the pedal on the line, then SHIFT
     // each time its light says now (the hand comes and goes with it).
-    if (s.panel === 'race') return ['.rm-camp .rm-cta .buy', '.shift-btn.launch:not(:disabled)', '.shift-btn.now']
+    if (s.panel === 'race') return ['.rm-lead .rm-lead-go', '.shift-btn.launch:not(:disabled)', '.shift-btn.now']
     // At a lot: Search all finds the car for sure, then tow it home.
     if (s.search) return ['.rs-auto:not(.on):not(:disabled)', '.rs-home.ready:not(:disabled)']
     if (step === 4) return ['.rsc-spot:not(.locked):not(.broke)']
@@ -152,7 +152,11 @@ export function Tutorial() {
 
   // Say each step's line as it comes up; quiet once the tutorial is done or skipped.
   useEffect(() => {
-    const say = () => sayLine(voiceLine(useGame.getState()))
+    const say = () => {
+      const s = useGame.getState()
+      const id = voiceLine(s)
+      sayLine(id, id ? STEPS[s.tutorial].text(s) : '')
+    }
     say()
     const off = useGame.subscribe(say)
     return () => {

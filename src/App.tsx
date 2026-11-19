@@ -13,6 +13,7 @@ import { quietShaders } from './scene/warm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
 import { ShotGrabber, ShotMode } from './ui/ShotMode'
+import { Cruise } from './ui/Cruise'
 import { InventoryPanel } from './ui/Inventory'
 import { PaintPrizePopup } from './ui/PaintRivals'
 import { RecapPopup } from './ui/Recap'
@@ -268,6 +269,7 @@ export default function App() {
       <RaveHeadsUp />
       <FlashWarning />
       <ShotMode />
+      <Cruise />
     </>
   )
 }

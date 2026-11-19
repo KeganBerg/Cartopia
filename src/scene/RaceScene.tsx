@@ -12,6 +12,8 @@ import { glowMats, dayPhase, duskAmount, nightAmount } from './dayNight'
 import { lookFor } from './look'
 import { PostFx } from './PostFx'
 import { SkyEnv } from './SkyEnv'
+import { NightCosmos } from './NightCosmos'
+import { skyClear } from '../game/skyExtras'
 import { holdTown } from './renderGate'
 import { PAL, SEASON } from './season'
 import { SHIRTS, PANTS, SKIN, HAIR, BEANIES } from './people'
@@ -485,6 +487,8 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
   // The race screen passes the one it races on, so the grip matches the sky.
   const weather = useMemo(() => given ?? raceWeather(venue.id, weatherSeed), [given, venue.id, weatherSeed])
   const beams = night > 0.3 || gloomOf(weather) > 0.5
+  // Stars, the Milky Way and planets on clear nights; clouds and storms hide them.
+  const cosmos = night * skyClear(weather)
   // Same lights and colour grade as the town at this time of day.
   const look = useMemo(() => weatherLook(lookFor(night, midnight ? 0 : duskAmount(dayPhase()), undefined, undefined, 'race'), weather), [night, midnight, weather])
   // The race fills the screen, so stop drawing the town underneath while racing.
@@ -769,6 +773,7 @@ export function RaceScene({ track, me, them, mine, theirs, venue, weatherSeed, w
       <fog attach="fog" args={[tint(venue.fog, '#1d2740'), venue.fogNear, venue.fogFar]} />
       <color attach="background" args={[sky]} />
       <SkyDome tint={tint(overcast('#ffffff'), '#2a3560')} />
+      {cosmos > 0.02 && <NightCosmos vis={cosmos} small={Math.min(size.width, size.height) < 700} />}
       <hemisphereLight args={[look.sky, look.ground, look.hemiIntensity * 1.15]} />
       <directionalLight position={[5, 10, 2]} intensity={look.sunIntensity * 0.85} color={look.sun} />
       <SkyEnv />

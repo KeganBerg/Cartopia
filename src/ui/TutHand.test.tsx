@@ -29,7 +29,7 @@ describe('the tutorial hand', () => {
   it('leads into the menu each step works in', () => {
     expect(handTarget(at({ tutorial: 3, panel: 'shop' }))).toEqual(['.start-here'])
     expect(handTarget(at({ tutorial: 4, panel: 'rescue' }))?.[0]).toMatch(/rsc-spot/)
-    expect(handTarget(at({ tutorial: 8, panel: 'race' }))?.[0]).toMatch(/rm-camp/)
+    expect(handTarget(at({ tutorial: 8, panel: 'race' }))?.[0]).toMatch(/rm-lead-go/)
   })
   it('shows the way out of a menu that isn’t part of the step', () => {
     expect(handTarget(at({ tutorial: 1, panel: 'goals' }))).toContain('.close')

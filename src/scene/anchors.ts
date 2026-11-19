@@ -40,16 +40,34 @@ const CHIP = 8
 const OFF = 120
 const sizes = new WeakMap<HTMLElement, { w: number; h: number; age: number }>()
 // What each bubble was last given, so unchanged ones aren't written again every frame.
-const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; cls: Record<string, boolean> }>()
+const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; x?: number; y?: number; cls: Record<string, boolean> }>()
 const memo = (el: HTMLElement) => {
   let m = last.get(el)
   if (!m) last.set(el, (m = { cls: {} }))
   return m
 }
-const show = (el: HTMLElement, on: boolean) => {
+// Bubbles hidden off screen right now, and what each wants done when it shows again. A job
+// timer off screen needn't redraw every second: a big town had a hundred or more of them
+// redrawing at once each second, a hitch while panning. It catches up as it comes back.
+const offscreen = new Set<string>()
+const onShow = new Map<string, () => void>()
+export const anchorOffscreen = (id: string) => offscreen.has(id)
+export function whenShown(id: string, fn: () => void) {
+  onShow.set(id, fn)
+  return () => {
+    if (onShow.get(id) === fn) onShow.delete(id)
+  }
+}
+export function setAnchorShown(id: string, on: boolean) {
+  if (on) {
+    if (offscreen.delete(id)) onShow.get(id)?.()
+  } else offscreen.add(id)
+}
+const show = (id: string, el: HTMLElement, on: boolean) => {
   const m = memo(el)
   if (m.seen === on) return
   m.seen = on
+  setAnchorShown(id, on)
   el.style.visibility = on ? 'visible' : 'hidden'
 }
 const toggle = (el: HTMLElement, c: string, on: boolean) => {
@@ -60,6 +78,8 @@ const toggle = (el: HTMLElement, c: string, on: boolean) => {
 }
 const move = (el: HTMLElement, x: number, y: number) => {
   const m = memo(el)
+  m.x = x
+  m.y = y
   const at = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
   if (m.at === at) return
   m.at = at
@@ -120,7 +140,7 @@ export function AnchorProjector() {
     for (const [id, el] of anchorEls) {
       const p = anchors.get(id)
       if (!p) {
-        show(el, false)
+        show(id, el, false)
         continue
       }
       v.copy(p).project(camera)
@@ -131,7 +151,7 @@ export function AnchorProjector() {
       if (v.z > 1) {
         // Behind the free camera. A pinned bubble flips to the edge it's really past.
         if (!clamp) {
-          show(el, false)
+          show(id, el, false)
           continue
         }
         x = size.width - x
@@ -139,10 +159,10 @@ export function AnchorProjector() {
       }
       // Well off screen: nothing to show or to dodge (a big town has hundreds of these).
       if (!clamp && (x < -OFF || x > size.width + OFF || y < -OFF || y > size.height + OFF)) {
-        show(el, false)
+        show(id, el, false)
         continue
       }
-      show(el, true)
+      show(id, el, true)
       if (clamp) {
         const cx = Math.min(Math.max(x, 60), size.width - 60)
         const cy = Math.min(Math.max(y, 210), size.height - 110)
@@ -257,9 +277,23 @@ export function AnchorProjector() {
   return null
 }
 
+// Where a bubble on screen was last put (the middle of it), from the projector's own numbers:
+// reading it back from the page made the browser lay the whole page out on every collect.
+export function anchorCenter(id: string): [number, number] | null {
+  const el = anchorEls.get(id)
+  const m = el && last.get(el)
+  if (!el || !m?.seen || m.x === undefined || m.y === undefined) return null
+  const h = sizes.get(el)?.h ?? 0
+  // The bubble sits on its point, above a 9px tail gap (.anchor's padding).
+  return [m.x, m.y - 9 - Math.max(0, h - 9) / 2]
+}
+
 export function anchorRef(id: string) {
   return (el: HTMLElement | null) => {
     if (el) anchorEls.set(id, el)
-    else anchorEls.delete(id)
+    else {
+      anchorEls.delete(id)
+      offscreen.delete(id)
+    }
   }
 }

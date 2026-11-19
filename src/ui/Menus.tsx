@@ -10,6 +10,7 @@ import { compact } from './format'
 import { CarInspect, CarPreview, type DynoFeed } from '../scene/CarPreview'
 import { DOOR_FLY, depotWalk, doorTrip } from '../scene/doorTrip'
 import { usePauseTownUnder } from '../scene/renderGate'
+import { startCruise } from '../scene/cruise'
 import type { DynoRun } from './Dyno'
 import { onDemand } from './lazy'
 import { CollectAllButton } from './CollectAll'
@@ -342,7 +343,7 @@ const SHOP_GROUPS: { id: Exclude<ShopTab, 'upgrades'>; label: React.ReactNode; f
   { id: 'business', label: '🍕 Businesses', filter: (b) => b.kind === 'business' && b.id !== 'rescue' && b.id !== 'crew' && !b.service && !b.rec && !b.event && !CAR_CARE.has(b.id) },
   { id: 'homes', label: '🏠 Homes', filter: (b) => b.kind === 'house' },
   { id: 'services', label: '⛽ Services', filter: (b) => b.kind === 'gas' || b.id === 'crew' || !!b.service },
-  { id: 'rec', label: <>🎡 Rec<span className="tab-long">reation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
+  { id: 'rec', label: <>🎡 <span className="tab-short">Rec</span><span className="tab-long">Recreation</span></>, filter: (b) => (b.kind === 'decor' || !!b.rec) && !b.event },
   // Limited-time decorations for the running event (the tab only shows while it runs).
   { id: 'event', label: '🎃 Spooky', filter: (b) => !!b.event && b.event === activeEvent()?.id },
 ]
@@ -762,6 +763,22 @@ function RaceCarToggle({ car }: { car: string }) {
   )
 }
 
+// Takes the car out for a drive round town by hand (scene/cruise.ts). A car on a flat
+// or out of fuel stays put until it's fixed.
+function DriveToggle({ car }: { car: OwnedCar }) {
+  const stuck = !!(car.flat || car.lowFuel)
+  const go = () => {
+    const s = useGame.getState()
+    s.closePanel()
+    if (!startCruise(car.uid)) s.toast('No road to drive on yet')
+  }
+  return (
+    <button className="showcase-toggle drive-toggle" onClick={go} disabled={stuck} title={stuck ? 'Fix it up first' : 'Drive it round town'}>
+      {stuck ? '🔧 Drive' : '🚗 Drive'}
+    </button>
+  )
+}
+
 // My Cars list filter and sort, kept while the game is open. Default: top PI first.
 type CarSort = 'pi' | 'pi-low' | 'name' | 'new'
 const CAR_SORTS: { id: CarSort; label: string }[] = [
@@ -974,6 +991,7 @@ function GarageSection() {
             <div className="car-toggles">
               <RaceCarToggle car={car.uid} />
               <ShowcaseToggle car={car.uid} />
+              <DriveToggle car={car} />
             </div>
           </div>
           <div className="garage-tabs" role="tablist">

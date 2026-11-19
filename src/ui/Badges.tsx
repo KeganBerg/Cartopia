@@ -1,10 +1,10 @@
 import { Vector3 } from 'three'
-import { memo, useMemo, useState, type CSSProperties } from 'react'
+import { memo, useEffect, useMemo, useReducer, useState, type CSSProperties } from 'react'
 import { useGame, buyablePlots, today, type PlacedBuilding } from '../game/store'
 import { buildingDef, buildingLevel, jobLevel, carDef, loves, levelLift, plotPrice, START_LAND, jobSeconds, isOpen, mergeBonus, mergeGain } from '../game/data'
 import { msUntilNight } from '../game/clock'
 import { clearCost } from '../game/wildLand'
-import { anchors, anchorRef } from '../scene/anchors'
+import { anchors, anchorOffscreen, anchorRef, whenShown } from '../scene/anchors'
 import { centerOf, groupCenter, plotCenter } from '../scene/World'
 import { mergeGroups, mergeCandidates, type MergeGroup } from '../game/merge'
 import { useNow } from '../scene/useNow'
@@ -35,16 +35,22 @@ type JobProps = { b: PlacedBuilding; now: number; g?: MergeGroup; members?: Plac
 // A badge whose text moves with the clock: a job timer, or a night countdown while closed.
 const ticking = ({ b, now, members = [b] }: JobProps) =>
   members.some((o) => o.jobEndsAt !== null && now < o.jobEndsAt) || !isOpen(buildingDef(b.def), now)
-// Only those redraw every second; a town full of ready coins otherwise redrew them all.
+// Only those redraw every second; a town full of ready coins otherwise redrew them all. One off
+// screen waits too, and redraws as it comes back into view (whenShown in JobBadge).
 const sameBadge = (a: JobProps, z: JobProps) =>
   a.b === z.b &&
   a.g === z.g &&
   (a.members ?? []).length === (z.members ?? []).length &&
   (a.members ?? []).every((m, i) => m === z.members![i]) &&
-  (a.now === z.now || (!ticking(a) && !ticking(z)))
+  (a.now === z.now || (!ticking(a) && !ticking(z)) || anchorOffscreen(z.b.uid))
 
 // `g` and `members` are the whole block for a merged business: one badge for all of it.
-const JobBadge = memo(function JobBadge({ b, now, g, members = [b] }: JobProps) {
+const JobBadge = memo(function JobBadge({ b, now: given, g, members = [b] }: JobProps) {
+  // Back in view after skipping seconds off screen: its own redraw, with the time it came back
+  // (the props it keeps are from the last time it drew).
+  const [shownAt, refresh] = useReducer((_: number, t: number) => t, 0)
+  useEffect(() => whenShown(b.uid, () => refresh(Date.now())), [b.uid])
+  const now = Math.max(given, shownAt)
   const d = buildingDef(b.def)
   const tap = useGame((s) => s.tapBuilding)
   const lit = useGame((s) => !!s.highlight?.includes(b.def) || (b.def === 'pizza' && tutTarget(s) === 'pizza'))

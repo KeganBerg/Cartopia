@@ -937,6 +937,9 @@ export function lastCollectAll() {
 }
 // What the last Collect All had to leave: idle jobs the fuel didn't cover, and
 // repairs or gas cans the coins didn't cover. The button shows them as icons.
+// The last tick that found the tank full (see tick).
+let fullAt = 0
+
 export type CollectSkips = { fuel: number; coins: number; at: number }
 let skips: CollectSkips = { fuel: 0, coins: 0, at: 0 }
 export const collectAllSkips = () => skips
@@ -1035,14 +1038,26 @@ export const useGame = create<GameState>()(
         const endless = rolledEndless(get())
         if (endless) set({ endless })
         const cap = fuelCap(s)
+        // A full tank changes nothing in the save. Writing the time each second rewrote the whole
+        // save and woke every part of the screen once a second: a hitch every second. The last
+        // full second is kept here instead, so a tank that stops being full (a bigger cap from a
+        // new gas station) still refills from then, not from whenever the save last spent fuel.
         if (s.fuel >= cap) {
-          if (s.fuelUpdatedAt !== now) set({ fuelUpdatedAt: now })
+          fullAt = now
           return
         }
+        if (now - fullAt < 5000 && fullAt > s.fuelUpdatedAt) {
+          // Just stopped being full without spending (the cap grew): the wait starts now, once.
+          set({ fuelUpdatedAt: fullAt })
+          fullAt = 0
+          return
+        }
+        fullAt = 0
+        const from = s.fuelUpdatedAt
         const every = fuelRegenSeconds(s.level) * 1000
-        const gained = Math.floor((now - s.fuelUpdatedAt) / every)
+        const gained = Math.floor((now - from) / every)
         if (gained > 0) {
-          set({ fuel: Math.min(cap, s.fuel + gained), fuelUpdatedAt: s.fuelUpdatedAt + gained * every })
+          set({ fuel: Math.min(cap, s.fuel + gained), fuelUpdatedAt: from + gained * every })
         }
       },
 

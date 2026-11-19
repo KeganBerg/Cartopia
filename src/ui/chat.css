@@ -59,3 +59,11 @@
 .btn-dot.new { min-width: 14px; width: 14px; height: 14px; padding: 0; }
 .chat-fill span { font-size: 72px; line-height: 1; }
 .chat-fill p { font: 20px var(--display); color: #33475b; }
+/* This week's leaders above the Global room. */
+.chat-news { flex: none; display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.chat-news::-webkit-scrollbar { display: none; }
+.chat-news-tag { flex: none; font-size: 18px; }
+.chat-news-chip { flex: none; display: inline-flex; align-items: center; gap: 5px; max-width: 46%; border: 2px solid #ffd54f; background: #fff8e1; border-radius: 12px; padding: 3px 9px; color: var(--ink); }
+.chat-news-chip i { font-style: normal; }
+.chat-news-chip b { font: 13px var(--display); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-news-chip span { font: 14px var(--display); color: #e65100; }
