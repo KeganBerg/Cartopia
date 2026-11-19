@@ -5,7 +5,7 @@ import { raceCarOf } from '../game/raceCar'
 import { raceFloor } from '../game/race'
 import { useGame, spendFuel } from '../game/store'
 import { GHOST_FUEL, isBody, runWarGhost, type Ghost } from './ghosts'
-import { WAR_RULES, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide } from './battles'
+import { WAR_RULES, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide, type WarAttack } from './battles'
 
 // The crew war map (supabase/migrations/0114_crew_war_map.sql): every member of both crews is a spot on the
 // map. A member races a rival's ghost (a war race); a win takes 1 to 3 stars from that rival and adds war
@@ -154,4 +154,80 @@ export async function submitWarRun(t: number): Promise<WarResult | null> {
     await new Promise((res) => setTimeout(res, 1200))
   }
   return null
+}
+
+// Where each racer stands on the battlefield: their crew across the top, ours across the bottom, the front
+// line between. x is a percent of the width, y is pixels from the top. Rows zigzag so the field
+// reads as a map rather than a table; bigger crews get more, smaller spots.
+// y is the centre of the racer's car; their name and stars hang below it.
+export const FIELD = { row: 76, car: 28, zig: 4, front: 26, pad: 8 }
+// Small spots (34px cars), for big crews and short phones.
+export const SMALL_FIELD = { ...FIELD, row: 64, car: 21, front: 22 }
+// How far a spot reaches above and below its car's centre (the stars and name hang below).
+export const SPOT = { big: { up: 22, down: 44 }, small: { up: 17, down: 39 } }
+export function fieldLayout(them: number, us: number, short = false) {
+  const small = short || Math.max(them, us) > 10
+  const F = small ? SMALL_FIELD : FIELD
+  const cols = (n: number) => (n <= 4 ? Math.max(1, n) : n <= 10 ? 5 : 6)
+  const place = (n: number, top: number, down: boolean) => {
+    const c = cols(n)
+    const rows = Math.ceil(n / c)
+    return Array.from({ length: n }, (_, i) => {
+      // Their front row is the one nearest the middle, so the last row up top and the first row below.
+      const r = Math.floor(i / c)
+      const inRow = Math.min(c, n - r * c)
+      const k = i % c
+      const row = down ? r : rows - 1 - r
+      const x = ((k + 0.5) / inRow) * 100
+      const y = top + row * F.row + F.car + ((k % 2 ? 1 : -1) * (inRow > 1 ? F.zig : 0))
+      return { x, y }
+    })
+  }
+  const themRows = Math.ceil(them / cols(them))
+  const usRows = Math.ceil(us / cols(us))
+  const frontY = F.pad + themRows * F.row + F.front / 2
+  return {
+    them: place(them, F.pad, false),
+    us: place(us, F.pad + themRows * F.row + F.front, true),
+    frontY,
+    height: F.pad * 2 + (themRows + usRows) * F.row + F.front,
+    small,
+  }
+}
+
+// War races the player hasn't watched yet: newer than the last one they saw on this device.
+const SEEN = 'cartopia.warSeen'
+export function unseenRaces(b: Battle) {
+  let seen = ''
+  try { seen = localStorage.getItem(`${SEEN}.${b.week}`) ?? '' } catch { /* private mode */ }
+  const fresh = (b.attacks ?? []).filter((a) => a.at > seen)
+  return { fresh, mark: () => { try { localStorage.setItem(`${SEEN}.${b.week}`, (b.attacks ?? []).reduce((m, a) => (a.at > m ? a.at : m), seen)) } catch { /* private mode */ } } }
+}
+
+// A demo war race (?battle=demo) lands on the map like a real one: the server isn't there to record it.
+export function recordDemoWarRun(target: string, t: number, their: number) {
+  const d = demoBattle()
+  const b = d?.current
+  if (!d || !b) return
+  const stars = warStars(t, their)
+  const attack: WarAttack = { side: 'us', by: 'me', byName: 'You', target, won: stars > 0, stars, points: stars * WAR_RULES.starPoints, at: new Date().toISOString() }
+  d.current = { ...b, us: { ...b.us, score: b.us.score + attack.points }, attacks: [attack, ...(b.attacks ?? [])] }
+  useCrewBattle.setState({ battle: { ...d } })
+}
+
+// While the map is open, new war races (crewmates' and rivals') come in on their own.
+export const WAR_LIVE_MS = 20_000
+export function watchWar() {
+  if (demoBattle()) return () => {}
+  const id = setInterval(() => {
+    if (typeof document === 'undefined' || document.visibilityState === 'visible') void refreshCrewBattle()
+  }, WAR_LIVE_MS)
+  return () => clearInterval(id)
+}
+
+// The final stretch of the war: its last day, and whether the score is close enough to swing.
+export function warFinal(b: Battle, msLeft: number) {
+  const final = !b.result && msLeft < 86_400_000
+  const gap = Math.abs(b.us.score - b.them.score)
+  return { final, close: final && gap <= Math.max(10, Math.max(b.us.score, b.them.score) * 0.1) }
 }

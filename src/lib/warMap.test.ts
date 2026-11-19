@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { raceFloor } from '../game/race'
 import type { Battle, BattleSide, WarAttack } from './battles'
-import { msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
+import { FIELD, SMALL_FIELD, SPOT, fieldLayout, warFinal, msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
 
 const sql = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
 
@@ -47,6 +47,34 @@ describe('crew war map', () => {
     expect(sql).toContain("i := substr(p_target, 4)::int")
   })
 
+  it('lays the battlefield out with their crew above the front and ours below, no spot touching another or the front', () => {
+    for (const [them, us, short] of [[3, 4], [5, 5], [1, 1], [12, 30], [7, 2], [5, 5, 1], [2, 9, 1]]) {
+      const lay = fieldLayout(them, us, !!short)
+      const F = lay.small ? SMALL_FIELD : FIELD
+      const { up, down } = lay.small ? SPOT.small : SPOT.big
+      expect(lay.them).toHaveLength(them)
+      expect(lay.us).toHaveLength(us)
+      for (const p of lay.them) {
+        expect(p.y - up).toBeGreaterThanOrEqual(0)
+        expect(p.y + down).toBeLessThanOrEqual(lay.frontY - F.front / 2)
+      }
+      for (const p of lay.us) {
+        expect(p.y - up).toBeGreaterThanOrEqual(lay.frontY + F.front / 2)
+        expect(p.y + down).toBeLessThanOrEqual(lay.height)
+      }
+      for (const side of [lay.them, lay.us]) {
+        for (const p of side) for (const q of side) if (q.y - p.y > F.row / 2) expect(q.y - up).toBeGreaterThanOrEqual(p.y + down)
+      }
+      for (const p of [...lay.them, ...lay.us]) {
+        expect(p.x).toBeGreaterThan(0)
+        expect(p.x).toBeLessThan(100)
+        expect(p.y).toBeLessThan(lay.height)
+      }
+      const all = [...lay.them, ...lay.us].map((p) => `${p.x.toFixed(1)},${p.y}`)
+      expect(new Set(all).size).toBe(all.length)
+    }
+  })
+
   it('picks revenge first, then the fewest stars, then the slowest time', () => {
     const spot = (id: string, stars: number, t: number, revenge = false): MapSpot => ({ id, name: id, car: 'c', body: 'sedan', color: '#fff', pi: 100, t, stars, hits: 0, revenge })
     expect(nextTarget([spot('a', 1, 8), spot('b', 0, 7), spot('c', 0, 9)], 100)?.id).toBe('c')
@@ -69,5 +97,16 @@ describe('crew war map', () => {
 
   it('counts down to UTC midnight', () => {
     expect(msToWarRaces(Date.UTC(2026, 9, 18, 21, 0))).toBe(3 * 3600_000)
+  })
+
+  it('calls the last day of a war, and a close score on it', () => {
+    const side = (score: number): BattleSide => ({ bot: true, name: 'X', tag: 'X', emblem: '🏁', color: '#fff', score, members: [] })
+    const war = (us: number, them: number, result: Battle['result'] = null): Battle => ({ week: '2026-10-12', venue: 'main', result, mine: 0, mvp: false, claimed: [], us: side(us), them: side(them) })
+    const day = 86_400_000
+    expect(warFinal(war(100, 50), 2 * day)).toEqual({ final: false, close: false })
+    expect(warFinal(war(100, 50), day / 2)).toEqual({ final: true, close: false })
+    expect(warFinal(war(100, 92), day / 2)).toEqual({ final: true, close: true })
+    expect(warFinal(war(3, 9), day / 2).close).toBe(true)
+    expect(warFinal(war(100, 92, 'win'), day / 2).final).toBe(false)
   })
 })
