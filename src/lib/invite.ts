@@ -64,7 +64,7 @@ export function captureArrival(url: URL = new URL(location.href)) {
 }
 
 // The invite reward each side gets once the new player reaches INVITE_LEVEL (claim_invite_rewards()
-// in supabase/migrations/0112_invite_rewards.sql pays it; the numbers here are only for the screen).
+// in supabase/migrations/20261017200711_invite_rewards.sql pays it; the numbers here are only for the screen).
 export const INVITE_GEMS = 100
 export const INVITE_LEVEL = 10
 

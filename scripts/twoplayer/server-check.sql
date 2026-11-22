@@ -43,7 +43,7 @@ do $$ begin
   raise exception 'FAIL an outsider reported a time';
 exception when insufficient_privilege then null;
 end $$;
--- The race channel is private to its two racers (0020_private_realtime.sql).
+-- The race channel is private to its two racers (20261011041915_private_realtime.sql).
 :as_admin
 insert into realtime.messages (topic, extension, event, payload) values ('race:11111111-race-0001', 'broadcast', 'probe', '{}');
 :as_c
@@ -223,12 +223,18 @@ update public.game_saves set corrections = null, state = state || jsonb_build_ob
 select pg_temp.ok((select not coalesce(corrections ? 'endless', false) from public.game_saves where owner_id = :C), 'first endless board saves without an endless correction');
 
 -- 11. Roblox link codes: a code from the web trades once for the town and its paid packs, and a web
--- account links to one Roblox player.
+-- account links to one Roblox player. Since 0120 the Roblox server must send x-cartopia-key.
 :as_admin
+select public.roblox_new_secret() as rkey \gset
 insert into public.purchases (owner_id, seq, session_id, pack, cents, bucks, coins, parts) select :A, 1, 'cs_roblox_check', 'pocket', 99, 70, 0, 0 where not exists (select 1 from public.purchases where owner_id = :A);
 :as_a
 select public.roblox_link_code() ->> 'code' as rcode \gset
 reset role; set role anon;
+select public.roblox_claim(:'rcode', 111) as nokey \gset
+:as_admin
+select pg_temp.ok((:'nokey'::jsonb ->> 'error') = 'server', 'a roblox claim without the server key is refused');
+reset role; set role anon;
+select set_config('request.headers', json_build_object('x-cartopia-key', :'rkey')::text, false) is not null as hdr \gset
 select public.roblox_claim(:'rcode', 111) as claim \gset
 :as_admin
 select pg_temp.ok((:'claim'::jsonb -> 'state' ->> 'townName') = 'Sql A' and jsonb_array_length(:'claim'::jsonb -> 'paid') >= 1, 'roblox code returns the town and its paid packs');

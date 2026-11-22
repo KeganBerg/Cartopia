@@ -30,7 +30,7 @@ function upgrades(d: BuildingDef) {
 }
 
 // The prices and rewards the server's save guard checks against
-// (supabase/migrations/0005_economy_guard.sql, public.econ_catalog()).
+// (supabase/migrations/20261010234915_economy_guard.sql, public.econ_catalog()).
 // economy.test.ts fails when data.ts changes without the SQL copy.
 export function econCatalog() {
   const cars = Object.fromEntries(

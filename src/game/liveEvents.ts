@@ -1,5 +1,5 @@
 // Live events: switches the whole game for every player at once, set from the
-// Supabase SQL editor (live_events table, supabase/migrations/0055_live_events.sql).
+// Supabase SQL editor (live_events table, supabase/migrations/20261012010136_live_events.sql).
 // src/lib/liveEventsSync.ts loads the table and listens for changes; this file
 // only holds what is live and answers "is it forced right now?", so the clock
 // can ask it without pulling Supabase in.

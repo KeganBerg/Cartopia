@@ -6,7 +6,7 @@ import { DEMO, demoTown } from './friends'
 import { useGame, type OwnedCar } from '../game/store'
 import { showcaseOf } from '../game/meet'
 
-// Likes are counted server-side in supabase/migrations/0030_car_meet_likes.sql.
+// Likes are counted server-side in supabase/migrations/20261011053420_car_meet_likes.sql.
 export type Display = { ownerId: string; townName: string; level: number; cars: OwnedCar[]; demo?: boolean }
 type Likes = { likes: number; liked: boolean }
 

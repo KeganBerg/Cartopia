@@ -1,6 +1,6 @@
 // Keeps slurs and crude words out of the names other players see:
 // town names, crew names, tags and mottos. public.name_ok() in the database uses the same
-// lists for crews (supabase/migrations/0015_security_hardening.sql; names.test.ts checks).
+// lists for crews (supabase/migrations/20261011033522_security_hardening.sql; names.test.ts checks).
 
 // Matched anywhere inside a name once it is squashed (so "N i g g a" and "n1gg@" count).
 export const ANYWHERE = [

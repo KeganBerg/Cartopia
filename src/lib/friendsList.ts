@@ -5,7 +5,7 @@ import { useNames } from './profiles'
 import { sfx } from './sound'
 import { useGame } from '../game/store'
 
-// Friends and friend requests (supabase/migrations/0049_friends_usernames.sql).
+// Friends and friend requests (supabase/migrations/20261011201520_friends_usernames.sql).
 
 export type FriendStatus = 'friend' | 'incoming' | 'outgoing'
 export type Friend = {

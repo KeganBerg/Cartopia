@@ -12,6 +12,8 @@ grant anon, authenticated, service_role to authenticator;
 create schema auth;
 create schema realtime;
 create schema extensions;
+-- Supabase installs pgcrypto into extensions (gen_random_bytes, digest); 0120 roblox_link_hardening uses it.
+create extension if not exists pgcrypto schema extensions;
 grant usage on schema public, auth, realtime, extensions to anon, authenticated, service_role;
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;

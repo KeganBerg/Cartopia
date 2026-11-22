@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { LAPS, TRACKS, buildTrack, kartStats } from './kart'
 
-// The kart party referee (supabase/migrations/0060_kart_floor_by_pi.sql) raises any finish faster
+// The kart party referee (supabase/migrations/20261012165328_kart_floor_by_pi.sql) raises any finish faster
 // than three laps of the shortest line at 1.6x top speed. Keep it below anything a real kart can do.
-const sql = readFileSync(new URL('../../supabase/migrations/0060_kart_floor_by_pi.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../supabase/migrations/20261012165328_kart_floor_by_pi.sql', import.meta.url), 'utf8')
 const m = /select round\((\d+) \/ \(\((\d+) \+ (\d+) \* \(1 - exp\(-greatest\(coalesce\(pi, 1\), 1\) \/ ([\d.]+)\)\)\) \* ([\d.]+)\), 3\)/.exec(sql)
 const [dist, base, span, scale, mult] = m ? m.slice(1).map(Number) : []
 const floor = (pi: number) => dist / ((base + span * (1 - Math.exp(-Math.max(pi, 1) / scale))) * mult)

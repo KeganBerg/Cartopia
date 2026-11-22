@@ -37,7 +37,7 @@ describe('displayName', () => {
 
 describe('database name filter', () => {
   it('uses the same word lists as the game', () => {
-    const sql = readFileSync(new URL('../../supabase/migrations/0015_security_hardening.sql', import.meta.url), 'utf8')
+    const sql = readFileSync(new URL('../../supabase/migrations/20261011033522_security_hardening.sql', import.meta.url), 'utf8')
     const block = sql.split('-- names:begin')[1].split('-- names:end')[0]
     const lists = [...block.matchAll(/array\[([^\]]*)\]/g)].map((m) => [...m[1].matchAll(/'([^']*)'/g)].map((w) => w[1]))
     expect(lists).toEqual([ALLOWED, ANYWHERE, WHOLE_WORD])

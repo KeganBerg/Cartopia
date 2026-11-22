@@ -604,7 +604,7 @@ export const driverPayout = (d: BuildingDef, level: number, car: CarDef | null, 
 // Merging pays: every building in a merged block earns this much more coins and
 // parts per job, and a merged house or gas station holds this much more fuel,
 // keyed by how many buildings went in (a pair, a 2x2, a giant 4x4). The server
-// guard banks the same extra (supabase/migrations/0088_merge_bonus.sql).
+// guard banks the same extra (supabase/migrations/20261014234044_merge_bonus.sql).
 export const MERGE_BONUS: Record<number, number> = { 2: 0.1, 4: 0.25, 8: 0.35, 16: 0.5 }
 export const mergeBonus = (members: number) => MERGE_BONUS[members] ?? 0
 export const mergedParts = (d: BuildingDef, level: number, boost = 0) => Math.round(upgradePartsPayout(d, level) * (1 + boost))
@@ -1660,13 +1660,13 @@ export const dealSave = (d: DealDef) => {
 }
 
 // Crew weekly goal. The server counts the points from each save and checks the target
-// (supabase/migrations/0027_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
+// (supabase/migrations/20261011050344_crew_weekly_goal.sql, crew_goal_rules()); these copies are for display.
 export const CREW_POINTS = { job: 1, race: 3 }
 // What a crew chest pays. The server guard reads this from econ_catalog().crew.
 export const CREW_CHEST: ChestPay = { coins: 1500, coinsPerLevel: 300, xp: 0, xpPerLevel: 0, parts: 25, bucks: 75, fuel: 0 }
 
 // Surprise visitors in town (src/lib/visitors.ts). For signed-in players the server picks who comes
-// and fixes the prize (supabase/migrations/0032_town_visitors.sql, visitor_next()); guests roll here.
+// and fixes the prize (supabase/migrations/20261011055555_town_visitors.sql, visitor_next()); guests roll here.
 //   racer: a street racer to beat (the bonus on top of the race's own prize, paid only on a win)
 //   tourist: tips you for the photo op
 //   mystery: a mystery car drives by; tap it before it leaves

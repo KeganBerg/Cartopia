@@ -3,7 +3,7 @@ import { flushSave, signedInUser } from './cloud'
 import { useGame } from '../game/store'
 import type { WagerEntry } from '../game/wager'
 
-// Wager races (supabase/migrations/0057_wager_matches.sql). The server holds both stakes when a
+// Wager races (supabase/migrations/20261012083027_wager_matches.sql). The server holds both stakes when a
 // challenge is accepted and pays the winner; the game adds the ledger rows to its coins.
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))

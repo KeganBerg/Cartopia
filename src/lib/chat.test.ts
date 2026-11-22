@@ -26,7 +26,7 @@ describe('chat delete', () => {
   })
 
   it('deletes through the server and broadcasts the removal', () => {
-    const sql = readFileSync('supabase/migrations/0068_chat_delete.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261013031645_chat_delete.sql', 'utf8')
     expect(sql).toMatch(/grant execute on function public\.chat_delete\(bigint\) to authenticated/)
     expect(sql).toMatch(/realtime\.send\(jsonb_build_object\('id', m\.id\), 'del'/)
     // The table stays closed to players.

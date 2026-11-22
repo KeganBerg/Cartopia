@@ -13,7 +13,7 @@ import './confirm.css'
 import './admin.css'
 
 // Kegan's admin panel (Menu > 🛡 for admins only). Every button is an admin_* RPC
-// that the server checks and logs (0095_admin_panel.sql); this screen only drives them.
+// that the server checks and logs (20261015042054_admin_panel.sql); this screen only drives them.
 
 type Tab = 'live' | 'reports' | 'players' | 'log'
 

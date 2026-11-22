@@ -4,7 +4,7 @@ import { raceFloor } from '../game/race'
 import type { Battle, BattleSide, WarAttack } from './battles'
 import { FIELD, SMALL_FIELD, SPOT, fieldLayout, warFinal, msToWarRaces, nextTarget, streetTime, warMap, warStars, type MapSpot } from './warMap'
 
-const sql = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
+const sql = readFileSync('supabase/migrations/20261017225612_crew_war_map.sql', 'utf8')
 
 describe('crew war map', () => {
   it('gives stars like the server: a win, then 1% and 3% margins', () => {

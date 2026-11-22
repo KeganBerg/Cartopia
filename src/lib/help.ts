@@ -9,7 +9,7 @@ import { sfx } from './sound'
 import { recordHelp } from './gifts'
 
 // Helping the businesses of the town you're visiting. Signed in, the server pays each help
-// (town_help() in supabase/migrations/0047_town_helps.sql); guests are paid on the device.
+// (town_help() in supabase/migrations/20261011194135_town_helps.sql); guests are paid on the device.
 type HelpState = {
   owner: string | null
   // Businesses helped in that town today.

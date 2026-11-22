@@ -44,7 +44,7 @@ export type Clan = {
   week: Record<Metric, number>
 }
 
-// Who may join (supabase/migrations/0103_crew_ranks.sql): anyone, by request, or nobody new.
+// Who may join (supabase/migrations/20261016013608_crew_ranks.sql): anyone, by request, or nobody new.
 export type JoinMode = 'open' | 'request' | 'closed'
 export const JOIN_MODES: { id: JoinMode; icon: string; label: string; tip: string }[] = [
   { id: 'open', icon: '🔓', label: 'Open', tip: 'Open: anyone at the level joins' },
@@ -246,7 +246,7 @@ export const fetchCrewRequests = () => rpc<JoinRequest[]>('crew_requests')
 export const respondRequest = (id: string, accept: boolean) => rpc<'joined' | 'declined' | 'gone'>('crew_respond', { p_owner: id, p_accept: accept })
 export const setRank = (id: string, rank: Rank) => rpc('crew_set_rank', { p_member: id, p_rank: rank })
 
-// Crew weekly goal (supabase/migrations/0027_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
+// Crew weekly goal (supabase/migrations/20261011050344_crew_weekly_goal.sql). Weeks are named by their Monday (UTC).
 export type CrewWeek = {
   week: string
   target: number

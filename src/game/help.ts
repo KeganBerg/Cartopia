@@ -2,7 +2,7 @@ import type { BuildingDef } from './data'
 
 // Helping a friend's businesses while visiting their town, like Car Town Streets: tap a shop to
 // lend a hand and you're paid a little for each. The server repeats these numbers in
-// supabase/migrations/0047_town_helps.sql (the helps table), and help.test.ts checks they match.
+// supabase/migrations/20261011194135_town_helps.sql (the helps table), and help.test.ts checks they match.
 export const HELPS_PER_TOWN = 5
 export const HELPS_PER_DAY = 40
 export const HELP_TABLE = { perTown: HELPS_PER_TOWN, perDay: HELPS_PER_DAY, coins: 20, coinsPerLevel: 5, coinsPerShopLevel: 10, xp: 2, xpPerFiveLevels: 1, lastParts: 2 }

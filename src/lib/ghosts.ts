@@ -6,7 +6,7 @@ import { useGame, spendFuel, type OwnedCar } from '../game/store'
 import { CARS, RACE_FUEL, carDef, performance, type Body } from '../game/data'
 import { raceFloor } from '../game/race'
 
-// Friend ghost races (supabase/migrations/0030_friend_ghosts.sql): from a friend's town, race the
+// Friend ghost races (supabase/migrations/20261011053105_friend_ghosts.sql): from a friend's town, race the
 // ghost of their best run, then leave them a preset taunt. Guests and demo towns race a ghost too,
 // but nothing is posted.
 

@@ -3,7 +3,7 @@ import { flushSave, signedInUser } from './cloud'
 import { kartChannel } from './live'
 
 // Kart parties: live kart races for 3 to 6 signed-in players, refereed by the server
-// (supabase/migrations/0058_kart_parties.sql). The host opens the party with everyone they
+// (supabase/migrations/20261012153557_kart_parties.sql). The host opens the party with everyone they
 // invite; each player joins as the race starts and reports their finish time; the server
 // places the players by time once they're all in, or a minute after the first finish.
 

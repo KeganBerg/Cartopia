@@ -3,7 +3,7 @@ import { SERVER_CAR_COLUMNS, serverCar } from './serverCar'
 import { flushSave, signedInUser } from './cloud'
 
 // Live races between two signed-in players are decided by the server
-// (supabase/migrations/0009_live_race_referee.sql): it knows each player's real car
+// (supabase/migrations/20261011011419_live_race_referee.sql): it knows each player's real car
 // and how fast that car can possibly finish. Races with a guest stay unrefereed.
 
 export type Verdict = { won: boolean; myTime: number; theirTime: number; forfeit: boolean; void: boolean }

@@ -170,7 +170,7 @@ async function pushSave(): Promise<void> {
     if (error && error.code !== '23505' && error.code !== '23514') return console.warn('Cloud save failed', error.message)
     if (!error && data && data.length) {
       setCloudAt(data[0].updated_at)
-      // The server trimmed something it couldn't verify (see 0005_economy_guard.sql): play on from its copy.
+      // The server trimmed something it couldn't verify (see 20261010234915_economy_guard.sql): play on from its copy.
       if (data[0].corrections) await pullNewer(uid, true, 'Your town was synced with the server')
       return
     }

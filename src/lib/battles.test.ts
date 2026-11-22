@@ -8,10 +8,10 @@ const battle = (b: Partial<Battle>): Battle => ({ week: '2026-10-05', venue: 'ma
 describe('crew battles', () => {
   it('uses the same rules as the server', () => {
     // The latest definition of crew_battle_rules() (0113 adds par and the war chest tiers).
-    const sql = readFileSync('supabase/migrations/0113_crew_war_chests_log.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261017204805_crew_war_chests_log.sql', 'utf8')
     const rules = JSON.parse(sql.match(/crew_battle_rules\(\)[\s\S]*?select '(\{.*?\})'::jsonb/)![1])
     for (const [k, v] of Object.entries(BATTLE_RULES)) expect(rules[k], k).toEqual(v)
-    const war = readFileSync('supabase/migrations/0114_crew_war_map.sql', 'utf8')
+    const war = readFileSync('supabase/migrations/20261017225612_crew_war_map.sql', 'utf8')
     expect(JSON.parse(war.match(/crew_war_rules\(\)[\s\S]*?select '(\{.*?\})'::jsonb/)![1])).toEqual(WAR_RULES)
   })
 
@@ -49,7 +49,7 @@ describe('crew battles', () => {
   })
 
   it('keeps war chests apart from the other crew chests on the server', () => {
-    const sql = readFileSync('supabase/migrations/0113_crew_war_chests_log.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261017204805_crew_war_chests_log.sql', 'utf8')
     // crew_chests is keyed by (owner, day): goal = Monday, victory + 1, MVP + 2, war chests + 3 and + 4.
     expect(sql).toMatch(/values \(me, p_week \+ 2 \+ p_tier, v_clan, 'tier' \|\| p_tier\)/)
     expect(sql).toMatch(/p_tier not in \(1, 2\)/)

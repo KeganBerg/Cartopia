@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { useGame } from '../game/store'
 
-// The admin panel's server calls (supabase/migrations/0095_admin_panel.sql). Every
+// The admin panel's server calls (supabase/migrations/20261015042054_admin_panel.sql). Every
 // admin_* RPC checks public.is_admin() (0094) itself, so useIsAdmin
 // only decides whether the 🛡 button shows; it keeps nobody out.
 
@@ -13,7 +13,7 @@ export type AdminPlayer = {
   cars: AdminCar[]; muted: string | true | null; admin: boolean; joined: string; seen: string | null; chat?: AdminChat[]
 }
 export type AdminLogRow = { id: number; at: string; action: string; target: string | null; name: string | null; detail: Record<string, unknown> }
-// One reported chat message (0118_chat_reports.sql): every open report on it rolled up.
+// One reported chat message (20261018205440_chat_reports.sql): every open report on it rolled up.
 export type AdminReport = {
   message: number; at: string; room: string; body: string; reported: string | null; reportedName: string
   reasons: string[]; count: number; reporter: string; live: boolean

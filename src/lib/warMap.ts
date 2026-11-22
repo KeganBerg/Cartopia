@@ -7,7 +7,7 @@ import { useGame, spendFuel } from '../game/store'
 import { GHOST_FUEL, isBody, runWarGhost, type Ghost } from './ghosts'
 import { WAR_RULES, demoBattle, refreshCrewBattle, useCrewBattle, type Battle, type BattleSide, type WarAttack } from './battles'
 
-// The crew war map (supabase/migrations/0114_crew_war_map.sql): every member of both crews is a spot on the
+// The crew war map (supabase/migrations/20261017225612_crew_war_map.sql): every member of both crews is a spot on the
 // map. A member races a rival's ghost (a war race); a win takes 1 to 3 stars from that rival and adds war
 // points. Both crews see every race, so the map shows who has beaten whom and who is still standing.
 
