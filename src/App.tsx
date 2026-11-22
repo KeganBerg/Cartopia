@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { CountFrames, FpsMeter } from './ui/FpsMeter'
 import { SharedShapes } from './scene/sharedShapes'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
@@ -10,6 +10,7 @@ import { ThumbRenderer } from './scene/BuildingPreview'
 import { Preview, StageCanvas } from './scene/Stage'
 import { WarmPreview } from './scene/WarmPreview'
 import { quietShaders } from './scene/warm'
+import { TownWarm } from './scene/TownWarm'
 import { TapTips } from './ui/TapTip'
 import { BottomBar, ShopPanel, CarsPage, Toasts } from './ui/Menus'
 import { ShotGrabber, ShotMode } from './ui/ShotMode'
@@ -126,6 +127,9 @@ export default function App() {
   const eventPrize = useGame((s) => !!s.eventPrize)
   const tick = useGame((s) => s.tick)
   const townPaused = useTownPaused()
+  // The town draws nothing until its shaders are built (TownWarm), so the loading screen never freezes.
+  const [warming, setWarming] = useState(true)
+  const warmed = useCallback(() => setWarming(false), [])
   const townSlowed = useTownSlowed()
   const graphics = usePrefs((p) => p.graphics)
   useCrewGoalWatcher()
@@ -184,7 +188,7 @@ export default function App() {
   return (
     <>
       {/* Camera sits well back with a tight near/far range so depth stays precise and flat layers never flicker. */}
-      <Canvas className="town-3d" shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : graphics === 'auto' ? [1, pace.dpr] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused ? 'never' : 'demand'}
+      <Canvas className="town-3d" shadows={graphics !== 'saver'} orthographic camera={{ position: [75, 80, 75], zoom: 36, near: 1, far: 320 }} dpr={graphics === 'saver' ? 1 : graphics === 'auto' ? [1, pace.dpr] : [1, 2]} gl={{ toneMapping: NeutralToneMapping }} frameloop={townPaused || warming ? 'never' : 'demand'}
         onCreated={({ gl }) => {
           quietShaders(gl)
           splashProgress(0.9)
@@ -195,10 +199,13 @@ export default function App() {
       >
         <SharedShapes />
         <CountFrames view="town" />
-        <World />
+        <InSlices>
+          <World />
+          <TownWarm onReady={warmed} />
+        </InSlices>
         <SplashHandoff />
         <ShotGrabber />
-        <FrameCap fps={townSlowed ? Math.min(30, pace.fps) : townFps(graphics, pace.fps, paceStep === 0, free, isDesktop())} paused={townPaused} />
+        <FrameCap fps={townSlowed ? Math.min(30, pace.fps) : townFps(graphics, pace.fps, paceStep === 0, free, isDesktop())} paused={townPaused || warming} />
         <ShadowSwitch on={graphics !== 'saver'} />
       </Canvas>
       <FpsMeter />
@@ -272,6 +279,15 @@ export default function App() {
       <Cruise />
     </>
   )
+}
+
+// Builds the town as a transition, which React does in small slices with breaks for the
+// browser in between, instead of one block of a second or more (a big town on a laptop)
+// that stalled the loading screen's bar and every click on the page.
+function InSlices({ children }: { children: ReactNode }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => startTransition(() => setOn(true)), [])
+  return on ? children : null
 }
 
 // Fades out the loading screen once the town has drawn a few frames, so the
