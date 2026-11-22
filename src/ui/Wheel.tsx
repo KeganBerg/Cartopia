@@ -148,6 +148,11 @@ export function WheelPanel() {
   }
 
 
+  // The 3D wheel itself is a spin button too; a ref keeps the memoised scene's handler current.
+  const spinRef = useRef(spin)
+  useEffect(() => { spinRef.current = spin })
+  const [tapWheel] = useState(() => () => { void spinRef.current() })
+
   const close = () => useGame.getState().closePanel()
   const collect = () => {
     const o = result?.open
@@ -164,7 +169,7 @@ export function WheelPanel() {
   const won = phase === 'won' && result ? wheelSlice(result.slice) : null
   const wonColor = won ? TIER_COLOR[won.tier] : '#ffd54f'
   // Memoised: a new element every render would rebuild the whole scene.
-  const scene = useMemo(() => <WheelScene level={level} drive={drive} wonColor={wonColor} />, [level, wonColor, drive])
+  const scene = useMemo(() => <WheelScene level={level} drive={drive} wonColor={wonColor} onTap={tapWheel} />, [level, wonColor, drive, tapWheel])
   const stageReady = useStageReady()
 
   if (claimed && phase === 'idle') return null
