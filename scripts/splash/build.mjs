@@ -88,7 +88,8 @@ left:-30%;width:160%;top:-24%;height:70%;--cx:50%;--cy:52%}
 
 // Picks the time of day, season and the player's car, eases the pill forward
 // while the game downloads, and gives src/lib/splash.ts its handle. Runs before
-// anything else.
+// anything else. The pill moves by Web Animation, which the browser draws off the
+// main thread: a timer stalled (then jumped) whenever the game's code was busy.
 const JS = `(function(){
 var q=new URLSearchParams(location.search),el=document.getElementById('splash');
 var f=document.createElement('link');f.rel='stylesheet';f.href='https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800&display=swap';document.head.appendChild(f);
@@ -109,9 +110,11 @@ var model=/^[a-z0-9]+$/.test(c.model)?c.model:'hotshot',car=el.querySelector('.c
 paint.style.setProperty('--paint',/^#[0-9a-f]{3,8}$/i.test(c.color)?c.color:'#d32f2f');
 function useCar(id){var mk='url(/splash/hero-'+id+'-mask.webp)';paint.style.webkitMaskImage=mk;paint.style.maskImage=mk;img.src='/splash/hero-'+id+'.webp'}
 img.onload=function(){car.style.setProperty('--k',Math.max(.8,Math.min(1.25,img.naturalWidth/${HERO_W})));car.style.setProperty('--ar',img.naturalHeight/img.naturalWidth);car.classList.add('on')};img.onerror=function(){if(model!='hotshot'){model='hotshot';useCar(model)}};useCar(model);
-var bar=el.querySelector('.ld .fill'),lab=el.querySelector('.ld b'),v=.06,cap=.6,end=0;
-function draw(){bar.style.transform='scaleX('+v+')'}
-var tick=setInterval(function(){v+=(cap-v)*.04;draw()},120);
+var bar=el.querySelector('.ld .fill'),lab=el.querySelector('.ld b'),v=.06,cap=.6,end=0,an=null,tick=0;
+function at(){var m=getComputedStyle(bar).transform;return m&&m!='none'?parseFloat(m.split('(')[1])||v:v}
+function sx(x){return{transform:'scaleX('+x+')'}}
+function draw(){if(!an){bar.style.transform='scaleX('+v+')';return}var c=at();an.cancel();bar.style.transform='scaleX('+(end?1:cap)+')';an=bar.animate(end?[sx(c),sx(1)]:[Object.assign(sx(c),{easing:'ease-out'}),Object.assign(sx(Math.max(c,v)),{offset:.04,easing:'cubic-bezier(.15,.6,.3,1)'}),sx(Math.max(c,cap))],{duration:end?250:9000,fill:'forwards'})}
+if(bar.animate){bar.style.transition='none';an=bar.animate([sx(v)],{duration:1,fill:'forwards'});draw()}else tick=setInterval(function(){v+=(cap-v)*.04;draw()},120);
 var slow=setTimeout(function(){lab.textContent='Still loading\\u2026 tap to retry';el.querySelector('.ld').onclick=function(){location.reload()}},30000);
 window.cartopiaSplash={set:function(x){if(x>v)v=x;cap=Math.max(cap,Math.min(.97,x+.08));draw()},done:function(){if(end)return;end=1;clearInterval(tick);clearTimeout(slow);v=1;draw();lab.textContent='Let\\u2019s go!';setTimeout(function(){car.classList.add('go');setTimeout(function(){el.classList.add('out');setTimeout(function(){el.remove()},650)},750)},250)}};
 })()`

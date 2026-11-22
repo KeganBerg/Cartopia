@@ -11,18 +11,18 @@ export function quietShaders(gl: WebGLRenderer) {
 // (KHR_parallel_shader_compile), so nothing freezes when it first draws. Parts that start
 // hidden (launch smoke, exhaust flames, rain) are included: otherwise their shaders would
 // compile the moment they appear, mid-race. Meant for small scenes (a race): in the big
-// town the hidden pieces add up to a lot of memory for little gain. `offscreen`: the
-// scene is drawn into a post effects buffer, which changes its shaders (no tone
-// mapping), so compile for that.
-export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, offscreen: boolean): Promise<unknown> {
+// town the hidden pieces add up to a lot of memory for little gain, so the town passes
+// `hidden: false` and warms only what it draws. `offscreen`: the scene is drawn into a
+// post effects buffer, which changes its shaders (no tone mapping), so compile for that.
+export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, offscreen: boolean, hidden = true): Promise<unknown> {
   // three swaps PCFSoft (r3f's default with shadows on) for PCF at the first shadow draw, which
   // would throw away everything compiled here; compile for what it will draw with.
   if (gl.shadowMap.type === PCFSoftShadowMap) gl.shadowMap.type = PCFShadowMap
-  const hidden: Object3D[] = []
-  scene.traverse((o) => {
+  const shown: Object3D[] = []
+  if (hidden) scene.traverse((o) => {
     // Pieces Batch has merged stay hidden: the merged mesh is what draws.
     if (!o.visible && !o.userData.batched) {
-      hidden.push(o)
+      shown.push(o)
       o.visible = true
     }
   })
@@ -35,7 +35,7 @@ export function warmShaders(gl: WebGLRenderer, scene: Object3D, camera: Camera, 
   } finally {
     gl.setRenderTarget(before)
     target?.dispose()
-    for (const o of hidden) o.visible = false
+    for (const o of shown) o.visible = false
   }
   // Without background compiling, a phone finishes a shader only when it's first used, so one
   // compiled here but first drawn later (the crate depot's walk back out) froze the view then.
