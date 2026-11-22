@@ -75,7 +75,7 @@ describe('revealOrder', () => {
 })
 
 describe('crate_open_many (0082)', () => {
-  const sql = readFileSync(new URL('../../supabase/migrations/0082_crate_open_many.sql', import.meta.url), 'utf8')
+  const sql = readFileSync(new URL('../../supabase/migrations/20261014035121_crate_open_many.sql', import.meta.url), 'utf8')
   it('rolls each open with crate_open itself and checks the whole price', () => {
     expect(sql).toContain('o := public.crate_open(p_crate);')
     expect(sql).toMatch(/\* p_count/)

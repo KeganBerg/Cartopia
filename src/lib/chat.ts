@@ -10,7 +10,7 @@ import { mentions } from './mentions'
 import { useFriends } from './friendsList'
 import type { ClanBadge } from './clans'
 
-// Global chat and crew chat (supabase/migrations/0048_chat.sql). Messages are sent through
+// Global chat and crew chat (supabase/migrations/20261011201519_chat.sql). Messages are sent through
 // chat_send(), which filters and rate-limits them and broadcasts each one on the private
 // Realtime topic chat:<room>. Rooms: 'global', and 'crew:<clan id>' for the player's crew.
 

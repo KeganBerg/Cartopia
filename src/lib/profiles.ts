@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { supabase } from './supabase'
 import { displayName, isCleanName } from './names'
 
-// Usernames: one per account, separate from the town name (supabase/migrations/0049_friends_usernames.sql).
+// Usernames: one per account, separate from the town name (supabase/migrations/20261011201520_friends_usernames.sql).
 // Other players' names are fetched in batches and cached here.
 
 export const USERNAME_MIN = 3

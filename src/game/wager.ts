@@ -1,7 +1,7 @@
 // Wager matches: two signed-in players stake coins on a live drag race. Coins only, never gems:
 // gems can be bought with real money, and betting them would be real-money gambling.
 // The server holds both stakes when the challenge is accepted and pays the winner both
-// (supabase/migrations/0057_wager_matches.sql); a race that doesn't count gives them back.
+// (supabase/migrations/20261012083027_wager_matches.sql); a race that doesn't count gives them back.
 
 // Each stake and the level both racers need to bet it. wager.test.ts checks the SQL matches.
 export const STAKES: readonly (readonly [stake: number, level: number])[] = [

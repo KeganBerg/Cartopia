@@ -352,7 +352,7 @@ describe('merge bonus', () => {
 })
 
 describe('merge bonus on the server', () => {
-  // The guard banks the bonus by merge code (see 0088_merge_bonus.sql): its numbers must match MERGE_BONUS.
+  // The guard banks the bonus by merge code (see 20261014234044_merge_bonus.sql): its numbers must match MERGE_BONUS.
   it('matches MERGE_BONUS', () => {
     const dir = `${process.cwd()}/supabase/migrations`
     const sql = readdirSync(dir).sort().map((f) => readFileSync(`${dir}/${f}`, 'utf8')).filter((q) => q.includes('-- merge:begin')).pop()!

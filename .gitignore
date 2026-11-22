@@ -29,3 +29,5 @@ dist-ssr
 
 # Roblox port kit (node scripts/roblox/export.mjs)
 roblox-export
+supabase/.temp
+supabase/.branches

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { WHEEL, WHEEL_DUPE, WHEEL_FALLBACK, rollWheel, spinGems, wheelCoins, wheelSlice, wheelTables } from './wheel'
 import { useGame } from './store'
 
-// wheel_spin()'s table (0064_wheel_spin.sql; pending/ holds staged SQL before it's numbered).
+// wheel_spin()'s table (20261012230611_wheel_spin.sql; pending/ holds staged SQL before it's numbered).
 const serverTable = () => {
   const tag = '$wheel$'
   const files = ['../../supabase/pending/', '../../supabase/migrations/'].flatMap((d) => {

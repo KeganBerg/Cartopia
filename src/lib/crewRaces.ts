@@ -9,7 +9,7 @@ import { parTime, runGhost, type Ghost } from './ghosts'
 import type { Body } from '../game/data'
 
 // Crew races: crewmates race each other's ghosts (the friend ghost plumbing in ghosts.ts and
-// supabase/migrations/0030_friend_ghosts.sql), and the crew ladder ranks everyone by their best
+// supabase/migrations/20261011053105_friend_ghosts.sql), and the crew ladder ranks everyone by their best
 // run. A race against a crewmate counts as a race for the crew goal and the crew battle.
 
 export type Racer = {

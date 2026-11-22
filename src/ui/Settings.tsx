@@ -161,7 +161,7 @@ export function SettingsTab({ user }: { user: User | null }) {
 
 // A one-time code that carries this town's earned progress into Cartopia on Roblox (typed in its
 // Settings). Paid packs stay on the web: Roblox's rules don't let them unlock anything there, so the
-// Roblox game takes them out (supabase/migrations/0119_roblox_link.sql).
+// Roblox game takes them out (supabase/migrations/20261019025009_roblox_link.sql).
 function RobloxLink() {
   const [code, setCode] = useState<string | null>(null)
   const [linked, setLinked] = useState(false)

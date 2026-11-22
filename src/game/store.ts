@@ -456,7 +456,7 @@ export type GameState = SaveState & UiState & Actions
 export const gateLevel = (s: { level: number; admin?: boolean }) => (s.admin ? Infinity : s.level)
 
 // Cars a signed-in player's search finds come from the server (rescue_roll() in
-// supabase/migrations/0022_rescue_rolls.sql), which keeps them so the guard can tell real
+// supabase/migrations/20261011043827_rescue_rolls.sql), which keeps them so the guard can tell real
 // finds from made-up ones. src/lib/rescue.ts plugs it in; null means roll here (guests, or a server
 // without it yet). Rusty's top spot can hand back a resto-mod piece as a crate open.
 export type ServerFind = { i: number; uid: string; model: string; rarity: Rarity }
@@ -468,7 +468,7 @@ export const setRescueRoller = (f: typeof rescueRoller) => {
 }
 
 // A signed-in player's crates are opened by the server (crate_open() in
-// supabase/migrations/0040_crates.sql); src/lib/crates.ts plugs it in. It returns the opens to add
+// supabase/migrations/20261011141305_crates.sql); src/lib/crates.ts plugs it in. It returns the opens to add
 // (normally one; more when earlier ones never reached the save), or null to roll here (guests).
 // It throws 'soon' when the server can't open crates yet.
 // `count` above 1 opens that many in one go (the ×10 open), all rolled on the server.
@@ -478,7 +478,7 @@ export const setCrateOpener = (f: typeof crateOpener) => {
 }
 
 // A signed-in player's daily spin is rolled by the server too (wheel_spin() in
-// supabase/migrations/0064_wheel_spin.sql); src/lib/crates.ts plugs it in. It returns the spin and any
+// supabase/migrations/20261012230611_wheel_spin.sql); src/lib/crates.ts plugs it in. It returns the spin and any
 // earlier opens the save never counted, or null to roll here (guests). Throws 'soon' or 'spun today'.
 export type ServerSpin = { spin: WheelSpin | null; day: string; pending: CrateOpen[] }
 let wheelSpinner: (() => Promise<ServerSpin | null>) | null = null

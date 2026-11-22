@@ -5,7 +5,7 @@ import { CARS, carDef, performance, type Body } from '../game/data'
 import { DEMO, demoTown } from './friends'
 import type { OwnedCar } from '../game/store'
 
-// The weekly time trial board (supabase/migrations/0026_time_trials.sql). Signed-in players
+// The weekly time trial board (supabase/migrations/20261011050343_time_trials.sql). Signed-in players
 // post times; everyone can look. Guests and offline players keep a best on this device only.
 
 export type BoardRow = { owner: string; town: string | null; t: number; pi: number; car: string | null; place: number }

@@ -18,7 +18,7 @@ import { sfx } from './sound'
 
 // Live drag racing over Supabase Realtime. A shared lobby channel carries
 // presence and challenges; each race gets its own channel for positions.
-// Both are private channels for signed-in players only (0020_private_realtime.sql):
+// Both are private channels for signed-in players only (20261011041915_private_realtime.sql):
 // the lobby is open to any signed-in player, a race channel only to its two racers.
 
 // uid: the signed-in account. Town, level and car shown to others come from its server save.
@@ -52,7 +52,7 @@ type LiveState = {
   signedIn: boolean
 }
 
-// The server caps bets per day (0059_economy_followups.sql), so a bet can fail on a yes.
+// The server caps bets per day (20261012164801_economy_followups.sql), so a bet can fail on a yes.
 export const BET_LIMIT = 'Bet limit for today. Race without a bet!'
 
 // How long a challenge stays open, and the breather after one ends.

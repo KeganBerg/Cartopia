@@ -1,5 +1,5 @@
 // Drag race physics, shared by the race screen and the server's live race referee
-// (supabase/migrations/0009_live_race_referee.sql, public.race_floor()).
+// (supabase/migrations/20261011011419_live_race_referee.sql, public.race_floor()).
 
 export const TRACK = 400
 

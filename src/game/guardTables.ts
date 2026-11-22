@@ -1,5 +1,5 @@
 // Tables the server's save guard uses to check restores and Grand Prix wins
-// (supabase/migrations/0016_econ_restore_gp.sql, 0022_rescue_rolls.sql). guardTables.test.ts keeps them in step.
+// (supabase/migrations/20261011034856_econ_restore_gp.sql, 20261011043827_rescue_rolls.sql). guardTables.test.ts keeps them in step.
 import { BAY2_LEVEL, HOT_RARE, TRUCK, BARN_PER_DAY, BARN_RARITY, GP_ROUNDS, GP_SERIES, RARITY, RESCUE_CAR_CHANCE, RESCUE_PINS, RESCUE_SPOTS, VISITORS, VISIT_GAP_MIN, VISITS_PER_DAY, type Rarity } from './data'
 import { AI_BOOST_GEAR, MAX_RACE_PI, OIL_SECONDS, TOP_GEAR, aiReaction, fireBoost, freshRacer, launchRacer, raceFloor, shiftRacer, stepRacer } from './race'
 
@@ -27,7 +27,7 @@ export function rescueSpots(): Record<string, { unlock: number; cars: [string, R
   return Object.fromEntries(RESCUE_SPOTS.map((s) => [s.id, { unlock: s.unlockLevel, cars: s.cars.map((c): [string, Rarity] => [c.model, c.rarity]) }]))
 }
 // What a search at each spot costs; rescue_roll() splits it over the cars found, and a restore's
-// payout is checked against its share (0024_season_track.sql).
+// payout is checked against its share (20261011050341_season_track.sql).
 export const spotCosts = (): Record<string, number> => Object.fromEntries(RESCUE_SPOTS.map((s) => [s.id, s.cost]))
 export function rarities(): Record<Rarity, { weight: number; minutes: number }> {
   return Object.fromEntries(Object.entries(RARITY).map(([k, r]) => [k, { weight: r.weight, minutes: r.minutes }])) as Record<Rarity, { weight: number; minutes: number }>
@@ -76,7 +76,7 @@ export function gpBeatTable(): number[] {
   })
 }
 
-// Surprise visitors as the server rolls them (visitor_next() in 0032_town_visitors.sql).
+// Surprise visitors as the server rolls them (visitor_next() in 20261011055555_town_visitors.sql).
 export function visitorTable() {
   return {
     kinds: Object.fromEntries(Object.entries(VISITORS).map(([k, v]) => [k, { weight: v.weight, minutes: v.minutes, ...v.pay }])),

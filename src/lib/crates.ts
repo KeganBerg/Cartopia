@@ -4,10 +4,10 @@ import { setCrateOpener, setWheelSpinner, today, useGame } from '../game/store'
 import type { CrateOpen } from '../game/crates'
 
 // A signed-in player's crates are opened by the server (crate_open() in
-// supabase/migrations/0040_crates.sql, newest copy 0072_crate_hats.sql; hat prizes come back as
+// supabase/migrations/20261011141305_crates.sql, newest copy 20261013032508_crate_hats.sql; hat prizes come back as
 // { kind: 'hat', hat } like the game's own), so the save guard only pays prizes it really rolled.
 // Guests roll in the browser. The ×10 open is one call to crate_open_many(), which rolls the ten
-// on the server as one batch (supabase/migrations/0082_crate_open_many.sql) and hands them all back.
+// on the server as one batch (supabase/migrations/20261014035121_crate_open_many.sql) and hands them all back.
 setCrateOpener(async (crate, free, count = 1) => {
   if (!supabase || !signedInUser()) return null
   // The server checks the price against the saved coins and gems, so what was just spent or earned has to land first.
@@ -23,7 +23,7 @@ setCrateOpener(async (crate, free, count = 1) => {
   return 'pending' in d ? d.pending : 'opens' in d ? d.opens : [d]
 })
 
-// The daily wheel spin, rolled by wheel_spin() (supabase/migrations/0064_wheel_spin.sql). Opens the save
+// The daily wheel spin, rolled by wheel_spin() (supabase/migrations/20261012230611_wheel_spin.sql). Opens the save
 // never counted come back first: they're added and saved, then the spin is asked for again.
 setWheelSpinner(async () => {
   if (!supabase || !signedInUser()) return null

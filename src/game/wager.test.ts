@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { STAKES, claim, isStake, shortCoins, stakesFor } from './wager'
 
-const sql = readFileSync(new URL('../../supabase/migrations/0057_wager_matches.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../supabase/migrations/20261012083027_wager_matches.sql', import.meta.url), 'utf8')
 
 describe('wager matches', () => {
   it('server stakes match STAKES', () => {

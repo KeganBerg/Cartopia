@@ -29,7 +29,7 @@ vi.mock('./supabase', () => ({
 vi.mock('./serverCar', () => ({ SERVER_CAR_COLUMNS: '', serverCar: () => ({ name: 'Car', color: '#ffffff', body: 'sedan', pi: 90, uid: null }), serverCallCard: () => undefined }))
 vi.mock('./referee', () => ({ joinRefereed: async () => true }))
 vi.mock('./cloud', () => ({ signedInUser: () => UID_ME }))
-// The server refuses to hold this pair's 4th bet of the day (0059_economy_followups.sql).
+// The server refuses to hold this pair's 4th bet of the day (20261012164801_economy_followups.sql).
 vi.mock('./wagers', () => ({ acceptWager: async () => 'limit', offerWager: async () => true, startWagers: () => {}, syncWagers: async () => 0, voidWager: async () => 0 }))
 const live = await import('./live')
 const { useGame } = await import('../game/store')

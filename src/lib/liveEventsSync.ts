@@ -3,7 +3,7 @@ import { useGame } from '../game/store'
 import { liveEvents, setLiveEvents, syncHandlers, type LiveEvent } from '../game/liveEvents'
 
 // Keeps src/game/liveEvents.ts in step with the live_events table
-// (0055_live_events.sql). Loads it on start, then Realtime pushes every insert
+// (20261012010136_live_events.sql). Loads it on start, then Realtime pushes every insert
 // or change so online players switch within seconds. A slow poll backs that up
 // in case the socket drops, and a missing table (SQL not run yet) just means
 // no events.

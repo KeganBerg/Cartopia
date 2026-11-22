@@ -43,7 +43,7 @@ do $$ begin
   raise exception 'FAIL an outsider reported a time';
 exception when insufficient_privilege then null;
 end $$;
--- The race channel is private to its two racers (0020_private_realtime.sql).
+-- The race channel is private to its two racers (20261011041915_private_realtime.sql).
 :as_admin
 insert into realtime.messages (topic, extension, event, payload) values ('race:11111111-race-0001', 'broadcast', 'probe', '{}');
 :as_c
