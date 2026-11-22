@@ -342,7 +342,7 @@ function useChase() {
   })
 }
 
-function BigWheel({ level, drive }: { level: number; drive: WheelDrive }) {
+function BigWheel({ level, drive, onTap }: { level: number; drive: WheelDrive; onTap?: () => void }) {
   const spin = useRef<Group>(null)
   const side = useMemo(() => sidewallTex(), [])
   const cap = useMemo(() => capTex(), [])
@@ -352,7 +352,13 @@ function BigWheel({ level, drive }: { level: number; drive: WheelDrive }) {
     if (spin.current) spin.current.rotation.z = (-drive.angle * Math.PI) / 180
   })
   return (
-    <group position={[0, CY, 0]}>
+    <group
+      position={[0, CY, 0]}
+      // Tapping anywhere on the wheel (tyre, slices or the star hub) spins it; a drag doesn't.
+      onClick={onTap && ((e) => { e.stopPropagation(); if (e.delta <= 8) onTap() })}
+      onPointerOver={onTap && (() => { document.body.style.cursor = 'pointer' })}
+      onPointerOut={onTap && (() => { document.body.style.cursor = '' })}
+    >
       <group ref={spin}>
         {/* The tyre, its tread and the raised sidewall lettering. */}
         <mesh geometry={tyreGeo} material={rubber} rotation-x={Math.PI / 2} castShadow receiveShadow />
@@ -574,8 +580,9 @@ function Confetti({ drive, color }: { drive: WheelDrive; color: string }) {
   )
 }
 
-export function WheelScene({ level, drive, wonColor }: { level: number; drive: WheelDrive; wonColor: string }) {
+export function WheelScene({ level, drive, wonColor, onTap }: { level: number; drive: WheelDrive; wonColor: string; onTap?: () => void }) {
   useEffect(() => holdTown(), [])
+  useEffect(() => () => { document.body.style.cursor = '' }, [])
   useEffect(() => holdPageTint('#120c1c'), [])
   const size = useThree((s) => s.size)
   const camera = useThree((s) => s.camera)
@@ -619,7 +626,7 @@ export function WheelScene({ level, drive, wonColor }: { level: number; drive: W
       <Shop wide={wide} />
       <Dust />
       <Stand />
-      <BigWheel level={level} drive={drive} />
+      <BigWheel level={level} drive={drive} onTap={onTap} />
       <Flapper drive={drive} />
       <Confetti drive={drive} color={wonColor} />
       {/* A soft glow pooled on the floor under the wheel. */}
