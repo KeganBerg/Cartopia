@@ -16,6 +16,18 @@
 html, body, #root { margin: 0; height: 100%; }
 body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; font-family: Nunito, system-ui, sans-serif; background: #5aa83a; overflow: hidden; color: var(--ink); user-select: none; }
 button { font: inherit; cursor: pointer; }
+/* iPhone Safari (iOS 26+) never lets a page draw under its status bar or its floating
+   address bar: it fills both with a flat colour taken from the page background, which
+   pageTint.ts keeps on the town's ground colour. The town's own edges are shaded darker
+   (vignette, cloud shadows), so on its own the bar meets the town at a hard line. These
+   short fades melt the town into the bar instead. Phones in the browser only: a home-screen
+   app is truly full screen, and desktops have no bars. */
+@media (pointer: coarse) and (display-mode: browser) {
+  body::before, body::after { content: ''; position: fixed; left: 0; right: 0; height: 44px; z-index: 1; pointer-events: none; }
+  body::before { top: 0; background: linear-gradient(var(--page-tint, transparent), transparent); }
+  body::after { bottom: 0; background: linear-gradient(transparent, var(--page-tint, transparent)); }
+  html.shot body::before, html.shot body::after, html.cruise body::before, html.cruise body::after { display: none; }
+}
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 input { font: inherit; padding: 8px 10px; border-radius: 10px; border: 2px solid #cfd8dc; width: 100%; margin: 4px 0; }
 
