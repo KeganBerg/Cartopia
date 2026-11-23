@@ -3,7 +3,8 @@
 -- It only reads the system catalogs; it changes nothing.
 --
 -- Expected values come from replaying every file in supabase/migrations on a fresh Postgres
--- (md5 of pg_get_functiondef, the same hash the economy thread already tracks).
+-- (md5 of pg_get_functiondef, the same hash the economy thread already tracks). Carriage returns are
+-- ignored: SQL pasted into the editor from Windows stores CRLF line ends, which change the hash only.
 -- Each row is one difference:
 --   missing          the repo creates it but live has none: that migration may never have run.
 --   different body   live has an older or hand-edited version of a function; `version` is the
@@ -813,7 +814,7 @@ with exp(version, kind, obj, md5) as (values
 ns as (select oid, nspname from pg_namespace where nspname in ('public','econ_private')),
 ext as (select objid from pg_depend where deptype = 'e'),
 live as (
-select 'function' as kind, ns.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' as obj, md5(pg_get_functiondef(p.oid)) as md5
+select 'function' as kind, ns.nspname||'.'||p.proname||'('||pg_get_function_identity_arguments(p.oid)||')' as obj, md5(replace(pg_get_functiondef(p.oid), chr(13), '')) as md5
   from pg_proc p join ns on ns.oid = p.pronamespace where p.prokind in ('f','p') and p.oid not in (select objid from ext)
 union all
 select 'table', ns.nspname||'.'||c.relname, null from pg_class c join ns on ns.oid = c.relnamespace where c.relkind in ('r','p','v','m') and c.oid not in (select objid from ext)
