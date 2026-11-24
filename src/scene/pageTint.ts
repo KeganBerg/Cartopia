@@ -9,6 +9,8 @@ function apply(hex: string): void {
   if (!hex || hex === shown) return
   shown = hex
   document.documentElement.style.backgroundColor = hex
+  // The edge fades (body::before/::after in index.css) blend the town into Safari's bars.
+  document.documentElement.style.setProperty('--page-tint', hex)
   document.body.style.backgroundColor = hex
   meta ??= document.querySelector('meta[name="theme-color"]')
   meta?.setAttribute('content', hex)

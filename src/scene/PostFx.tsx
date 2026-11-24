@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
 import { Bloom, EffectComposer, ToneMapping } from '@react-three/postprocessing'
 import { BlendFunction, Effect, KernelSize, TiltShiftEffect, ToneMappingMode, type BloomEffect } from 'postprocessing'
@@ -91,6 +91,21 @@ class SoftTiltShift extends TiltShiftEffect {
     this.uniforms.set('fade', new Uniform(feather))
     this.setFragmentShader(TILT_FRAG)
   }
+
+  setBand(focusArea: number, feather: number) {
+    if (this.focusArea === focusArea && this.feather === feather) return
+    this.focusArea = focusArea
+    this.feather = feather
+    this.uniforms.get('fade')!.value = feather
+  }
+}
+
+// The focus band is a share of the screen height. On a wide screen that blurs only the
+// far distance, but a portrait phone is twice as tall as it is wide, so the same share
+// blurred half the town (the buildings above and below the middle went soft). Tall
+// screens keep the blur to thin strips under the HUD and the bottom buttons.
+export function tiltBand(width: number, height: number): [focusArea: number, feather: number] {
+  return height > width ? [0.84, 0.14] : [0.72, 0.28]
 }
 
 // How much post-processing a device gets.
@@ -165,6 +180,8 @@ export function PostFx({ look, town, tiltShift }: { look: Look; town?: boolean; 
 
   useEffect(() => () => grade.dispose(), [grade])
   useEffect(() => () => tilt.dispose(), [tilt])
+  const size = useThree((st) => st.size)
+  useEffect(() => tilt.setBand(...tiltBand(size.width, size.height)), [tilt, size.width, size.height])
   useEffect(() => {
     if (town) fxState.on = tier !== 'off'
   }, [town, tier])
