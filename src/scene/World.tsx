@@ -56,6 +56,11 @@ import { tapOwnedBy } from './pick'
 import { useLite } from '../lib/prefs'
 
 // Meadow ground that drifting cloud shadows pass over, one per tiling.
+// A pointer that can hover (a mouse, a trackpad). Without one there's no cursor to change, and
+// hover handlers on every building made each finger move test the ray against every part of
+// every building in town: ~2 ms a move on a fast computer, several times that on a phone.
+const HOVER = typeof matchMedia === 'function' && matchMedia('(any-hover: hover)').matches
+
 const meadows = new Map<number, MeshStandardMaterial>()
 const meadow = (repeat: number) => meadows.get(repeat) ?? meadows.set(repeat, cloudyGround(meadowTex(repeat))).get(repeat)!
 
@@ -278,12 +283,16 @@ function BuildingLot({ b, turn, group, picked, city }: BuildingProps) {
         else if (mark) launchTower(b.uid)
         s.tapBuilding(b.uid)
       }}
-      onPointerOver={() => {
-        const mode = useGame.getState().mode
-        if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
-        else if (mode === 'play' && (!useGame.getState().visiting || (d.kind !== 'decor' && helpable(d)))) document.body.style.cursor = 'pointer'
-      }}
-      onPointerOut={() => (document.body.style.cursor = '')}
+      onPointerOver={
+        HOVER
+          ? () => {
+              const mode = useGame.getState().mode
+              if (mode === 'move' && movable(b.def)) document.body.style.cursor = 'grab'
+              else if (mode === 'play' && (!useGame.getState().visiting || (d.kind !== 'decor' && helpable(d)))) document.body.style.cursor = 'pointer'
+            }
+          : undefined
+      }
+      onPointerOut={HOVER ? () => (document.body.style.cursor = '') : undefined}
     >
       {d.kind !== 'decor' && d.kind !== 'obstacle' && (
         // One paved lot under the whole block, a 2x4's two halves included.
