@@ -36,6 +36,11 @@ const REST = 0.12
 let dirty = true
 // Thumbnails came, went, resized or scrolled in or out: where they sit is looked at again (see the hero).
 let moved = true
+// The page scrolled since the hero was last looked for.
+let scrolled = false
+if (typeof addEventListener === 'function') addEventListener('scroll', () => (scrolled = true), { capture: true, passive: true })
+// Thumbnails that can fade out while mounted (inside [data-fade], the Car Packs showcase).
+let fading = 0
 const DPR = typeof window === 'undefined' ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
 
 // Each model is measured once it's mounted and the camera is fitted to it, so
@@ -110,7 +115,9 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   // observer doesn't always report a target that's unobserved and observed again, so it keeps
   // whether it was on screen; otherwise the new car never draws and the box stays blank.
   // Held, a standing car shows its front three quarters, a floating model the three quarters view.
-  const slot: Slot = { key: item.key, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, scene: !!item.view, angle: item.stand ? 0 : REST, at: -Infinity, fresh: true }
+  const fades = !!canvas.closest('[data-fade]')
+  if (fades) fading++
+  const slot: Slot = { key: item.key, fades, canvas, ctx: canvas.getContext('2d'), seen: typeof IntersectionObserver === 'undefined' || wasSeen.get(canvas) === true, still, scene: !!item.view, angle: item.stand ? 0 : REST, at: -Infinity, fresh: true }
   slots.add(slot)
   byCanvas.set(canvas, slot)
   const m = models.get(item.key)
@@ -146,6 +153,7 @@ function attach(item: Item, canvas: HTMLCanvasElement, still: boolean) {
   changed()
   return () => {
     wasSeen.set(canvas, slot.seen)
+    if (fades) fading--
     slots.delete(slot)
     byCanvas.delete(canvas)
     watcher?.unobserve(canvas)
@@ -245,6 +253,13 @@ function Renderer() {
   const [, mounted] = useState(0)
   // A rebuilt canvas (the phone dropped the old one) starts with an empty scene.
   useEffect(() => () => inScene.clear(), [])
+  // Every model stays mounted (KEEP_IDLE), hidden, and each thumbnail drawn used to work out the
+  // matrices of all of them: a Shop page drawing a few a frame spent ~2 ms a frame on that on a
+  // fast computer. Each draw updates just the model it shows, and the lights (see below).
+  useEffect(() => {
+    scene.matrixWorldAutoUpdate = false
+    return () => void (scene.matrixWorldAutoUpdate = true)
+  }, [scene])
   // Each model's size, measured the first time it's drawn.
   const sizes = useRef(new WeakMap<Group, Bounds>())
   const shadow = useRef<Mesh>(null)
@@ -280,14 +295,19 @@ function Renderer() {
     // not every frame something is waiting its turn.
     const f = focus.current
     if (still) f.slot = null
-    else if (moved || now - f.at > 250 || (f.slot && !slots.has(f.slot))) {
+    // Reading places makes the browser lay the page out there and then, mid-frame: a big menu
+    // (40 cars) spent ~9 ms on that four times a second while nothing on it moved. So it's read
+    // when thumbnails came, went or resized, a few times a second while the page scrolls or a
+    // showcase fades its cars, and otherwise only every couple of seconds.
+    else if (moved || (f.slot && !slots.has(f.slot)) || (now - f.at > 250 && (scrolled || fading > 0)) || now - f.at > 2000) {
       f.at = now
       moved = false
+      scrolled = false
       const cands: { slot: Slot; box: DOMRect }[] = []
       for (const s of slots) {
         // Faded right out (the Car Packs showcase keeps its other cars mounted, see-through): it
         // neither turns nor takes the hero's place until it shows, and draws as soon as it does.
-        const hidden = s.seen && typeof s.canvas.checkVisibility === 'function' && !s.canvas.checkVisibility({ opacityProperty: true, visibilityProperty: true })
+        const hidden = s.fades && s.seen && typeof s.canvas.checkVisibility === 'function' && !s.canvas.checkVisibility({ opacityProperty: true, visibilityProperty: true })
         if (hidden !== !!s.hidden) {
           s.hidden = hidden
           if (!hidden) s.fresh = true
@@ -386,6 +406,7 @@ function Renderer() {
       gl.setViewport(n.x, ah - n.y - n.h, n.w, n.h)
       gl.setScissor(n.x, ah - n.y - n.h, n.w, n.h)
       gl.clear()
+      for (const o of scene.children) if (o === g || !o.userData.thumbModel) o.updateMatrixWorld()
       gl.render(scene, c)
       g.visible = false
     }
@@ -415,8 +436,10 @@ function Renderer() {
           key={item.key}
           visible={false}
           ref={(g) => {
-            if (g) groups.current.set(item.key, g)
-            else groups.current.delete(item.key)
+            if (g) {
+              g.userData.thumbModel = true
+              groups.current.set(item.key, g)
+            } else groups.current.delete(item.key)
           }}
         >
           <Model item={item} />

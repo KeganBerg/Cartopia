@@ -46,8 +46,9 @@ export function copyThumbs(src: CanvasImageSource, width: number, height: number
 // `still`: holds still (Shop > Upgrades' many buildings) unless the mouse is over it.
 // `scene`: an arcade card that animates itself; those keep drawing (at 24 a second).
 // `angle`: how far round it has turned (0-1). `at`: when it was last drawn (ms).
-// `fresh`: it needs drawing (new, or resized). `hidden`: on screen but faded right out.
-export type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean; still: boolean; scene: boolean; angle: number; at: number; fresh: boolean; hidden?: boolean }
+// `fresh`: it needs drawing (new, or resized). `hidden`: on screen but faded right out (only
+// looked at for `fades` ones, inside a [data-fade] that fades them).
+export type Slot = { key: string; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null; seen: boolean; still: boolean; scene: boolean; angle: number; at: number; fresh: boolean; hidden?: boolean; fades?: boolean }
 
 // Held pictures drawn per frame, so a page full of them fills in over a few frames
 // instead of stalling one.

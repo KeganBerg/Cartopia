@@ -10,7 +10,7 @@ export const anchorEls = new Map<string, HTMLElement>()
 
 const v = new Vector3()
 
-type Placed = { el: HTMLElement; x: number; y: number; x0: number; y0: number; w: number; h: number; fixed: boolean }
+export type Placed = { el: HTMLElement; x: number; y: number; x0: number; y0: number; w: number; h: number; fixed: boolean }
 // How far each bubble is currently nudged off its building. It slides to a new spot rather
 // than hopping, so bubbles don't flicker between spots while the camera turns.
 const nudges = new WeakMap<HTMLElement, { x: number; y: number }>()
@@ -26,19 +26,57 @@ const quiet = (el: HTMLElement) => {
   return !!c && (c.contains('badge-working') || c.contains('badge-idle'))
 }
 
-// The top HUD's boxes, re-measured every few frames. A bubble may not sit behind them.
+// The top HUD's boxes. A bubble may not sit behind them.
 const HUD = '.hud-left, .hud-center > *, .hud-right > *, .hud-strip, .hud-town, .hud-mobile > .goal-tracker'
 let hud: DOMRect[] = []
 let hudAge = 0
-const underHud = (x: number, y: number, w: number, h: number) =>
-  hud.some((r) => x + w / 2 > r.left && x - w / 2 < r.right && y > r.top && y - h < r.bottom)
+// The boxes are measured when one of them changes size (a counter gets a digit longer, a strip
+// shows) or the window does, right after the browser's own layout. Measured in the frame, after
+// the bubbles' writes, they made the browser lay the page out again every 20 frames.
+let hudEls: Element[] = []
+const measureHud = () => {
+  hud = hudEls.map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
+}
+const hudSizer = typeof ResizeObserver === 'function' ? new ResizeObserver(measureHud) : null
+// A resized window moves the boxes without always resizing them: observe them afresh.
+let hudStale = true
+if (hudSizer) addEventListener('resize', () => (hudStale = true))
+// HUD pieces come and go; every 20 frames the list is checked (no layout in that). Every couple of
+// seconds they're observed afresh anyway, for a box that slid somewhere without changing size.
+let hudWatches = 0
+function watchHud() {
+  if (++hudWatches % 6 === 0) hudStale = true
+  const els = [...document.querySelectorAll(HUD)]
+  if (!hudSizer) {
+    hudEls = els
+    return measureHud()
+  }
+  if (!hudStale && els.length === hudEls.length && els.every((e, i) => e === hudEls[i])) return
+  hudStale = false
+  hudSizer.disconnect()
+  hudEls = els
+  // Observing reports each one's size once, so this measures them all after the next layout.
+  for (const e of els) hudSizer.observe(e)
+  if (!els.length) hud = []
+}
 
 // How far a pill's count chip pokes out past its top-right corner, in px.
 const CHIP = 8
 
 // Off screen by more than this, in px, a bubble is hidden and skipped.
 const OFF = 120
-const sizes = new WeakMap<HTMLElement, { w: number; h: number; age: number }>()
+const sizes = new WeakMap<HTMLElement, { w: number; h: number }>()
+// Each bubble's size, kept up to date as its text changes. Read in the observer's callback, the
+// size costs nothing: the browser has just laid the page out.
+const sizer =
+  typeof ResizeObserver === 'function'
+    ? new ResizeObserver((list) => {
+        for (const e of list) {
+          const el = e.target as HTMLElement
+          sizes.set(el, { w: el.offsetWidth, h: el.offsetHeight })
+        }
+      })
+    : null
 // What each bubble was last given, so unchanged ones aren't written again every frame.
 const last = new WeakMap<HTMLElement, { seen?: boolean; at?: string; x?: number; y?: number; cls: Record<string, boolean> }>()
 const memo = (el: HTMLElement) => {
@@ -123,6 +161,74 @@ function sameAsBefore(w: number, h: number) {
   return true
 }
 
+type Box = { left: number; right: number; top: number; bottom: number }
+const near: Placed[] = []
+
+// Bubbles on neighbouring buildings would pile on top of each other. `placed` comes sorted from
+// the bottom of the screen up: bubbles nearest the bottom keep their spot; each later one moves to
+// the closest free spot beside, above or below the ones already placed, but only a short hop
+// (HOP) so it still reads as its building's, and never up under the HUD. `done` gets each bubble
+// with its spot in a.x / a.y, in order, and may move it (the slide) before the next is placed.
+// Every spot tried is within HOP of the bubble, so only bubbles that close can be in its way:
+// testing each spot against every bubble placed before it made this cubic, 10 ms or more a
+// frame while panning a big town on a fast computer (several times that on a phone).
+export function spread(placed: Placed[], width: number, height: number, hudBoxes: Box[], done: (a: Placed, under: boolean) => void) {
+  const top = Math.min(200, height / 3)
+  const overHud = (x: number, y: number, w: number, h: number) => hudBoxes.some((r) => x + w / 2 > r.left && x - w / 2 < r.right && y > r.top && y - h < r.bottom)
+  const free = (a: Placed, x: number, y: number) => {
+    // A bubble already up near the HUD may dodge sideways at its own height, just not higher.
+    if (x - a.w / 2 < 2 || x + a.w / 2 + CHIP > width - 2 || y - a.h < Math.min(top, a.y0 - a.h) || overHud(x, y, a.w, a.h)) return false
+    for (let j = 0; j < near.length; j++) {
+      const b = near[j]
+      if (Math.abs(x - b.x) < (a.w + b.w) / 2 + CHIP && y > b.y - b.h - CHIP && y - a.h - CHIP < b.y) return false
+    }
+    return true
+  }
+  const consider = (a: Placed, x: number, y: number, best: { x: number; y: number; d: number }) => {
+    const d = (x - a.x) ** 2 + (y - a.y) ** 2
+    if (d < best.d && free(a, x, y)) {
+      best.x = x
+      best.y = y
+      best.d = d
+    }
+  }
+  const best = { x: 0, y: 0, d: 0 }
+  for (let i = 0; i < placed.length; i++) {
+    const a = placed[i]
+    // Keep plain bubbles fully on screen sideways too, count chip included.
+    if (!a.fixed) a.x = Math.min(Math.max(a.x, a.w / 2 + 4), width - a.w / 2 - CHIP - 4)
+    if (!a.fixed) {
+      // The ones placed already that could be in the way of a spot within HOP (one px spare).
+      near.length = 0
+      for (let j = 0; j < i; j++) {
+        const b = placed[j]
+        if (Math.abs(a.x - b.x) < HOP + (a.w + b.w) / 2 + CHIP + 1 && a.y + HOP + 1 > b.y - b.h - CHIP && a.y - HOP - 1 - a.h - CHIP < b.y) near.push(b)
+      }
+      if (!free(a, a.x, a.y)) {
+        best.d = HOP * HOP
+        let found = false
+        for (let j = 0; j < i; j++) {
+          const b = placed[j]
+          // Neighbours leave room for each other's count chips.
+          const d0 = best.d
+          consider(a, a.x, b.y - b.h - CHIP - 1, best)
+          consider(a, a.x, b.y + a.h + CHIP + 1, best)
+          consider(a, b.x - (a.w + b.w) / 2 - CHIP - 1, a.y, best)
+          consider(a, b.x + (a.w + b.w) / 2 + CHIP + 1, a.y, best)
+          if (best.d < d0) found = true
+        }
+        if (found) {
+          a.x = best.x
+          a.y = best.y
+        }
+      }
+      near.length = 0
+    }
+    // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
+    done(a, !a.fixed && overHud(a.x, a.y, a.w, a.h))
+  }
+}
+
 export function AnchorProjector() {
   const camera = useThree((s) => s.camera)
   const size = useThree((s) => s.size)
@@ -130,9 +236,9 @@ export function AnchorProjector() {
     placed.length = 0
     const now = performance.now()
     const slide = Math.min(1, delta * 14)
-    if (hudAge-- <= 0) {
+    if (hudAge-- <= 0 || hudStale) {
       hudAge = 20
-      hud = [...document.querySelectorAll(HUD)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0)
+      watchHud()
     }
     // Same default zoom as ResponsiveZoom in World.tsx.
     // The free view's camera is a perspective one: there, far means pulled well back.
@@ -179,21 +285,17 @@ export function AnchorProjector() {
       }
       placed.push({ el, x, y, x0: x, y0: y, w: 0, h: 0, fixed: clamp })
     }
-    // Sizes, read together after the writes above (reading between writes re-ran layout once
-    // per bubble) and only every second or so: they change only when a bubble's text does.
+    // Sizes come from the ResizeObserver below, which hears of a change after the browser's own
+    // layout. Reading them here made the browser lay the page out again in the middle of the
+    // frame (the writes above dirty it): ~2 ms a frame in a big town on a fast computer.
+    // A bubble too new to have been heard of yet is read once.
     for (const a of placed) {
       let s = sizes.get(a.el)
-      if (!s || s.age-- <= 0) {
-        s = { w: a.el.offsetWidth, h: a.el.offsetHeight, age: 30 + (Math.random() * 30) | 0 }
-        sizes.set(a.el, s)
-      }
+      if (!s || (!sizer && Math.random() < 1 / 45)) sizes.set(a.el, (s = { w: a.el.offsetWidth, h: a.el.offsetHeight }))
       a.w = s.w
       a.h = s.h
     }
-    // Bubbles on neighbouring buildings would pile on top of each other. Bubbles nearest the
-    // bottom of the screen keep their spot; each later one moves to the closest free spot beside,
-    // above or below the ones already placed, but only a short hop so it still reads as its
-    // building's, and never up under the HUD.
+    // Bottom of the screen first: see spread().
     placed.sort((a, b) => b.y - a.y)
     if (sameAsBefore(size.width, size.height)) {
       let settled = true
@@ -216,42 +318,7 @@ export function AnchorProjector() {
     }
     before.els.length = before.at.length = before.to.length = before.under.length = 0
     let settled = true
-    const top = Math.min(200, size.height / 3)
-    const free = (a: Placed, x: number, y: number, upto: number) => {
-      // A bubble already up near the HUD may dodge sideways at its own height, just not higher.
-      if (x - a.w / 2 < 2 || x + a.w / 2 + CHIP > size.width - 2 || y - a.h < Math.min(top, a.y0 - a.h) || underHud(x, y, a.w, a.h)) return false
-      for (let j = 0; j < upto; j++) {
-        const b = placed[j]
-        if (Math.abs(x - b.x) < (a.w + b.w) / 2 + CHIP && y > b.y - b.h - CHIP && y - a.h - CHIP < b.y) return false
-      }
-      return true
-    }
-    for (let i = 0; i < placed.length; i++) {
-      const a = placed[i]
-      // Keep plain bubbles fully on screen sideways too, count chip included.
-      if (!a.fixed) a.x = Math.min(Math.max(a.x, a.w / 2 + 4), size.width - a.w / 2 - CHIP - 4)
-      if (!a.fixed && !free(a, a.x, a.y, i)) {
-        let best: [number, number] | null = null
-        let bestD = HOP * HOP
-        for (let j = 0; j < i; j++) {
-          const b = placed[j]
-          // Neighbours leave room for each other's count chips.
-          const spots: [number, number][] = [
-            [a.x, b.y - b.h - CHIP - 1], [a.x, b.y + a.h + CHIP + 1],
-            [b.x - (a.w + b.w) / 2 - CHIP - 1, a.y], [b.x + (a.w + b.w) / 2 + CHIP + 1, a.y],
-          ]
-          for (const [x, y] of spots) {
-            const d = (x - a.x) ** 2 + (y - a.y) ** 2
-            if (d < bestD && free(a, x, y, i)) {
-              best = [x, y]
-              bestD = d
-            }
-          }
-        }
-        if (best) [a.x, a.y] = best
-      }
-      // Still behind the HUD (a building near the top edge): fade it rather than show half a pill.
-      const under = !a.fixed && underHud(a.x, a.y, a.w, a.h)
+    spread(placed, size.width, size.height, hud, (a, under) => {
       toggle(a.el, 'under', under)
       before.els.push(a.el)
       before.at.push(a.x0, a.y0, a.w, a.h)
@@ -268,7 +335,7 @@ export function AnchorProjector() {
         a.y = a.y0 + n.y
       }
       move(a.el, a.x, a.y + bob(a.el, now))
-    }
+    })
     before.w = size.width
     before.h = size.height
     before.hud = hud
@@ -290,8 +357,12 @@ export function anchorCenter(id: string): [number, number] | null {
 
 export function anchorRef(id: string) {
   return (el: HTMLElement | null) => {
-    if (el) anchorEls.set(id, el)
-    else {
+    if (el) {
+      anchorEls.set(id, el)
+      sizer?.observe(el)
+    } else {
+      const old = anchorEls.get(id)
+      if (old) sizer?.unobserve(old)
       anchorEls.delete(id)
       offscreen.delete(id)
     }

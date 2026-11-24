@@ -85,7 +85,7 @@ function Showcase({ packs, owns, pending, buy }: { packs: BucksPack[]; owns: (p:
       <div className="pk-stage">
         <div className="pk-streaks" />
         {/* Every car stays mounted, so its render is ready the moment it slides in. */}
-        {packs.map((q, i) => <div key={q.id} className={i === at ? 'pk-swap on' : 'pk-swap'}><Stage car={carDef(q.car!)} big /></div>)}
+        {packs.map((q, i) => <div key={q.id} data-fade className={i === at ? 'pk-swap on' : 'pk-swap'}><Stage car={carDef(q.car!)} big /></div>)}
       </div>
       <div key={`i${car.id}`} className="pk-hero-info">
         <span className={`pk-tiertag ${tierOf(pi).toLowerCase()}`}>{tierOf(pi)}</span>
